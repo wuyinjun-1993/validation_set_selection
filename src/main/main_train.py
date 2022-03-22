@@ -9,7 +9,7 @@ from common.utils import *
 from tqdm.notebook import tqdm
 import itertools
 import torch_higher as higher
-from find_valid_set import *
+from main.find_valid_set import *
 
 
 def vary_learning_rate(current_learning_rate, eps, args, model=None):
@@ -248,31 +248,15 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
         # inference after epoch
         with torch.no_grad():
             logging.info("valid performance at epoch %d"%(ep))
-            test(valid_loader, model, args)
+            test(valid_loader, model, args, "valid")
             logging.info("test performance at epoch %d"%(ep))
-            test(test_loader, model, args)
+            test(test_loader, model, args, "test")
 
         torch.save(model, os.path.join(args.save_path, 'refined_model_' + str(ep)))
         torch.save(w_array, os.path.join(args.save_path, 'sample_weights_' + str(ep)))
 
 
-def test(test_loader, network, args):
-    test_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for _, data, target in test_loader:
-            if args.cuda:
-                data = data.cuda()
-                target = target.cuda()
-            output = network(data)
-            test_loss += F.nll_loss(output, target).item()*data.shape[0]
-            pred = output.data.max(1, keepdim=True)[1]
-            correct += pred.eq(target.data.view_as(pred)).sum()
-    test_loss /= len(test_loader.dataset)
-    # test_losses.append(test_loss)
-    logging.info('\nAvg. loss: %f, Accuracy: %d/%d (%f)\n'%(
-        test_loss, correct.item(), len(test_loader.dataset),
-        100. * correct.item()*1.0 / len(test_loader.dataset)))
+
 
 
 def basic_train(train_loader, valid_loader, test_loader, args, network, optimizer):
@@ -301,9 +285,9 @@ def basic_train(train_loader, valid_loader, test_loader, args, network, optimize
         # logging.info("train performance at epoch %d"%(epoch))
         # test(train_loader,network, args)
         logging.info("valid performance at epoch %d"%(epoch))
-        test(valid_loader,network, args)
+        test(valid_loader,network, args, "valid")
         logging.info("test performance at epoch %d"%(epoch))
-        test(test_loader,network, args)
+        test(test_loader,network, args, "test")
                 # train_losses.append(loss.item())
                 # train_counter.append(
                 # (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
@@ -311,18 +295,18 @@ def basic_train(train_loader, valid_loader, test_loader, args, network, optimize
                 # torch.save(optimizer.state_dict(), '/results/optimizer.pth')
 
 def sort_prob_gap_by_class(pred_labels, prob_gap_ls, label_ls, class_id, select_count):
-    # boolean_id_arrs = torch.logical_and((label_ls == class_id).view(-1), (pred_labels == label_ls).view(-1))
+    boolean_id_arrs = torch.logical_and((label_ls == class_id).view(-1), (pred_labels == label_ls).view(-1))
 
-    boolean_id_arrs = (label_ls == class_id).view(-1)
+    # boolean_id_arrs = (label_ls == class_id).view(-1)
 
     sample_id_with_curr_class = torch.nonzero(boolean_id_arrs).view(-1)
 
     prob_gap_ls_curr_class = prob_gap_ls[boolean_id_arrs]
 
-    sorted_probs, sorted_idx = torch.sort(prob_gap_ls_curr_class, dim = 0, descending = True)
+    sorted_probs, sorted_idx = torch.sort(prob_gap_ls_curr_class, dim = 0, descending = False)
 
-    # selected_sub_ids = (sorted_probs < 0.2).nonzero()
-    selected_sub_ids = (sorted_probs > 0.999).nonzero()
+    selected_sub_ids = (sorted_probs < 0.2).nonzero()
+    # # # selected_sub_ids = (sorted_probs > 0.999).nonzero()
     select_count = min(select_count, len(selected_sub_ids))
 
     selected_sample_indx = sample_id_with_curr_class[sorted_idx[0:select_count]]
@@ -385,6 +369,8 @@ def find_boundary_samples(net, train_loader, args, valid_ratio = 0.1):
 
     pred_labels = torch.zeros(len(train_loader.dataset), dtype =torch.long)
 
+    pred_correct_count = 0
+
     for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
 
         if args.cuda:
@@ -400,7 +386,15 @@ def find_boundary_samples(net, train_loader, args, valid_ratio = 0.1):
 
         label_ls[sample_ids] = labels
 
-        pred_labels[sample_ids] = sorted_indices[:,0].detach().cpu()
+        curr_pred_labels = sorted_indices[:,0].detach().cpu()
+
+        pred_labels[sample_ids] = curr_pred_labels
+
+        pred_correct_count += torch.sum(labels.view(-1) == curr_pred_labels.view(-1))
+
+    pred_accuracy = pred_correct_count*1.0/len(train_loader.dataset)
+
+    logging.info("training accuracy is %f"%(pred_accuracy.item()))
 
     unique_label_ls = label_ls.unique()
 
@@ -410,7 +404,19 @@ def find_boundary_samples(net, train_loader, args, valid_ratio = 0.1):
         selected_valid_ids = sort_prob_gap_by_class(pred_labels, prob_gap_ls, label_ls, label_id, int(valid_count/len(unique_label_ls)))
         selected_valid_ids_ls.append(selected_valid_ids)
 
+    valid_ids = torch.cat(selected_valid_ids_ls)
+
+    # valid_set = Subset(train_loader.dataset, valid_ids)
+    valid_set = new_mnist_dataset2(train_loader.dataset.data[valid_ids].clone(), train_loader.dataset.targets[valid_ids].clone())
+
+    meta_set = new_mnist_dataset2(train_loader.dataset.data[valid_ids].clone(), train_loader.dataset.targets[valid_ids].clone())
+
+
+
+
     origin_train_labels = train_loader.dataset.targets.clone()
+
+    test(train_loader, net, args, "train")
 
     if args.flip_labels:
 
@@ -419,11 +425,14 @@ def find_boundary_samples(net, train_loader, args, valid_ratio = 0.1):
         train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
 
 
-    valid_ids = torch.cat(selected_valid_ids_ls)
+    
 
-    train_dataset, valid_dataset, meta_dataset = partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids)
+    train_dataset, _, _ = partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids)
 
-    train_loader, valid_loader, meta_loader, _ = create_data_loader(train_dataset, valid_dataset, meta_dataset, None, args)
+    train_loader, valid_loader, meta_loader, _ = create_data_loader(train_dataset, valid_set, meta_set, None, args)
+
+    test(valid_loader, net, args, "valid")
+    test(train_loader, net, args, "train")
 
     return train_loader, valid_loader, meta_loader
     # torch.sort(prob_gap_ls, dim = 0, descending = False)
@@ -437,16 +446,22 @@ def main(args):
 
     net = DNN_two_layers()
 
+    
+    pre_processing_mnist_main(args)
     if args.select_valid_set:
-        train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations(args)
-        net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"))
+        # train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations(args)
+
+        train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations2(args)
+
+        net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
 
         net.load_state_dict(net_state_dict, strict=False)
 
         if args.cuda:
             net = net.cuda()
 
-        test(test_loader, net, args)
+        test(test_loader, net, args, "test")
+        # test(train_loader, net, args)
 
         # train_loader, valid_loader, meta_loader = find_boundary_samples(net, train_loader, args)
         train_loader, valid_loader, meta_loader = find_representative_samples(net, train_loader, args)

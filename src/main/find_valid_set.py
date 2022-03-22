@@ -6,6 +6,9 @@ import os,sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from datasets.mnist import *
 from common.utils import *
+from main.helper_func import *
+
+
 
 def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4):
     cluster_ids_x, cluster_centers = kmeans(
@@ -41,30 +44,7 @@ def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_pe
     return torch.cat(representive_id_ls)
 
 
-def random_flip_labels_on_training(train_dataset, ratio = 0.5):
-    full_ids = torch.tensor(list(range(len(train_dataset.targets))))
 
-    full_rand_ids = torch.randperm(len(train_dataset.targets))
-
-    err_label_count = int(len(full_rand_ids)*ratio)
-
-    err_label_ids = full_rand_ids[0:err_label_count]
-
-    correct_label_ids = full_rand_ids[err_label_count:]
-
-    label_type_count = len(train_dataset.targets.unique())
-
-    origin_labels = train_dataset.targets.clone()
-
-    rand_err_labels = torch.randint(low=0,high=label_type_count-1, size=[len(err_label_ids)])
-
-    origin_err_labels = origin_labels[err_label_ids]
-
-    rand_err_labels[rand_err_labels == origin_err_labels] = (rand_err_labels[rand_err_labels == origin_err_labels] + 1)%label_type_count
-
-    train_dataset.targets[err_label_ids] = rand_err_labels
-
-    return train_dataset, origin_labels
 
 
 def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
@@ -105,12 +85,24 @@ def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
 
         sample_id_ls = torch.tensor(sample_id_ls_by_class[label])
 
-        valid_ids = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(valid_count/len(sample_representation_vec_ls_by_class)), num_clusters = 10)
+        valid_ids = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(valid_count/len(sample_representation_vec_ls_by_class)), num_clusters = 50)
 
         valid_ids_ls.append(valid_ids)
 
     
+    valid_ids = torch.cat(valid_ids_ls)
+
+    # valid_set = Subset(train_loader.dataset, valid_ids)
+    valid_set = new_mnist_dataset2(train_loader.dataset.data[valid_ids].clone(), train_loader.dataset.targets[valid_ids].clone())
+
+    meta_set = new_mnist_dataset2(train_loader.dataset.data[valid_ids].clone(), train_loader.dataset.targets[valid_ids].clone())
+
+
+
+
     origin_train_labels = train_loader.dataset.targets.clone()
+
+    test(train_loader, net, args)
 
     if args.flip_labels:
 
@@ -119,12 +111,31 @@ def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
         train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
 
 
-    valid_ids = torch.cat(valid_ids_ls)
+    
 
-    train_dataset, valid_dataset, meta_dataset = partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids)
+    train_dataset, _, _ = partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids)
 
-    train_loader, valid_loader, meta_loader, _ = create_data_loader(train_dataset, valid_dataset, meta_dataset, None, args)
+    train_loader, valid_loader, meta_loader, _ = create_data_loader(train_dataset, valid_set, meta_set, None, args)
+
+    test(valid_loader, net, args)
+    test(train_loader, net, args)
 
     return train_loader, valid_loader, meta_loader
+    # origin_train_labels = train_loader.dataset.targets.clone()
+
+    # if args.flip_labels:
+
+    #     logging.info("add errors to train set")
+
+    #     train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+
+
+    # valid_ids = torch.cat(valid_ids_ls)
+
+    # train_dataset, valid_dataset, meta_dataset = partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids)
+
+    # train_loader, valid_loader, meta_loader, _ = create_data_loader(train_dataset, valid_dataset, meta_dataset, None, args)
+
+    # return train_loader, valid_loader, meta_loader
 
 
