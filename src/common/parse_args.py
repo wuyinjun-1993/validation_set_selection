@@ -10,6 +10,8 @@ def parse_args(args=None):
     parser.add_argument('--cuda', action='store_true', help='use GPU')
     parser.add_argument('--flip_labels', action='store_true', help='flip labels')
     parser.add_argument('--load_dataset', action='store_true', help='load dataset')
+    parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
+    parser.add_argument('--select_valid_set', action='store_true', help='select valid set')
     parser.add_argument('--do_train', action='store_true', help='do training')
     parser.add_argument('--err_label_ratio', default=0.2, type=float)
     parser.add_argument('--data_dir', default=None, type=str)
@@ -20,6 +22,7 @@ def parse_args(args=None):
     parser.add_argument('--meta_lr', default=0.2, type=float)
     parser.add_argument('--test_batch_size', default=4, type=int)
     parser.add_argument('--epochs', default=4, type=int)
+
 
 
     # parser.add_argument('--obj_cl_hidden_layer_count', default=0, type=int)

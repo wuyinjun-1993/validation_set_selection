@@ -9,7 +9,26 @@ from common.utils import *
 from tqdm.notebook import tqdm
 import itertools
 import torch_higher as higher
+from find_valid_set import *
 
+
+def vary_learning_rate(current_learning_rate, eps, args, model=None):
+    current_learning_rate = current_learning_rate / 2
+    logging.info('Change learning_rate to %f at step %d' % (current_learning_rate, eps))
+
+    optimizer = None
+
+    if model is not None:
+        # optimizer = torch.optim.Adam(
+        #     filter(lambda p: p.requires_grad, model.parameters()), 
+        #     lr=current_learning_rate
+
+
+        # )
+
+        optimizer = torch.optim.SGD(model.parameters(), lr=current_learning_rate)
+
+    return optimizer, current_learning_rate
 
 def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, valid_loader, test_loader, to_device, cached_w_array = None, target_id = None):
     
@@ -47,7 +66,8 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             
     #     metrics = model.test(model, test_loader, args)
         
-    #     log_metrics('Test', 0, metrics)
+    #     log_metrics('Test', 0, metrics)   
+    warm_up_steps = 200
 
     total_iter_count = 1
 
@@ -104,6 +124,7 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
                 # meta_train_loss = criterion(meta_train_outputs, labels.type_as(meta_train_outputs))
                 #
                 # meta_train_loss = torch.sum(eps * meta_train_loss)
+                
                 meta_opt.step(meta_train_loss)
     
                 # 2. Compute grads of eps on meta validation data
@@ -141,6 +162,8 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             w_array[train_ids] =  w_array[train_ids]-curr_ilp_learning_rate*eps_grads
             
             w_array[train_ids] = torch.clamp(w_array[train_ids], max=1, min=1e-7) #torch.relu(w_array[train_ids])
+
+            
 
 
             # if args.learning_decay and total_iter_count%warm_up_steps == 0:
@@ -208,6 +231,11 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             opt.step()
 
             total_iter_count += 1
+
+            # if total_iter_count%warm_up_steps == 0:
+            #     warm_up_steps*=3
+            #     curr_ilp_learning_rate = curr_ilp_learning_rate/10
+            #     opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
     
             # keep track of epoch loss/accuracy
             # if type(inputs) is tuple:
@@ -237,7 +265,7 @@ def test(test_loader, network, args):
                 data = data.cuda()
                 target = target.cuda()
             output = network(data)
-            test_loss += F.nll_loss(output, target, size_average=False).item()
+            test_loss += F.nll_loss(output, target).item()*data.shape[0]
             pred = output.data.max(1, keepdim=True)[1]
             correct += pred.eq(target.data.view_as(pred)).sum()
     test_loss /= len(test_loader.dataset)
@@ -253,7 +281,7 @@ def basic_train(train_loader, valid_loader, test_loader, args, network, optimize
     
     for epoch in range(args.epochs):
 
-        for batch_idx, (data, target) in enumerate(train_loader):
+        for batch_idx, (_, data, target) in enumerate(train_loader):
             optimizer.zero_grad()
             if args.cuda:
                 data = data.cuda()
@@ -269,7 +297,9 @@ def basic_train(train_loader, valid_loader, test_loader, args, network, optimize
 
         # logging.info("Train Epoch: %d \tLoss: %f", (
         # epoch, loss.item()))
-
+        torch.save(network.state_dict(), os.path.join(args.save_path, "model_" + str(epoch)))
+        # logging.info("train performance at epoch %d"%(epoch))
+        # test(train_loader,network, args)
         logging.info("valid performance at epoch %d"%(epoch))
         test(valid_loader,network, args)
         logging.info("test performance at epoch %d"%(epoch))
@@ -280,6 +310,123 @@ def basic_train(train_loader, valid_loader, test_loader, args, network, optimize
                 # torch.save(network.state_dict(), '/results/model.pth')
                 # torch.save(optimizer.state_dict(), '/results/optimizer.pth')
 
+def sort_prob_gap_by_class(pred_labels, prob_gap_ls, label_ls, class_id, select_count):
+    # boolean_id_arrs = torch.logical_and((label_ls == class_id).view(-1), (pred_labels == label_ls).view(-1))
+
+    boolean_id_arrs = (label_ls == class_id).view(-1)
+
+    sample_id_with_curr_class = torch.nonzero(boolean_id_arrs).view(-1)
+
+    prob_gap_ls_curr_class = prob_gap_ls[boolean_id_arrs]
+
+    sorted_probs, sorted_idx = torch.sort(prob_gap_ls_curr_class, dim = 0, descending = True)
+
+    # selected_sub_ids = (sorted_probs < 0.2).nonzero()
+    selected_sub_ids = (sorted_probs > 0.999).nonzero()
+    select_count = min(select_count, len(selected_sub_ids))
+
+    selected_sample_indx = sample_id_with_curr_class[sorted_idx[0:select_count]]
+
+    selected_prob_gap_values = sorted_probs[0:select_count]
+
+    return selected_sample_indx
+
+
+
+
+
+# def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
+#     prob_gap_ls = torch.zeros(len(train_loader.dataset))
+
+#     label_ls = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+#     valid_count = int(len(train_loader.dataset)*valid_ratio)
+
+#     pred_labels = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+#     sample_representation_vec_ls_by_class = dict()
+
+#     for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
+
+#         if args.cuda:
+#             data = data.cuda()
+#             # labels = labels.cuda()
+
+#         sample_representation = net.feature_forward(data)
+
+#         for idx in range(len(labels)):
+#             curr_label = labels[idx].item()
+#             if curr_label not in sample_representation_vec_ls_by_class:
+#                 sample_representation_vec_ls_by_class[curr_label] = []
+#             sample_representation_vec_ls_by_class[curr_label].append(sample_representation[idx])
+
+#     for label in sample_representation_vec_ls_by_class:
+#         sample_representation_vec_ls_by_class[label] = torch.stack(sample_representation_vec_ls_by_class[label])
+
+    
+        # out_probs = torch.exp(net.(data))
+        # sorted_probs, sorted_indices = torch.sort(out_probs, dim = 1, descending = True)
+
+        # prob_gap = sorted_probs[:,0] - sorted_probs[:,1]
+
+        # prob_gap_ls[sample_ids] = prob_gap.detach().cpu()
+
+        # label_ls[sample_ids] = labels
+
+        # pred_labels[sample_ids] = sorted_indices[:,0].detach().cpu()
+
+
+def find_boundary_samples(net, train_loader, args, valid_ratio = 0.1):
+    prob_gap_ls = torch.zeros(len(train_loader.dataset))
+
+    label_ls = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+    valid_count = int(len(train_loader.dataset)*valid_ratio)
+
+    pred_labels = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+    for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
+
+        if args.cuda:
+            data = data.cuda()
+            # labels = labels.cuda()
+
+        out_probs = torch.exp(net(data))
+        sorted_probs, sorted_indices = torch.sort(out_probs, dim = 1, descending = True)
+
+        prob_gap = sorted_probs[:,0] - sorted_probs[:,1]
+
+        prob_gap_ls[sample_ids] = prob_gap.detach().cpu()
+
+        label_ls[sample_ids] = labels
+
+        pred_labels[sample_ids] = sorted_indices[:,0].detach().cpu()
+
+    unique_label_ls = label_ls.unique()
+
+    selected_valid_ids_ls = []
+
+    for label_id in unique_label_ls:
+        selected_valid_ids = sort_prob_gap_by_class(pred_labels, prob_gap_ls, label_ls, label_id, int(valid_count/len(unique_label_ls)))
+        selected_valid_ids_ls.append(selected_valid_ids)
+
+    origin_train_labels = train_loader.dataset.targets.clone()
+
+    if args.flip_labels:
+
+        logging.info("add errors to train set")
+
+        train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+
+
+    valid_ids = torch.cat(selected_valid_ids_ls)
+
+    train_dataset, valid_dataset, meta_dataset = partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids)
+
+    train_loader, valid_loader, meta_loader, _ = create_data_loader(train_dataset, valid_dataset, meta_dataset, None, args)
+
+    return train_loader, valid_loader, meta_loader
+    # torch.sort(prob_gap_ls, dim = 0, descending = False)
 
 
 def main(args):
@@ -288,7 +435,23 @@ def main(args):
     
     logging.info("start")
 
-    train_loader, valid_loader, meta_loader, test_loader = get_mnist_data_loader(args)
+    net = DNN_two_layers()
+
+    if args.select_valid_set:
+        train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations(args)
+        net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"))
+
+        net.load_state_dict(net_state_dict, strict=False)
+
+        if args.cuda:
+            net = net.cuda()
+
+        test(test_loader, net, args)
+
+        # train_loader, valid_loader, meta_loader = find_boundary_samples(net, train_loader, args)
+        train_loader, valid_loader, meta_loader = find_representative_samples(net, train_loader, args)
+    else:
+        train_loader, valid_loader, meta_loader, test_loader = get_mnist_data_loader(args)
 
     net = DNN_two_layers()
 
@@ -299,8 +462,11 @@ def main(args):
 
     
     if args.do_train:
+        logging.info("start basic training")
         basic_train(train_loader, valid_loader, test_loader, args, net, optimizer)
     else:
+
+        logging.info("start meta training")
         meta_learning_model(args, net, optimizer, torch.nn.NLLLoss(), train_loader, meta_loader, valid_loader, test_loader, mnist_to_device, cached_w_array = None, target_id = None)
 
 
