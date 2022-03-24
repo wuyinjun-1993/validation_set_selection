@@ -305,7 +305,7 @@ def sort_prob_gap_by_class(pred_labels, prob_gap_ls, label_ls, class_id, select_
 
     sorted_probs, sorted_idx = torch.sort(prob_gap_ls_curr_class, dim = 0, descending = False)
 
-    selected_sub_ids = (sorted_probs < 0.2).nonzero()
+    selected_sub_ids = (sorted_probs < 0.05).nonzero()
     # # # selected_sub_ids = (sorted_probs > 0.999).nonzero()
     select_count = min(select_count, len(selected_sub_ids))
 
@@ -418,16 +418,118 @@ def find_boundary_samples(net, train_loader, args, valid_ratio = 0.1):
 
     test(train_loader, net, args, "train")
 
+    flipped_labels = None
+
     if args.flip_labels:
 
         logging.info("add errors to train set")
 
-        train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+        # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+        flipped_labels = obtain_flipped_labels(train_loader.dataset, args)
 
 
     
 
-    train_dataset, _, _ = partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids)
+    train_dataset, _, _ = partition_train_valid_dataset_by_ids(train_loader.dataset, origin_train_labels, flipped_labels, valid_ids)
+
+    train_loader, valid_loader, meta_loader, _ = create_data_loader(train_dataset, valid_set, meta_set, None, args)
+
+    test(valid_loader, net, args, "valid")
+    test(train_loader, net, args, "train")
+
+    return train_loader, valid_loader, meta_loader
+
+def get_boundary_valid_ids(train_loader, net, args, valid_count):
+    pred_labels = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+    pred_correct_count = 0
+
+    prob_gap_ls = torch.zeros(len(train_loader.dataset))
+
+    label_ls = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+    for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
+
+        if args.cuda:
+            data = data.cuda()
+            # labels = labels.cuda()
+
+        out_probs = torch.exp(net(data))
+        sorted_probs, sorted_indices = torch.sort(out_probs, dim = 1, descending = True)
+
+        prob_gap = sorted_probs[:,0] - sorted_probs[:,1]
+
+        prob_gap_ls[sample_ids] = prob_gap.detach().cpu()
+
+        label_ls[sample_ids] = labels
+
+        curr_pred_labels = sorted_indices[:,0].detach().cpu()
+
+        pred_labels[sample_ids] = curr_pred_labels
+
+        pred_correct_count += torch.sum(labels.view(-1) == curr_pred_labels.view(-1))
+
+    pred_accuracy = pred_correct_count*1.0/len(train_loader.dataset)
+
+    logging.info("training accuracy is %f"%(pred_accuracy.item()))
+
+    unique_label_ls = label_ls.unique()
+
+    selected_valid_ids_ls = []
+
+    for label_id in unique_label_ls:
+        selected_valid_ids = sort_prob_gap_by_class(pred_labels, prob_gap_ls, label_ls, label_id, int(valid_count/len(unique_label_ls)))
+        selected_valid_ids_ls.append(selected_valid_ids)
+
+    valid_ids = torch.cat(selected_valid_ids_ls)
+    return valid_ids
+
+def find_boundary_and_representative_samples(net, train_loader, args, valid_ratio = 0.1):
+
+
+    
+    
+
+    valid_count = int(len(train_loader.dataset)*valid_ratio)
+
+
+    valid_ids2 = get_boundary_valid_ids(train_loader, net, args, int(valid_count/10))
+    valid_ids1 = get_representative_valid_ids(train_loader, args, net, valid_count - len(valid_ids2))
+
+    
+    
+    valid_ids = torch.zeros(len(train_loader.dataset))
+
+    valid_ids[valid_ids1] = 1
+    valid_ids[valid_ids2] = 1
+
+    valid_ids = torch.nonzero(valid_ids).view(-1)
+
+    # valid_set = Subset(train_loader.dataset, valid_ids)
+    valid_set = new_mnist_dataset2(train_loader.dataset.data[valid_ids].clone(), train_loader.dataset.targets[valid_ids].clone())
+
+    meta_set = new_mnist_dataset2(train_loader.dataset.data[valid_ids].clone(), train_loader.dataset.targets[valid_ids].clone())
+
+
+
+
+    origin_train_labels = train_loader.dataset.targets.clone()
+
+    test(train_loader, net, args, "train")
+
+    flipped_labels = None
+
+    if args.flip_labels:
+
+        logging.info("add errors to train set")
+
+        # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+
+
+        flipped_labels = obtain_flipped_labels(train_loader.dataset, args)
+    
+
+    train_dataset, _, _ = partition_train_valid_dataset_by_ids(train_loader.dataset, origin_train_labels, flipped_labels, valid_ids)
 
     train_loader, valid_loader, meta_loader, _ = create_data_loader(train_dataset, valid_set, meta_set, None, args)
 
@@ -448,12 +550,15 @@ def main(args):
 
     
     pre_processing_mnist_main(args)
+
+    
     if args.select_valid_set:
         # train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations(args)
 
         train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations2(args)
 
         net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
+        # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
 
         net.load_state_dict(net_state_dict, strict=False)
 
@@ -463,10 +568,13 @@ def main(args):
         test(test_loader, net, args, "test")
         # test(train_loader, net, args)
 
-        # train_loader, valid_loader, meta_loader = find_boundary_samples(net, train_loader, args)
-        train_loader, valid_loader, meta_loader = find_representative_samples(net, train_loader, args)
+        # train_loader, valid_loader, meta_loader = find_boundary_samples(net, train_loader, args, args.valid_ratio)
+
+
+        # train_loader, valid_loader, meta_loader = find_boundary_and_representative_samples(net, train_loader, args, args.valid_ratio)
+        train_loader, valid_loader, meta_loader = find_representative_samples(net, train_loader, args, args.valid_ratio)
     else:
-        train_loader, valid_loader, meta_loader, test_loader = get_mnist_data_loader(args)
+        train_loader, valid_loader, meta_loader, test_loader = get_mnist_data_loader2(args)
 
     net = DNN_two_layers()
 

@@ -67,7 +67,7 @@ def pre_processing_mnist_main(args):
                                         (0.1307,), (0.3081,))
                                     ]))
 
-    train_loader, _, _, test_loader = create_data_loader(train_dataset, None, None, test_dataset, args)
+    train_loader, _, _, test_loader = create_data_loader(train_dataset, None, None, test_dataset, args, False)
 
     logging.info("start preprocessing train dataset")
     pre_processing_mnist(train_loader, args, 'train')
@@ -75,17 +75,17 @@ def pre_processing_mnist_main(args):
     pre_processing_mnist(test_loader, args, 'test')
 
 
-def create_data_loader(train_dataset, valid_dataset, meta_dataset, test_dataset, args):
+def create_data_loader(train_dataset, valid_dataset, meta_dataset, test_dataset, args, train_shuffle = True):
     if train_dataset is not None:
-        train_loader = torch.utils.data.DataLoader(train_dataset ,batch_size=args.batch_size, shuffle=True)
+        train_loader = torch.utils.data.DataLoader(train_dataset ,batch_size=args.batch_size, shuffle=train_shuffle)
     else:
         train_loader = None
     if valid_dataset is not None:
-        valid_loader = torch.utils.data.DataLoader(valid_dataset,batch_size=args.test_batch_size, shuffle=True)
+        valid_loader = torch.utils.data.DataLoader(valid_dataset,batch_size=args.test_batch_size, shuffle=train_shuffle)
     else:
         valid_loader = None
     if meta_dataset is not None:
-        meta_loader = torch.utils.data.DataLoader(meta_dataset,batch_size=args.test_batch_size, shuffle=True)
+        meta_loader = torch.utils.data.DataLoader(meta_dataset,batch_size=args.test_batch_size, shuffle=train_shuffle)
     else:
         meta_loader = None
 
@@ -106,8 +106,9 @@ def mnist_to_device(inputs, args):
     return (index, data, targets)
 
 
-def partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids):
-
+def partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, flipped_labels, valid_ids):
+    if flipped_labels is not None:
+        train_dataset.targets = flipped_labels.clone()
     all_train_ids = torch.ones(len(origin_train_labels))
 
     all_train_ids[valid_ids] = 0
@@ -139,6 +140,27 @@ def random_partition_train_valid_datastet(train_dataset, origin_train_labels, va
     return train_set, valid_set, meta_set
 
 
+def random_partition_train_valid_dataset2(train_dataset, valid_ratio = 0.1):
+    train_ids = torch.tensor(list(range(len(train_dataset))))
+
+    rand_train_ids = torch.randperm(len(train_ids))
+
+    valid_size = int(len(train_dataset)*valid_ratio)
+
+    valid_ids = rand_train_ids[0:valid_size]
+
+    update_train_ids = rand_train_ids[valid_size:]
+
+    valid_set = new_mnist_dataset2(train_dataset.data[valid_ids].clone(), train_dataset.targets[valid_ids].clone())
+    meta_set = new_mnist_dataset2(train_dataset.data[valid_ids].clone(), train_dataset.targets[valid_ids].clone())
+
+
+    # valid_set = Subset(train_dataset, valid_ids)
+    # valid_set.targets = origin_train_labels[valid_ids]
+    # meta_set =Subset(train_dataset, valid_ids)
+    # meta_set.targets = origin_train_labels[valid_ids]
+    # train_set = new_mnist_dataset2(train_dataset.data[update_train_ids].clone(), train_dataset.targets[update_train_ids].clone())
+    return update_train_ids, valid_set, meta_set
 
 
 def get_mnist_dataset_without_valid_without_perturbations(args):
@@ -216,6 +238,45 @@ def random_flip_labels_on_training(train_dataset, ratio = 0.5):
 
     return train_dataset, origin_labels
 
+def random_flip_labels_on_training2(train_dataset, ratio = 0.5):
+    full_ids = torch.tensor(list(range(len(train_dataset.targets))))
+
+    full_rand_ids = torch.randperm(len(train_dataset.targets))
+
+    err_label_count = int(len(full_rand_ids)*ratio)
+
+    err_label_ids = full_rand_ids[0:err_label_count]
+
+    correct_label_ids = full_rand_ids[err_label_count:]
+
+    label_type_count = len(train_dataset.targets.unique())
+
+    origin_labels = train_dataset.targets.clone()
+
+    rand_err_labels = torch.randint(low=0,high=label_type_count-1, size=[len(err_label_ids)])
+
+    # origin_err_labels = origin_labels[err_label_ids]
+
+    # rand_err_labels[rand_err_labels == origin_err_labels] = (rand_err_labels[rand_err_labels == origin_err_labels] + 1)%label_type_count
+
+    origin_labels[err_label_ids] = rand_err_labels
+
+    return origin_labels
+
+
+
+def obtain_flipped_labels(train_dataset, args):
+    if not args.load_dataset:
+
+        flipped_labels = random_flip_labels_on_training2(train_dataset, ratio = args.err_label_ratio)
+
+        torch.save(flipped_labels, os.path.join(args.data_dir, "flipped_labels"))
+
+    else:
+        flipped_labels = torch.load(os.path.join(args.data_dir, "flipped_labels"))
+    return flipped_labels
+
+
 def get_mnist_data_loader(args, partition_train_valid_dataset=random_partition_train_valid_datastet):
 
     test_dataset = new_mnist_dataset(args.data_dir, train=False, download=True,
@@ -234,9 +295,12 @@ def get_mnist_data_loader(args, partition_train_valid_dataset=random_partition_t
                                         (0.1307,), (0.3081,))
                                     ]))
         origin_train_labels = train_dataset.targets.clone()
+        flipped_labels = None
         if args.flip_labels:
 
-            train_dataset, _ = random_flip_labels_on_training(train_dataset, ratio = args.err_label_ratio)
+            # train_dataset, _ = random_flip_labels_on_training(train_dataset, ratio = args.err_label_ratio)
+            flipped_labels = obtain_flipped_labels(train_dataset, args)
+            train_dataset.targets = flipped_labels.clone()
 
         train_dataset, valid_dataset, meta_dataset = partition_train_valid_dataset(train_dataset, origin_train_labels)
 
@@ -258,7 +322,7 @@ def get_mnist_data_loader(args, partition_train_valid_dataset=random_partition_t
     return train_loader, valid_loader, meta_loader, test_loader
 
 
-def get_mnist_data_loader2(args, partition_train_valid_dataset=random_partition_train_valid_datastet):
+def get_mnist_data_loader2(args):
 
     train_data_tensor = torch.load(os.path.join(args.data_dir, "train_data_tensor"))
 
@@ -277,33 +341,37 @@ def get_mnist_data_loader2(args, partition_train_valid_dataset=random_partition_
     #                                     (0.1307,), (0.3081,))
     #                                 ]))
 
-    if not args.load_dataset:
+    # if not args.load_dataset:
 
-        train_dataset = new_mnist_dataset2(train_data_tensor, train_label_tensor)
-        # train_dataset = new_mnist_dataset(args.data_dir, train=True, download=True,
-        #                             transform=torchvision.transforms.Compose([
-        #                             torchvision.transforms.ToTensor(),
-        #                             torchvision.transforms.Normalize(
-        #                                 (0.1307,), (0.3081,))
-        #                             ]))
-        origin_train_labels = train_dataset.targets.clone()
-        if args.flip_labels:
+    train_dataset = new_mnist_dataset2(train_data_tensor, train_label_tensor)
+    # train_dataset = new_mnist_dataset(args.data_dir, train=True, download=True,
+    #                             transform=torchvision.transforms.Compose([
+    #                             torchvision.transforms.ToTensor(),
+    #                             torchvision.transforms.Normalize(
+    #                                 (0.1307,), (0.3081,))
+    #                             ]))
 
-            train_dataset, _ = random_flip_labels_on_training(train_dataset, ratio = args.err_label_ratio)
+    update_train_ids, valid_dataset, meta_dataset = random_partition_train_valid_dataset2(train_dataset, args.valid_ratio)
+    # origin_train_labels = train_dataset.targets.clone()
+    if args.flip_labels:
 
-        train_dataset, valid_dataset, meta_dataset = partition_train_valid_dataset(train_dataset, origin_train_labels)
+        # train_dataset, _ = random_flip_labels_on_training(train_dataset, ratio = args.err_label_ratio)
+        flipped_labels = obtain_flipped_labels(train_dataset, args)
+        train_dataset.targets = flipped_labels.clone()
 
-        
-        # torch.save(origin_train_labels, )
-        if not args.not_save_dataset:
-            torch.save(train_dataset, os.path.join(args.data_dir, "train_dataset"))
-            torch.save(valid_dataset, os.path.join(args.data_dir, "valid_dataset"))
-            torch.save(meta_dataset, os.path.join(args.data_dir, "meta_dataset"))
+    train_dataset = Subset(train_dataset, update_train_ids)
+ 
+    
+    # torch.save(origin_train_labels, )
+    if not args.not_save_dataset:
+        torch.save(train_dataset, os.path.join(args.data_dir, "train_dataset"))
+        torch.save(valid_dataset, os.path.join(args.data_dir, "valid_dataset"))
+        torch.save(meta_dataset, os.path.join(args.data_dir, "meta_dataset"))
 
-    else:
-        train_dataset = torch.load(os.path.join(args.data_dir, "train_dataset"))
-        valid_dataset = torch.load(os.path.join(args.data_dir, "valid_dataset"))
-        meta_dataset = torch.load(os.path.join(args.data_dir, "meta_dataset"))
+    # else:
+    #     train_dataset = torch.load(os.path.join(args.data_dir, "train_dataset"))
+    #     valid_dataset = torch.load(os.path.join(args.data_dir, "valid_dataset"))
+        # meta_dataset = torch.load(os.path.join(args.data_dir, "meta_dataset"))
     
     
     train_loader, valid_loader, meta_loader, test_loader = create_data_loader(train_dataset, valid_dataset, meta_dataset, test_dataset, args)

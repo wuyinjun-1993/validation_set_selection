@@ -47,15 +47,8 @@ def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_pe
 
 
 
-def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
-    prob_gap_ls = torch.zeros(len(train_loader.dataset))
 
-    label_ls = torch.zeros(len(train_loader.dataset), dtype =torch.long)
-
-    valid_count = int(len(train_loader.dataset)*valid_ratio)
-
-    pred_labels = torch.zeros(len(train_loader.dataset), dtype =torch.long)
-
+def get_representative_valid_ids(train_loader, args, net, valid_count):
     sample_representation_vec_ls_by_class = dict()
     sample_id_ls_by_class = dict()
 
@@ -85,12 +78,25 @@ def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
 
         sample_id_ls = torch.tensor(sample_id_ls_by_class[label])
 
-        valid_ids = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(valid_count/len(sample_representation_vec_ls_by_class)), num_clusters = 50)
+        valid_ids = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(valid_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(valid_count/len(sample_representation_vec_ls_by_class)))
 
         valid_ids_ls.append(valid_ids)
 
     
     valid_ids = torch.cat(valid_ids_ls)
+
+    return valid_ids
+
+def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
+    prob_gap_ls = torch.zeros(len(train_loader.dataset))
+
+    label_ls = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+    valid_count = int(len(train_loader.dataset)*valid_ratio)
+
+    pred_labels = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+    valid_ids = get_representative_valid_ids(train_loader, args, net, valid_count)
 
     # valid_set = Subset(train_loader.dataset, valid_ids)
     valid_set = new_mnist_dataset2(train_loader.dataset.data[valid_ids].clone(), train_loader.dataset.targets[valid_ids].clone())
@@ -104,16 +110,27 @@ def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
 
     test(train_loader, net, args)
 
+    # if args.flip_labels:
+
+    #     logging.info("add errors to train set")
+
+    #     train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+
+    flipped_labels = None
     if args.flip_labels:
 
         logging.info("add errors to train set")
 
-        train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+        # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+        flipped_labels = obtain_flipped_labels(train_loader.dataset, args)
 
 
     
 
-    train_dataset, _, _ = partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids)
+    train_dataset, _, _ = partition_train_valid_dataset_by_ids(train_loader.dataset, origin_train_labels, flipped_labels, valid_ids)
+
+
+    # train_dataset, _, _ = partition_train_valid_dataset_by_ids(train_dataset, origin_train_labels, valid_ids)
 
     train_loader, valid_loader, meta_loader, _ = create_data_loader(train_dataset, valid_set, meta_set, None, args)
 
