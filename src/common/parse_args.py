@@ -22,14 +22,79 @@ def parse_args(args=None):
     parser.add_argument('--meta_lr', default=0.2, type=float)
     parser.add_argument('--valid_ratio', default=0.1, type=float)
     parser.add_argument('--test_batch_size', default=4, type=int)
-    parser.add_argument('--epochs', default=4, type=int)
+    # parser.add_argument('--epochs', default=4, type=int)
 
+
+
+
+
+
+    parser.add_argument('--dataset', type=str, default='cifar10', help='dataset to training')
+    parser.add_argument('--crop', type=float, default=0.08, help='minimum crop')
+    parser.add_argument('--aug', type=str, default='CJ', choices=['NULL', 'CJ'],
+                        help="augmentation type: NULL for normal supervised aug, CJ for aug with ColorJitter")
+    parser.add_argument('--batch-size', type=int, default=128, help='batch_size')
+    parser.add_argument('--num-workers', type=int, default=4, help='num of workers to use')
+
+    # model and loss function
+    parser.add_argument('--alpha', type=float, default=0.999, help='exponential moving average weight')
+    parser.add_argument('--nce-k', type=int, default=4096, help='num negative sampler')
+    parser.add_argument('--nce-t', type=float, default=0.1, help='NCE temperature')
+    parser.add_argument('--low-dim', default=128, type=int,
+                        metavar='D', help='feature dimension')
+    # optimization
+    parser.add_argument('--base-learning-rate', '--base-lr', type=float, default=0.03,
+                        help='base learning when batch size = 128. final lr is determined by linear scale')
+    parser.add_argument('--lr-scheduler', type=str, default='cosine',
+                        choices=["step", "cosine"], help="learning rate scheduler")
+    parser.add_argument('--warmup-epoch', type=int, default=5, help='warmup epoch')
+    parser.add_argument('--warmup-multiplier', type=int, default=100, help='warmup multiplier')
+    parser.add_argument('--lr-decay-epochs', type=int, default=[120, 160, 200], nargs='+',
+                        help='for step scheduler. where to decay lr, can be a list')
+    parser.add_argument('--lr-decay-rate', type=float, default=0.1,
+                        help='for step scheduler. decay rate for learning rate')
+    parser.add_argument('--weight-decay', type=float, default=1e-4, help='weight decay')
+    parser.add_argument('--momentum', type=float, default=0.9, help='momentum for SGD')
+    parser.add_argument('--amp-opt-level', type=str, default='O0', choices=['O0', 'O1', 'O2'],
+                        help='mixed precision opt level, if O0, no amp is used')
+    parser.add_argument('--epochs', type=int, default=200, help='number of training epochs')
+    parser.add_argument('--start-epoch', type=int, default=1, help='used for resume')
+
+    # io
+    parser.add_argument('--resume', default='', type=str, metavar='PATH',
+                        help='path to latest checkpoint (default: none)')
+    parser.add_argument('--print-freq', type=int, default=10, help='print frequency')
+    parser.add_argument('--save-freq', type=int, default=10, help='save frequency')
+    # parser.add_argument('--save-dir', type=str, default='./output', help='output director')
+
+    # misc
+    parser.add_argument("--local_rank", type=int, help='local rank for DistributedDataParallel')
+    parser.add_argument("--rng-seed", type=int, default=0, help='manual seed')
+
+    # CLD related arguments
+    parser.add_argument('--clusters', default=10, type=int,
+                        help='num of clusters for spectral clustering')
+    parser.add_argument('--k-eigen', default=10, type=int,
+                        help='num of eigenvectors for k-way normalized cuts')
+    parser.add_argument('--cld_t', default=0.07, type=float,
+                        help='temperature for spectral clustering')
+    parser.add_argument('--use-kmeans', action='store_true', help='Whether use k-means for clustering. \
+                        Use Normalized Cuts if it is False')
+    parser.add_argument('--num-iters', default=20, type=int,
+                        help='num of iters for clustering')
+    parser.add_argument('--Lambda', default=1.0, type=float,
+                        help='weight of mutual information loss')
+    parser.add_argument('--two-imgs', action='store_true', help='Whether use two randomly processed views')
+    parser.add_argument('--three-imgs', action='store_true', help='Whether use three randomly processed views')
+    parser.add_argument('--normlinear', action='store_true', help='whether use normalization linear layer')
+    parser.add_argument('--aug-plus', action='store_true', help='whether add strong augmentation')
+    parser.add_argument('--erasing', action='store_true', help='whether add random erasing as an augmentation')
 
 
     # parser.add_argument('--obj_cl_hidden_layer_count', default=0, type=int)
 
     args,_ = parser.parse_known_args()
-    torch.cuda.set_device(args.gpu_id)
+    # torch.cuda.set_device(args.gpu_id)
 
     # args.gpu_id  = os.environ["CUDA_VISIBLE_DEVICES"]
     # if not args.cuda:
@@ -42,4 +107,8 @@ def parse_args(args=None):
     #     args.device = torch.device("cuda:"+str(GPU_ID) if torch.cuda.is_available() else "cpu")
     #     print("device::", args.device)
     
+    torch.manual_seed(args.rng_seed)
+    torch.cuda.manual_seed_all(args.rng_seed)
+
+
     return args

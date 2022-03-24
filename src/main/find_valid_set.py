@@ -1,13 +1,14 @@
 import torch
 import numpy as np
-from kmeans_pytorch import kmeans
+# from kmeans_pytorch import kmeans
+
 
 import os,sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from datasets.mnist import *
 from common.utils import *
 from main.helper_func import *
-
+from clustering_method.k_means import *
 
 
 def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4):
