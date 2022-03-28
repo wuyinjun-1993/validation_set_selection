@@ -10,12 +10,19 @@ def parse_args(args=None):
     parser.add_argument('--cuda', action='store_true', help='use GPU')
     parser.add_argument('--flip_labels', action='store_true', help='flip labels')
     parser.add_argument('--load_dataset', action='store_true', help='load dataset')
+    parser.add_argument('--continue_label', action='store_true', help='load dataset')
+
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
     parser.add_argument('--select_valid_set', action='store_true', help='select valid set')
     parser.add_argument('--do_train', action='store_true', help='do training')
+    parser.add_argument('--load_cached_weights', action='store_true', help='load_cached_weights')
+
+    parser.add_argument('--use_pretrained_model', action='store_true', help='use pretrained models')
     parser.add_argument('--err_label_ratio', default=0.2, type=float)
     parser.add_argument('--data_dir', default=None, type=str)
     parser.add_argument('--save_path', default=None, type=str)
+    parser.add_argument('--prev_save_path', default=None, type=str)
+
     parser.add_argument('--batch_size', default=4, type=int)
     parser.add_argument('--gpu_id', default=4, type=int)
     parser.add_argument('--lr', default=0.2, type=float)
@@ -24,16 +31,18 @@ def parse_args(args=None):
     parser.add_argument('--test_batch_size', default=4, type=int)
     # parser.add_argument('--epochs', default=4, type=int)
 
+    parser.add_argument('--norm_fn', choices=['bound', 'linear', 'softmax'])
+    parser.add_argument("--w_decay", default=10., type=float)
+    parser.add_argument("--w_init", default=0., type=float)
 
-
-
+    parser.add_argument('--image_softmax_norm_temp', default=1., type=float)
 
 
     parser.add_argument('--dataset', type=str, default='cifar10', help='dataset to training')
     parser.add_argument('--crop', type=float, default=0.08, help='minimum crop')
     parser.add_argument('--aug', type=str, default='CJ', choices=['NULL', 'CJ'],
                         help="augmentation type: NULL for normal supervised aug, CJ for aug with ColorJitter")
-    parser.add_argument('--batch-size', type=int, default=128, help='batch_size')
+    # parser.add_argument('--batch-size', type=int, default=128, help='batch_size')
     parser.add_argument('--num-workers', type=int, default=4, help='num of workers to use')
 
     # model and loss function
@@ -57,6 +66,13 @@ def parse_args(args=None):
     parser.add_argument('--momentum', type=float, default=0.9, help='momentum for SGD')
     parser.add_argument('--amp-opt-level', type=str, default='O0', choices=['O0', 'O1', 'O2'],
                         help='mixed precision opt level, if O0, no amp is used')
+
+    parser.add_argument('--cached_model_name', type=str, default = None,
+                        help='cached model name')
+
+    parser.add_argument('--cached_sample_weights_name', type=str, default = None,
+                        help='cached sample weights')
+    
     parser.add_argument('--epochs', type=int, default=200, help='number of training epochs')
     parser.add_argument('--start-epoch', type=int, default=1, help='used for resume')
 

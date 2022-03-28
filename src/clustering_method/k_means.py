@@ -62,14 +62,14 @@ def kmeans(
 
         for index in range(num_clusters):
             selected = torch.nonzero(choice_cluster == index).squeeze().to(device)
-
-            selected = torch.index_select(X, 0, selected)
             if sample_weights is not None:
                 selected_sample_weights = torch.index_select(sample_weights, 0, selected)
+            selected = torch.index_select(X, 0, selected)
+            
             if sample_weights is None:
                 initial_state[index] = selected.mean(dim=0)
             else:
-                initial_state[index] = torch.sum((selected*selected_sample_weights)/torch.sum(selected_sample_weights))
+                initial_state[index] = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
 
 
         center_shift = torch.sum(

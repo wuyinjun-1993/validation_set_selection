@@ -11,9 +11,9 @@ from main.helper_func import *
 from clustering_method.k_means import *
 
 
-def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4):
+def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4, sample_weights = None):
     cluster_ids_x, cluster_centers = kmeans(
-        X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device)
+        X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights)
 
     representive_id_ls = []
     cluster_centers = cluster_centers.to(sample_representation_vec_ls.device)
@@ -49,26 +49,29 @@ def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_pe
 
 
 
-def get_representative_valid_ids(train_loader, args, net, valid_count):
+def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sample_weights = None):
     sample_representation_vec_ls_by_class = dict()
     sample_id_ls_by_class = dict()
 
-    for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
 
-        if args.cuda:
-            data = data.cuda()
-            # labels = labels.cuda()
+    with torch.no_grad():
 
-        sample_representation = net.feature_forward(data)
+        for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
 
-        for idx in range(len(labels)):
-            curr_label = labels[idx].item()
-            sample_id = sample_ids[idx]
-            if curr_label not in sample_representation_vec_ls_by_class:
-                sample_representation_vec_ls_by_class[curr_label] = []
-                sample_id_ls_by_class[curr_label] = []
-            sample_representation_vec_ls_by_class[curr_label].append(sample_representation[idx])
-            sample_id_ls_by_class[curr_label].append(sample_id)
+            if args.cuda:
+                data = data.cuda()
+                # labels = labels.cuda()
+            
+            sample_representation = net.feature_forward(data)
+
+            for idx in range(len(labels)):
+                curr_label = labels[idx].item()
+                sample_id = sample_ids[idx]
+                if curr_label not in sample_representation_vec_ls_by_class:
+                    sample_representation_vec_ls_by_class[curr_label] = []
+                    sample_id_ls_by_class[curr_label] = []
+                sample_representation_vec_ls_by_class[curr_label].append(sample_representation[idx])
+                sample_id_ls_by_class[curr_label].append(sample_id)
 
     valid_ids_ls = []
 
@@ -79,7 +82,11 @@ def get_representative_valid_ids(train_loader, args, net, valid_count):
 
         sample_id_ls = torch.tensor(sample_id_ls_by_class[label])
 
-        valid_ids = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(valid_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(valid_count/len(sample_representation_vec_ls_by_class)))
+        curr_cached_sample_weights = None
+        if cached_sample_weights is not None:
+            curr_cached_sample_weights = cached_sample_weights[sample_id_ls]
+
+        valid_ids = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(valid_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(valid_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights)
 
         valid_ids_ls.append(valid_ids)
 

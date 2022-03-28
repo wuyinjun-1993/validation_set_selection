@@ -10,6 +10,15 @@ from tqdm.notebook import tqdm
 import itertools
 import torch_higher as higher
 from main.find_valid_set import *
+from main.meta_reweighting_rl import *
+from datasets.dataloader import *
+import torch.distributed as dist
+import json
+from utils.logger import setup_logger
+import models
+from lib.NCECriterion import NCESoftmaxLoss
+from lib.lr_scheduler import get_scheduler
+
 
 
 def vary_learning_rate(current_learning_rate, eps, args, model=None):
@@ -30,7 +39,7 @@ def vary_learning_rate(current_learning_rate, eps, args, model=None):
 
     return optimizer, current_learning_rate
 
-def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, valid_loader, test_loader, to_device, cached_w_array = None, target_id = None):
+def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, valid_loader, test_loader, to_device, cached_w_array = None, scheduler = None, target_id = None):
     
     # train_loader = DataLoader(train_dataset, batch_size=args['bs'], shuffle=True, num_workers=2, pin_memory=True)
     # test_loader =  DataLoader(test_dataset, batch_size=args['bs'], shuffle=False, num_workers=2, pin_memory=True)
@@ -87,9 +96,10 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
         for idx, inputs in enumerate(train_loader):
             # inputs, labels = inputs.to(device=args['device'], non_blocking=True),\
                                 # labels.to(device=args['device'], non_blocking=True)
-            train_ids = (train_loader.dataset.indices.view(1,-1) == inputs[0].view(-1,1)).nonzero()[:,1]
-
-            assert len(torch.nonzero(train_loader.dataset.__getitem__(train_ids[0])[1] - inputs[1][0])) == 0
+            # train_ids = (train_loader.dataset.indices.view(1,-1) == inputs[0].view(-1,1)).nonzero()[:,1]
+            train_ids = inputs[0]
+            if args.dataset == 'MNIST':
+                assert len(torch.nonzero(train_loader.dataset.__getitem__(train_ids[0])[1] - inputs[1][0])) == 0
 
             
             inputs = to_device(inputs, args)
@@ -229,6 +239,11 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             # minibatch_loss = torch.sum(w * minibatch_loss)
             minibatch_loss.backward()
             opt.step()
+            if scheduler is not None:
+                logging.info("learning rate at iteration %d before using scheduler: %f" %(int(idx), float(opt.param_groups[0]['lr'])))
+
+                scheduler.step(1)
+                logging.info("learning rate at iteration %d after using scheduler: %f" %(int(idx), float(opt.param_groups[0]['lr'])))
 
             total_iter_count += 1
 
@@ -247,10 +262,12 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
     
         # inference after epoch
         with torch.no_grad():
+            if criterion is not None:
+                criterion.reduction = 'mean'
             logging.info("valid performance at epoch %d"%(ep))
-            test(valid_loader, model, args, "valid")
+            test(valid_loader, model, criterion, args, "valid")
             logging.info("test performance at epoch %d"%(ep))
-            test(test_loader, model, args, "test")
+            test(test_loader, model, criterion, args, "test")
 
         torch.save(model, os.path.join(args.save_path, 'refined_model_' + str(ep)))
         torch.save(w_array, os.path.join(args.save_path, 'sample_weights_' + str(ep)))
@@ -259,7 +276,7 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
 
 
 
-def basic_train(train_loader, valid_loader, test_loader, args, network, optimizer):
+def basic_train(train_loader, valid_loader, test_loader, criterion, args, network, optimizer, scheduler = None):
 
     network.train()
     
@@ -270,10 +287,12 @@ def basic_train(train_loader, valid_loader, test_loader, args, network, optimize
             if args.cuda:
                 data = data.cuda()
                 target = target.cuda()
-            output = network(data)
-            loss = F.nll_loss(output, target)
+            output = network(data, full_pred=True)
+            loss = criterion(output, target)
             loss.backward()
             optimizer.step()
+            if scheduler is not None:
+                scheduler.step()
             # if batch_idx % log_interval == 0:
         # logging.info("Train Epoch: %d [{}/{} ({:.0f}%)]\tLoss: {:.6f}", (
         # epoch, batch_idx * len(data), len(train_loader.dataset),
@@ -285,9 +304,9 @@ def basic_train(train_loader, valid_loader, test_loader, args, network, optimize
         # logging.info("train performance at epoch %d"%(epoch))
         # test(train_loader,network, args)
         logging.info("valid performance at epoch %d"%(epoch))
-        test(valid_loader,network, args, "valid")
+        test(valid_loader,network, criterion, args, "valid")
         logging.info("test performance at epoch %d"%(epoch))
-        test(test_loader,network, args, "test")
+        test(test_loader,network, criterion,args, "test")
                 # train_losses.append(loss.item())
                 # train_counter.append(
                 # (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
@@ -484,6 +503,43 @@ def get_boundary_valid_ids(train_loader, net, args, valid_count):
     valid_ids = torch.cat(selected_valid_ids_ls)
     return valid_ids
 
+
+def load_checkpoint(args, model):
+    logger.info('==> Loading...')
+    state = torch.load(os.path.join(args.data_dir, args.cached_model_name), map_location=torch.device("cpu"))
+
+    model_state = state['model']
+
+    model.load_state_dict(model_state, strict=False)
+
+    return model
+
+    # state = {
+    #     'opt': args,
+    #     'model': model.state_dict(),
+    #     'model_ema': model_ema.state_dict(),
+    #     'contrast': contrast.state_dict(),
+    #     'optimizer': optimizer.state_dict(),
+    #     'scheduler': scheduler.state_dict(),
+    #     'epoch': epoch,
+    #     'best_acc': best_acc,
+    # }
+    # if args.amp_opt_level != "O0":
+    #     state['amp'] = amp.state_dict()
+    # torch.save(state, os.path.join(args.save_path, 'current.pth'))
+    # if epoch % args.save_freq == 0:
+    #     torch.save(state, os.path.join(args.save_path, f'ckpt_epoch_{epoch}.pth'))
+
+
+
+
+
+
+
+
+
+
+
 def find_boundary_and_representative_samples(net, train_loader, args, valid_ratio = 0.1):
 
 
@@ -540,6 +596,109 @@ def find_boundary_and_representative_samples(net, train_loader, args, valid_rati
     # torch.sort(prob_gap_ls, dim = 0, descending = False)
 
 
+
+def main2(args):
+
+    set_logger(args)
+    
+    logging.info("start")
+
+    print('==> Preparing data..')
+
+
+    # net = DNN_two_layers()
+    net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
+
+    # net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
+    net = load_checkpoint(args, net)
+        # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
+
+    # net.load_state_dict(net_state_dict, strict=False)
+    cached_sample_weights = None
+    if args.load_cached_weights:
+        cached_sample_weights = torch.load(os.path.join(args.data_dir, args.cached_sample_weights_name))
+        logging.info("load sample weights successfully")
+    if args.cuda:
+        net = net.cuda()
+    # trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, split_method='cluster', pretrained_model=net)
+    criterion = torch.nn.NLLLoss()
+    if args.select_valid_set:
+        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='cluster', pretrained_model=net, cached_sample_weights = cached_sample_weights)
+    else:
+        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='random', pretrained_model=net)
+
+    if not args.use_pretrained_model:
+        net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
+        if args.cuda:
+            net = net.cuda()
+
+    optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
+    
+    if args.do_train:
+        logging.info("start basic training")
+        basic_train(trainloader, validloader, testloader, torch.nn.NLLLoss(), args, net, optimizer)
+    else:
+        logging.info("start meta training")
+        # meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), trainloader, metaloader, validloader, testloader)
+        meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = None, cached_w_array = None, target_id = None)
+
+def main3(args):
+
+    set_logger(args)
+    
+    logging.info("start")
+
+    print('==> Preparing data..')
+
+    if args.dataset == 'cifar10':
+        args.pool_len = 4
+
+    model = models.__dict__['ResNet18'](low_dim=args.low_dim, pool_len=args.pool_len, normlinear=args.normlinear).cuda()
+
+    model = load_checkpoint(args, model)
+
+    if args.cuda:
+        model = model.cuda()
+
+    # net = DNN_two_layers()
+
+    # net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
+        # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
+
+    # net.load_state_dict(net_state_dict, strict=False)
+
+    # if args.cuda:
+    #     net = net.cuda()
+    criterion = nn.CrossEntropyLoss().cuda()
+    if args.select_valid_set:
+        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='cluster', pretrained_model=model)
+    else:
+        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='random', pretrained_model=model)
+
+    # net = DNN_two_layers()
+    if not args.use_pretrained_model:
+        model = models.__dict__['ResNet18'](low_dim=args.low_dim, pool_len=args.pool_len, normlinear=args.normlinear).cuda()
+        if args.cuda:
+            model = model.cuda()
+
+    # optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+
+    
+    optimizer = torch.optim.SGD(model.parameters(),
+                                lr=args.lr,#args.batch_size * dist.get_world_size() / 128 * args.base_learning_rate,
+                                momentum=args.momentum,
+                                weight_decay=args.weight_decay)
+    scheduler = None#get_scheduler(optimizer, len(trainloader), args)
+
+    # meta_learning_model_rl(args, model, optimizer, criterion, trainloader, metaloader, validloader, testloader, scheduler)
+    if args.do_train:
+        logging.info("start basic training")
+        basic_train(trainloader, validloader, testloader, criterion, args, model, optimizer, scheduler)
+    else:
+        logging.info("start meta training")
+        meta_learning_model(args, model, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = None, target_id = None)
+
+
 def main(args):
 
     set_logger(args)
@@ -586,13 +745,29 @@ def main(args):
     
     if args.do_train:
         logging.info("start basic training")
-        basic_train(train_loader, valid_loader, test_loader, args, net, optimizer)
+        basic_train(train_loader, valid_loader, test_loader, torch.nn.NLLLoss(), args, net, optimizer)
     else:
 
         logging.info("start meta training")
-        meta_learning_model(args, net, optimizer, torch.nn.NLLLoss(), train_loader, meta_loader, valid_loader, test_loader, mnist_to_device, cached_w_array = None, target_id = None)
-
+        # meta_learning_model(args, net, optimizer, torch.nn.NLLLoss(), train_loader, meta_loader, valid_loader, test_loader, mnist_to_device, cached_w_array = None, target_id = None)
+        meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), train_loader, meta_loader, valid_loader, test_loader)
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args)
+
+    torch.cuda.set_device(args.local_rank)
+    torch.distributed.init_process_group(backend='nccl', init_method='env://')
+    cudnn.benchmark = True
+
+    os.makedirs(args.save_path, exist_ok=True)
+    logger = setup_logger(output=args.save_path, distributed_rank=dist.get_rank(), name="moco+cld")
+    if dist.get_rank() == 0:
+        path = os.path.join(args.save_path, "config.json")
+        with open(path, 'w') as f:
+            json.dump(vars(args), f, indent=2)
+        logger.info("Full config saved to {}".format(path))
+
+    if args.dataset == 'MNIST':
+        main2(args)
+    else:
+        main3(args)

@@ -36,7 +36,7 @@ class CIFAR10Instance(datasets.CIFAR10):
             img3 = self.transform(img)
             return (img1, img2, img3), target, index
         else:
-            return img1, target, index
+            return index, img1, target
 
 class CIFAR100Instance(CIFAR10Instance):
     """CIFAR100Instance Dataset.

@@ -130,6 +130,23 @@ class ResNet(nn.Module):
             return out, out_2
         return out
 
+    def feature_forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = F.avg_pool2d(out, self.pool_len)
+        out_ = out.view(out.size(0), -1)
+        if self.mlp:
+            out_ = self.pre_fc(out_)
+        # out = self.linear(out_)
+        # out = self.l2norm(out)
+        # if two_branch:
+        #     out_2 = self.groupDis(out_)
+        #     return out, out_2
+        return out_
+
 
 def ResNet18(low_dim=128, medium_dim=128, mlp=False, pool_len=4, normlinear=False):
     return ResNet(BasicBlock, [2,2,2,2], low_dim, medium_dim=medium_dim, mlp=mlp, pool_len=pool_len, normlinear=normlinear)

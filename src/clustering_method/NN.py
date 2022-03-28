@@ -115,9 +115,9 @@ def kNN(epoch, net, lemniscate, trainloader, testloader, K, sigma, recompute_mem
             batchSize = inputs.size(0)
 
             if two_branch:
-                features = net(inputs, two_branch=False)
+                features = net(inputs, two_branch=False, full_pred=False)
             else:
-                features = net(inputs, two_branch=False)
+                features = net(inputs, two_branch=False, full_pred=False)
             features = features[0] if len(features) == 2 else features
             if batch_idx == 0:
                 trainFeatures = features.data.t()
@@ -147,16 +147,16 @@ def kNN(epoch, net, lemniscate, trainloader, testloader, K, sigma, recompute_mem
     end = time.time()
     with torch.no_grad():
         retrieval_one_hot = torch.zeros(K, C).cuda()
-        for batch_idx, (inputs, targets, indexes) in enumerate(testloader):
+        for batch_idx, (indexes, inputs, targets) in enumerate(testloader):
             end = time.time()
             targets = targets.cuda()
             inputs = inputs[0] if len(inputs) == 2 or len(inputs) == 3 else inputs
             batchSize = inputs.size(0)
 
             if two_branch:
-                features = net(inputs, two_branch=False)
+                features = net(inputs, two_branch=False, full_pred=False)
             else:
-                features = net(inputs, two_branch=False)
+                features = net(inputs, two_branch=False, full_pred=False)
 
             net_time.update(time.time() - end)
             end = time.time()
