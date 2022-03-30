@@ -29,13 +29,14 @@ class GaussianBlur(object):
         return x
 
 class dataset_wrapper(Dataset):
-    def __init__(self, data_tensor, label_tensor, transform, three_imgs = False):
+    def __init__(self, data_tensor, label_tensor, transform, three_imgs = False, two_imgs = False):
 
         # super(new_mnist_dataset, self).__init__(*args, **kwargs)
         self.data = data_tensor
         self.targets = label_tensor
         self.transform = transform
         self.three_imgs = three_imgs
+        self.two_imgs = two_imgs
 
     def __getitem__(self, index):
         img, target = self.data[index], self.targets[index]
@@ -45,6 +46,12 @@ class dataset_wrapper(Dataset):
             img = Image.fromarray(img)
         if self.transform is not None:
             img1 = self.transform(img)
+
+            if self.two_imgs:
+                img2 = self.transform(img)
+                return (img1, img2), target, index
+
+
             if self.three_imgs:
                 img2 = self.transform(img)
                 img3 = self.transform(img)
@@ -115,8 +122,19 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
         ])
 
     if args.dataset == 'cifar10':
-        trainset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        
+        if args.continue_label:
+            trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+            trainset.transform = transform_train
+            trainset.two_imgs=args.two_imgs
+            trainset.three_imgs=args.three_imgs
+        else:
+            trainset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
+
+
+
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
 
         testset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
@@ -125,7 +143,13 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
         ndata = trainset.__len__()
 
     elif args.dataset == 'cifar100':
-        trainset = datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        if args.continue_label:
+            trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+            trainset.transform = transform_train
+            trainset.two_imgs=args.two_imgs
+            trainset.three_imgs=args.three_imgs
+        else:
+            trainset = datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
 
@@ -182,10 +206,17 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
                                     torchvision.transforms.Normalize(
                                         (0.1307,), (0.3081,))
                                     ])
-        trainset = torchvision.datasets.MNIST(args.data_dir, train=True, download=True,
+
+        if args.continue_label:
+            trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+            trainset.transform = transform_train
+            trainset.two_imgs=args.two_imgs
+            trainset.three_imgs=args.three_imgs
+        else:
+            trainset = torchvision.datasets.MNIST(args.data_dir, train=True, download=True,
                                     transform=transform_train)
 
-        trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train, three_imgs=True)
+        trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train, three_imgs=args.three_imgs)
 
         transform_test = torchvision.transforms.Compose([
                                         torchvision.transforms.ToTensor(),
@@ -209,7 +240,7 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
 def concat_valid_set(valid_set, new_valid_set):
     valid_data_mat = valid_set.data
     valid_labels = valid_set.targets
-    if not type(valid_data_mat) is numpy.ndarray:
+    if type(valid_data_mat) is numpy.ndarray:
         valid_data_mat = numpy.concatenate((valid_data_mat, new_valid_set.data), axis = 0)
         valid_labels = numpy.concatenate((valid_labels, new_valid_set.targets), axis = 0)
         
@@ -265,13 +296,13 @@ def split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, 
     return train_set, valid_set, meta_set
 
 def random_partition_train_valid_datastet0(args, train_dataset, transform, origin_labels):
-    valid_ratio = args.valid_ratio
+    # valid_ratio = args.valid_ratio
 
     train_ids = torch.tensor(list(range(len(train_dataset))))
 
     rand_train_ids = torch.randperm(len(train_ids))
 
-    valid_size = int(len(train_dataset)*valid_ratio)
+    valid_size = args.valid_count#int(len(train_dataset)*valid_ratio)
 
     valid_ids = rand_train_ids[0:valid_size]
 
@@ -284,11 +315,11 @@ def random_partition_train_valid_datastet0(args, train_dataset, transform, origi
 
 
 def find_representative_samples0(net, train_dataset, train_transform, args, origin_labels, cached_sample_weights = None):
-    valid_ratio = args.valid_ratio
+    # valid_ratio = args.valid_ratio
     prob_gap_ls = torch.zeros(len(train_dataset))
 
 
-    valid_count = int(len(train_dataset)*valid_ratio)
+    valid_count = args.valid_count#int(len(train_dataset)*valid_ratio)
 
     pred_labels = torch.zeros(len(train_dataset), dtype =torch.long)
 
@@ -420,6 +451,10 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                                         transform=transform_test)
         args.pool_len = 4
 
+    valid_ratio = args.valid_ratio
+    valid_count = int(len(trainset)*valid_ratio)
+    args.valid_count = valid_count
+
     if split_method == 'random':
 
         if args.continue_label:
@@ -445,7 +480,15 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
 
                 # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
                 # flipped_labels = obtain_flipped_labels(train_dataset, args)
-                flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
+                if not args.load_dataset:
+                    flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
+                    torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
+                else:
+                    flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
+                    if not os.path.exists(flipped_label_dir):
+                        flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
+                        torch.save(flipped_labels, flipped_label_dir)
+                    flipped_labels = torch.load(flipped_label_dir)
                 trainset.targets = flipped_labels
             trainset, validset, metaset, remaining_origin_labels = random_partition_train_valid_datastet0(args, trainset, transform_train, origin_labels)
 
@@ -486,7 +529,11 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                     flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
                     torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
                 else:
-                    flipped_labels = torch.load(os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
+                    flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
+                    if not os.path.exists(flipped_label_dir):
+                        flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
+                        torch.save(flipped_labels, flipped_label_dir)
+                    flipped_labels = torch.load(flipped_label_dir)
                 trainset.targets = flipped_labels
             trainset, validset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, transform_train, args, origin_labels)
 

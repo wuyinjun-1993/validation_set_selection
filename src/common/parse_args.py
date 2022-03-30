@@ -14,8 +14,12 @@ def parse_args(args=None):
 
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
     parser.add_argument('--select_valid_set', action='store_true', help='select valid set')
+
+    parser.add_argument('--add_under_rep_samples', action='store_true', help='add under represented samples')
+
     parser.add_argument('--do_train', action='store_true', help='do training')
     parser.add_argument('--load_cached_weights', action='store_true', help='load_cached_weights')
+    parser.add_argument('--lr_decay', action='store_true', help='load_cached_weights')
 
     parser.add_argument('--use_pretrained_model', action='store_true', help='use pretrained models')
     parser.add_argument('--err_label_ratio', default=0.2, type=float)

@@ -19,10 +19,15 @@ import models
 from lib.NCECriterion import NCESoftmaxLoss
 from lib.lr_scheduler import get_scheduler
 
-
+cached_model_name="cached_model"
 
 def vary_learning_rate(current_learning_rate, eps, args, model=None):
-    current_learning_rate = current_learning_rate / 2
+    # current_learning_rate = current_learning_rate / 2
+    if args.dataset == 'MNIST':#args.dataset == 'MNIST'
+        current_learning_rate = args.lr* ((0.5 ** int(eps >= 500)) * (0.5 ** int(eps >= 800)))
+    else:
+        if args.dataset.startswith('cifar'):
+            current_learning_rate = args.lr* ((0.2 ** int(eps >= 50)) * (0.2 ** int(eps >= 100)))
     logging.info('Change learning_rate to %f at step %d' % (current_learning_rate, eps))
 
     optimizer = None
@@ -38,6 +43,81 @@ def vary_learning_rate(current_learning_rate, eps, args, model=None):
         optimizer = torch.optim.SGD(model.parameters(), lr=current_learning_rate)
 
     return optimizer, current_learning_rate
+
+def report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, test_acc):
+    test_loss_ls.append(test_loss)
+    test_acc_ls.append(test_acc)
+
+    test_loss_array = numpy.array(test_loss_ls)
+
+    test_acc_array = numpy.array(test_acc_ls)
+
+    min_loss_epoch = numpy.argmin(test_loss_array)
+
+    min_test_loss = test_loss_array[min_loss_epoch]
+
+    min_test_acc = test_acc_array[min_loss_epoch]
+
+    logging.info("best test performance so far is in epoch %d: %f, %f"%(min_loss_epoch, min_test_loss, min_test_acc))
+
+def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5):
+    valid_acc_arr = numpy.array(valid_acc_ls)
+
+    best_valid_acc = numpy.max(valid_acc_arr)
+
+    # for k in range(len(valid_acc_ls)):
+    #     if valid_acc_ls[k] == best_valid_acc:
+
+
+    best_valid_acc_epochs = numpy.reshape(numpy.nonzero(valid_acc_arr == best_valid_acc), (-1))
+
+    for epoch in best_valid_acc_epochs:
+        all_best = True
+        for k in range(1, tol+1):
+            if not valid_acc_ls[epoch + k] == best_valid_acc:
+                all_best = False
+                break
+
+        if all_best:
+            break
+
+    final_epoch = min(epoch + tol, args.epochs-1)
+    final_test_loss = test_loss_ls[final_epoch]
+
+    final_test_acc = test_acc_ls[final_epoch]
+
+    logging.info("final test performance is in epoch %d: %f, %f"%(final_epoch, final_test_loss, final_test_acc))
+
+    cache_sample_weights_given_epoch(final_epoch)
+
+def cache_sample_weights_for_min_loss_epoch(args, test_loss_ls):
+    min_loss_epoch = numpy.argmin(test_loss_ls)
+
+    best_w_array = torch.load(os.path.join(args.save_path, 'sample_weights_' + str(min_loss_epoch)))
+
+    best_model = torch.load(os.path.join(args.save_path, 'refined_model_' + str(min_loss_epoch)))
+
+    logging.info("caching sample weights at epoch %d"%(min_loss_epoch))
+
+
+    torch.save(best_w_array, os.path.join(args.save_path, "cached_sample_weights"))
+
+    torch.save(best_model, os.path.join(args.save_path, cached_model_name))
+
+
+def cache_sample_weights_given_epoch(epoch):
+    best_w_array = torch.load(os.path.join(args.save_path, 'sample_weights_' + str(epoch)))
+
+    best_model = torch.load(os.path.join(args.save_path, 'refined_model_' + str(epoch)))
+
+    logging.info("caching sample weights at epoch %d"%(epoch))
+
+
+    torch.save(best_w_array, os.path.join(args.save_path, "cached_sample_weights"))
+
+    torch.save(best_model, os.path.join(args.save_path, cached_model_name))
+
+
 
 def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, valid_loader, test_loader, to_device, cached_w_array = None, scheduler = None, target_id = None):
     
@@ -88,6 +168,11 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
     curr_learning_rate = args.lr
 
     curr_ilp_learning_rate = args.meta_lr
+
+    valid_loss_ls = []
+    valid_acc_ls = []
+    test_loss_ls = []
+    test_acc_ls = []
 
     model.train()
     for ep in tqdm(range(1, args.epochs+1)):
@@ -265,13 +350,26 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             if criterion is not None:
                 criterion.reduction = 'mean'
             logging.info("valid performance at epoch %d"%(ep))
-            test(valid_loader, model, criterion, args, "valid")
+            valid_loss, valid_acc = test(valid_loader, model, criterion, args, "valid")
             logging.info("test performance at epoch %d"%(ep))
-            test(test_loader, model, criterion, args, "test")
+            test_loss, test_acc = test(test_loader, model, criterion, args, "test")
+
+            report_best_test_performance_so_far(valid_loss_ls, valid_acc_ls, valid_loss, valid_acc)
+
+            report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, test_acc)
+        if args.lr_decay:
+            # min_valid_loss_epoch = numpy.argmin(numpy.array(valid_loss_ls))
+            # if min_valid_loss_epoch < ep-1:
+            opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
+
+                
+
+            
 
         torch.save(model, os.path.join(args.save_path, 'refined_model_' + str(ep)))
         torch.save(w_array, os.path.join(args.save_path, 'sample_weights_' + str(ep)))
-
+    # cache_sample_weights_for_min_loss_epoch(args, test_loss_ls)
+    report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
 
 
 
@@ -514,6 +612,20 @@ def load_checkpoint(args, model):
 
     return model
 
+
+def load_checkpoint2(args, model):
+    logger.info('==> Loading cached model...')
+    if args.prev_save_path is not None:
+        cached_model_file_name = os.path.join(args.prev_save_path, cached_model_name)
+        if os.path.exists(cached_model_file_name):
+            
+            state = torch.load(cached_model_file_name, map_location=torch.device("cpu"))
+
+            model.load_state_dict(state.state_dict())
+            logger.info('==> Loading cached model successfully')
+
+    return model
+
     # state = {
     #     'opt': args,
     #     'model': model.state_dict(),
@@ -610,13 +722,13 @@ def main2(args):
     net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
 
     # net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
-    net = load_checkpoint(args, net)
+    net = load_checkpoint2(args, net)
         # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
 
     # net.load_state_dict(net_state_dict, strict=False)
     cached_sample_weights = None
     if args.load_cached_weights:
-        cached_sample_weights = torch.load(os.path.join(args.data_dir, args.cached_sample_weights_name))
+        cached_sample_weights = torch.load(os.path.join(args.prev_save_path, args.cached_sample_weights_name))
         logging.info("load sample weights successfully")
     if args.cuda:
         net = net.cuda()

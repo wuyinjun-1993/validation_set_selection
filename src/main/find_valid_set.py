@@ -16,6 +16,7 @@ def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_pe
         X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights)
 
     representive_id_ls = []
+    representive_representation_ls = []
     cluster_centers = cluster_centers.to(sample_representation_vec_ls.device)
     for cluster_id in range(len(cluster_centers)):
         curr_cluster_center = cluster_centers[cluster_id]
@@ -42,19 +43,55 @@ def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_pe
 
         representive_id_ls.append(sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]])
     
-    return torch.cat(representive_id_ls)
+        representive_representation_ls.append(sample_representation_vec_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]])
+
+    return torch.cat(representive_id_ls), torch.cat(representive_representation_ls)
 
 
+def obtain_most_under_represent_samples(under_represent_count, full_sample_representations, full_sample_ids, full_valid_sample_representation_ls):
+    full_distance = pairwise_distance(full_sample_representations, full_valid_sample_representation_ls, device=torch.device('cpu'))
+
+    min_distance_by_sample,_ = torch.min(full_distance, dim = 1)
+
+    most_under_representive_sample_dist, most_under_representive_sample_ids = torch.sort(min_distance_by_sample, descending=True)
+
+    
+    most_under_representive_sample_ids = full_sample_ids[most_under_representive_sample_ids[0:under_represent_count]]
+
+    return most_under_representive_sample_ids
+
+def random_obtain_other_samples(under_represent_count, full_sample_ids, valid_ids):
+    full_sample_id_tensor = torch.ones(len(full_sample_ids))
+    full_sample_id_tensor[valid_ids] = 0
+
+    remaining_sample_ids = full_sample_ids[full_sample_id_tensor.nonzero()]
+
+    rand_remaining_sample_ids = torch.randperm(len(remaining_sample_ids))
+
+    selected_sample_ids = remaining_sample_ids[rand_remaining_sample_ids[0:under_represent_count]]
+
+    return selected_sample_ids
 
 
 
 
 def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sample_weights = None):
+
+    if args.add_under_rep_samples:
+        under_represent_count = int(valid_count/5)
+        main_represent_count = valid_count - under_represent_count
+    else:
+        under_represent_count = 0
+        main_represent_count = valid_count
+
+
     sample_representation_vec_ls_by_class = dict()
     sample_id_ls_by_class = dict()
 
 
     with torch.no_grad():
+
+        # all_sample_representations = [None]*len(train_loader.dataset)
 
         for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
 
@@ -74,6 +111,9 @@ def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sa
                 sample_id_ls_by_class[curr_label].append(sample_id)
 
     valid_ids_ls = []
+    valid_sample_representation_ls = []
+    full_sample_representation_ls = []
+    full_sample_id_ls = []
 
     for label in sample_representation_vec_ls_by_class:
         sample_representation_vec_ls_by_class[label] = torch.stack(sample_representation_vec_ls_by_class[label])
@@ -86,12 +126,20 @@ def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sa
         if cached_sample_weights is not None:
             curr_cached_sample_weights = cached_sample_weights[sample_id_ls]
 
-        valid_ids = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(valid_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(valid_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights)
+        valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights)
 
         valid_ids_ls.append(valid_ids)
-
+        valid_sample_representation_ls.append(valid_sample_representation)
+        full_sample_representation_ls.append(sample_representation_vec_ls)
+        full_sample_id_ls.append(sample_id_ls.view(-1))
     
     valid_ids = torch.cat(valid_ids_ls)
+    under_represent_count = valid_count - len(valid_ids)
+    if under_represent_count > 0:
+        # under_represent_valid_ids = obtain_most_under_represent_samples(under_represent_count, torch.cat(full_sample_representation_ls), torch.cat(full_sample_id_ls), torch.cat(valid_sample_representation_ls))
+        under_represent_valid_ids = random_obtain_other_samples(under_represent_count, torch.cat(full_sample_id_ls), valid_ids)
+
+        valid_ids = torch.cat([valid_ids.view(-1), under_represent_valid_ids.view(-1)])
 
     return valid_ids
 

@@ -34,6 +34,8 @@ from clustering_method.NN import *
 from common.parse_args import *
 from models.DNN import *
 
+import logging
+
 try:
     # noinspection PyUnresolvedReferences
     from apex import amp
@@ -207,13 +209,19 @@ def main(args):
     else:
         summary_writer = None
 
+    cached_sample_weights = None
+    if args.load_cached_weights:
+        cached_sample_weights = torch.load(os.path.join(args.prev_save_path, args.cached_sample_weights_name))
+        logging.info("load sample weights successfully")
+
+
     # routine
     for epoch in range(args.start_epoch, args.epochs + 1):
         if args.lr_scheduler == 'cosine':
             train_loader.sampler.set_epoch(epoch)
 
         tic = time.time()
-        loss, prob = train_moco(epoch, train_loader, model, model_ema, contrast, criterion, optimizer, scheduler, args)
+        loss, prob = train_moco(epoch, train_loader, model, model_ema, contrast, criterion, optimizer, scheduler, args, cached_sample_weights)
 
         logger.info('epoch {}, total time {:.2f}'.format(epoch, time.time() - tic))
 
@@ -246,7 +254,7 @@ def main(args):
     logger.info(str(args))
 
 
-def train_moco(epoch, train_loader, model, model_ema, contrast, criterion, optimizer, scheduler, args):
+def train_moco(epoch, train_loader, model, model_ema, contrast, criterion, optimizer, scheduler, args, cached_sample_weights=None):
     """
     one epoch training for moco
     """
@@ -276,6 +284,10 @@ def train_moco(epoch, train_loader, model, model_ema, contrast, criterion, optim
         feat_q1, features_groupDis1 = model(x1, two_branch=True, full_pred=False)
         feat_q2, features_groupDis2 = model(x2, two_branch=True, full_pred=False)
 
+        curr_sample_weights = None
+        if cached_sample_weights is not None:
+            curr_sample_weights = cached_sample_weights[index]
+
         with torch.no_grad():
             x3_shuffled, backward_inds = DistributedShufle.forward_shuffle(x3, epoch)
             feat_k3, features_groupDis3 = model_ema(x3_shuffled, two_branch=True, full_pred=False)
@@ -284,10 +296,10 @@ def train_moco(epoch, train_loader, model, model_ema, contrast, criterion, optim
 
         # NCE loss
         out = contrast(feat_q1, feat_k3, feat_k_all, update=False)
-        loss_1 = criterion(out)
+        loss_1 = criterion(out, curr_sample_weights)
 
         out = contrast(feat_q2, feat_k3, feat_k_all, update=True)
-        loss_2 = criterion(out)
+        loss_2 = criterion(out, curr_sample_weights)
         loss = (loss_1 + loss_2)/2
 
         prob = F.softmax(out, dim=1)[:, 0].mean()
@@ -304,10 +316,17 @@ def train_moco(epoch, train_loader, model, model_ema, contrast, criterion, optim
 
         # instance-group discriminative learning
         affnity1 = torch.mm(features_groupDis1, centroids2.t())
-        CLD_loss = criterion_cld(affnity1.div_(args.cld_t), cluster_label2)
 
         affnity2 = torch.mm(features_groupDis2, centroids1.t())
-        CLD_loss = (CLD_loss + criterion_cld(affnity2.div_(args.cld_t), cluster_label1))/2
+
+        if cached_sample_weights is None:
+            CLD_loss = criterion_cld(affnity1.div_(args.cld_t), cluster_label2)
+            CLD_loss = (CLD_loss + criterion_cld(affnity2.div_(args.cld_t), cluster_label1))/2
+        else:
+            criterion_cld.reduce = 'none'
+
+            CLD_loss = torch.mean(criterion_cld(affnity1.div_(args.cld_t), cluster_label2).view(-1)*curr_sample_weights.view(-1))
+            CLD_loss = (CLD_loss + torch.mean(criterion_cld(affnity2.div_(args.cld_t), cluster_label1).view(-1)*curr_sample_weights.view(-1)))/2
 
         # get cluster label prediction accuracy
         _, cluster_pred = torch.topk(affnity1, 1)

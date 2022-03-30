@@ -71,6 +71,12 @@ class NCESoftmaxLoss(nn.Module):
         super(NCESoftmaxLoss, self).__init__()
         self.criterion = nn.CrossEntropyLoss()
 
-    def forward(self, x):
+    def forward(self, x, weights = None):
         label = torch.zeros([x.shape[0]]).long().to(x.device)
-        return self.criterion(x, label)
+        if weights is None:
+            
+            return self.criterion(x, label)
+        else:
+            self.criterion.reduction = 'none'
+            loss = torch.mean(self.criterion(x, label).view(-1)*weights.view(-1))
+            return loss
