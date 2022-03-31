@@ -72,13 +72,81 @@ def random_obtain_other_samples(under_represent_count, full_sample_ids, valid_id
 
     return selected_sample_ids
 
+def sort_prob_gap_by_class0(prob_gap_ls, select_count, existing_valid_ids):
+    # boolean_id_arrs = torch.logical_and((label_ls == class_id).view(-1), (pred_labels == label_ls).view(-1))
+    # boolean_id_arrs = (label_ls == class_id).view(-1)
 
+    # sample_id_with_curr_class = torch.nonzero(boolean_id_arrs).view(-1)
+
+    prob_gap_ls_curr_class = prob_gap_ls#[boolean_id_arrs]
+
+    sorted_probs, sorted_idx = torch.sort(prob_gap_ls_curr_class, dim = 0, descending = False)
+
+    sorted_idx = sorted_idx[torch.all(sorted_idx.view(-1,1) != existing_valid_ids.view(1, -1), dim = 1).nonzero().view(-1)]
+
+    # selected_sub_ids = (sorted_probs < 0.05).nonzero()
+
+
+    # # # selected_sub_ids = (sorted_probs > 0.999).nonzero()
+    # select_count = min(select_count, len(selected_sub_ids))
+
+    selected_sample_indx = sorted_idx[0:select_count]
+
+    selected_prob_gap_values = sorted_probs[0:select_count]
+
+    return selected_sample_indx
+
+
+def get_boundary_valid_ids0(train_loader, net, args, valid_count, existing_valid_ids):
+    pred_labels = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+    pred_correct_count = 0
+
+    prob_gap_ls = torch.zeros(len(train_loader.dataset))
+
+    label_ls = torch.zeros(len(train_loader.dataset), dtype =torch.long)
+
+    for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
+
+        if args.cuda:
+            data = data.cuda()
+            # labels = labels.cuda()
+
+        out_probs = torch.exp(net(data))
+        sorted_probs, sorted_indices = torch.sort(out_probs, dim = 1, descending = True)
+
+        prob_gap = sorted_probs[:,0] - sorted_probs[:,1]
+
+        prob_gap_ls[sample_ids] = prob_gap.detach().cpu()
+
+        label_ls[sample_ids] = labels
+
+        curr_pred_labels = sorted_indices[:,0].detach().cpu()
+
+        pred_labels[sample_ids] = curr_pred_labels
+
+        pred_correct_count += torch.sum(labels.view(-1) == curr_pred_labels.view(-1))
+
+    pred_accuracy = pred_correct_count*1.0/len(train_loader.dataset)
+
+    logging.info("training accuracy is %f"%(pred_accuracy.item()))
+
+    unique_label_ls = label_ls.unique()
+
+    selected_valid_ids_ls = []
+
+    # for label_id in unique_label_ls:
+    selected_valid_ids = sort_prob_gap_by_class0(prob_gap_ls, valid_count, existing_valid_ids)
+    selected_valid_ids_ls.append(selected_valid_ids)
+
+    valid_ids = torch.cat(selected_valid_ids_ls)
+    return valid_ids
 
 
 def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sample_weights = None):
 
     if args.add_under_rep_samples:
-        under_represent_count = int(valid_count/5)
+        under_represent_count = int(valid_count/2)
         main_represent_count = valid_count - under_represent_count
     else:
         under_represent_count = 0
@@ -135,10 +203,10 @@ def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sa
     
     valid_ids = torch.cat(valid_ids_ls)
     under_represent_count = valid_count - len(valid_ids)
-    if under_represent_count > 0:
+    if under_represent_count > 0 and args.add_under_rep_samples:
         # under_represent_valid_ids = obtain_most_under_represent_samples(under_represent_count, torch.cat(full_sample_representation_ls), torch.cat(full_sample_id_ls), torch.cat(valid_sample_representation_ls))
-        under_represent_valid_ids = random_obtain_other_samples(under_represent_count, torch.cat(full_sample_id_ls), valid_ids)
-
+        # under_represent_valid_ids = random_obtain_other_samples(under_represent_count, torch.cat(full_sample_id_ls), valid_ids)
+        under_represent_valid_ids = get_boundary_valid_ids0(train_loader, net, args, under_represent_count, valid_ids)
         valid_ids = torch.cat([valid_ids.view(-1), under_represent_valid_ids.view(-1)])
 
     return valid_ids

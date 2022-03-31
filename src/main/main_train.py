@@ -722,7 +722,10 @@ def main2(args):
     net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
 
     # net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
-    net = load_checkpoint2(args, net)
+    if args.unsup_rep:
+        net = load_checkpoint(args, net)
+    else:
+        net = load_checkpoint2(args, net)
         # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
 
     # net.load_state_dict(net_state_dict, strict=False)
