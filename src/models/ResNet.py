@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from torchvision.models.utils import load_state_dict_from_url
+from torch.utils.model_zoo import load_url as load_state_dict_from_url
+# from torchvision.models.utils import load_state_dict_from_url
 import torch.nn.functional as F
 from torch.nn import Parameter
 
@@ -229,7 +230,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, full_pred=True):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -242,17 +243,44 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
-        if self.mlp and self.two_branch:
-            x = self.fc(x)
-            x1 = self.instDis(x)
-            x2 = self.groupDis(x)
-            return [x1, x2]
-        else:
-            x1 = self.fc(x)
-            if self.two_branch:
-                x2 = self.groupDis(x)
-                return [x1, x2]
-            return x1
+        x = self.fc(x)
+        # if self.mlp and self.two_branch:
+        #     x = self.fc(x)
+        #     x1 = self.instDis(x)
+        #     x2 = self.groupDis(x)
+        #     return [x1, x2]
+        # else:
+        #     x1 = self.fc(x)
+        #     if self.two_branch:
+        #         x2 = self.groupDis(x)
+        #         return [x1, x2]
+        return x
+
+    def feature_forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        # x = self.fc(x)
+        # if self.mlp and self.two_branch:
+        #     x = self.fc(x)
+        #     x1 = self.instDis(x)
+        #     x2 = self.groupDis(x)
+        #     return [x1, x2]
+        # else:
+        #     x1 = self.fc(x)
+        #     if self.two_branch:
+        #         x2 = self.groupDis(x)
+        #         return [x1, x2]
+        return x
 
 
 def _resnet(arch, block, layers, pretrained, progress, **kwargs):

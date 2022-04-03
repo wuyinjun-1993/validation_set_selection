@@ -18,6 +18,8 @@ from utils.logger import setup_logger
 import models
 from lib.NCECriterion import NCESoftmaxLoss
 from lib.lr_scheduler import get_scheduler
+from models.resnet import *
+
 
 cached_model_name="cached_model"
 
@@ -324,12 +326,7 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             # minibatch_loss = torch.sum(w * minibatch_loss)
             minibatch_loss.backward()
             opt.step()
-            if scheduler is not None:
-                logging.info("learning rate at iteration %d before using scheduler: %f" %(int(idx), float(opt.param_groups[0]['lr'])))
-
-                scheduler.step(1)
-                logging.info("learning rate at iteration %d after using scheduler: %f" %(int(idx), float(opt.param_groups[0]['lr'])))
-
+            
             total_iter_count += 1
 
             # if total_iter_count%warm_up_steps == 0:
@@ -357,10 +354,19 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             report_best_test_performance_so_far(valid_loss_ls, valid_acc_ls, valid_loss, valid_acc)
 
             report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, test_acc)
+
+        if scheduler is not None:
+            logging.info("learning rate at iteration %d before using scheduler: %f" %(int(ep), float(opt.param_groups[0]['lr'])))
+
+            scheduler.step()
+            logging.info("learning rate at iteration %d after using scheduler: %f" %(int(ep), float(opt.param_groups[0]['lr'])))
+
         if args.lr_decay:
+            if ep > 100:
+                curr_ilp_learning_rate = args.meta_lr*0.1
             # min_valid_loss_epoch = numpy.argmin(numpy.array(valid_loss_ls))
             # if min_valid_loss_epoch < ep-1:
-            opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
+            # opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
 
                 
 
@@ -372,12 +378,14 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
     report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
 
 
-
+def update_lr(optimizer, lr):    
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
 
 def basic_train(train_loader, valid_loader, test_loader, criterion, args, network, optimizer, scheduler = None):
 
     network.train()
-    
+    curr_lr = args.lr
     for epoch in range(args.epochs):
 
         for batch_idx, (_, data, target) in enumerate(train_loader):
@@ -389,8 +397,8 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
             loss = criterion(output, target)
             loss.backward()
             optimizer.step()
-            if scheduler is not None:
-                scheduler.step()
+        if scheduler is not None:
+            scheduler.step()
             # if batch_idx % log_interval == 0:
         # logging.info("Train Epoch: %d [{}/{} ({:.0f}%)]\tLoss: {:.6f}", (
         # epoch, batch_idx * len(data), len(train_loader.dataset),
@@ -401,10 +409,16 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
         torch.save(network.state_dict(), os.path.join(args.save_path, "model_" + str(epoch)))
         # logging.info("train performance at epoch %d"%(epoch))
         # test(train_loader,network, args)
+        logging.info("learning rate at epoch %d: %f"%(epoch, float(optimizer.param_groups[0]['lr'])))
         logging.info("valid performance at epoch %d"%(epoch))
-        test(valid_loader,network, criterion, args, "valid")
+        if valid_loader is not None:
+            test(valid_loader,network, criterion, args, "valid")
         logging.info("test performance at epoch %d"%(epoch))
         test(test_loader,network, criterion,args, "test")
+
+        # if (epoch+1) % 40 == 0:
+        #     curr_lr /= 10
+        #     update_lr(optimizer, curr_lr)
                 # train_losses.append(loss.item())
                 # train_counter.append(
                 # (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
@@ -719,7 +733,12 @@ def main2(args):
 
 
     # net = DNN_two_layers()
-    net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
+    if args.dataset == 'MNIST':
+        net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
+        criterion = torch.nn.NLLLoss()
+    else:
+        net = ResNet18().cuda()
+        criterion = torch.nn.CrossEntropyLoss()
 
     # net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
     if args.unsup_rep:
@@ -736,26 +755,37 @@ def main2(args):
     if args.cuda:
         net = net.cuda()
     # trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, split_method='cluster', pretrained_model=net)
-    criterion = torch.nn.NLLLoss()
+    
+    
     if args.select_valid_set:
         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='cluster', pretrained_model=net, cached_sample_weights = cached_sample_weights)
     else:
         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='random', pretrained_model=net)
 
     if not args.use_pretrained_model:
-        net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
+        if args.dataset == 'MNIST':
+            net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
+            
+        else:
+            net = ResNet18()
+            
         if args.cuda:
             net = net.cuda()
-
-    optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
+    if args.dataset == 'MNIST':
+        optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
+        scheduler = None
+    else:
+        optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
+                                                        milestones=[100, 150], last_epoch=-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     
     if args.do_train:
         logging.info("start basic training")
-        basic_train(trainloader, validloader, testloader, torch.nn.NLLLoss(), args, net, optimizer)
+        basic_train(trainloader, validloader, testloader, criterion, args, net, optimizer, scheduler = scheduler)
     else:
         logging.info("start meta training")
         # meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), trainloader, metaloader, validloader, testloader)
-        meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = None, cached_w_array = None, target_id = None)
+        meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = None, target_id = None)
 
 def main3(args):
 
@@ -768,9 +798,11 @@ def main3(args):
     if args.dataset == 'cifar10':
         args.pool_len = 4
 
-    model = models.__dict__['ResNet18'](low_dim=args.low_dim, pool_len=args.pool_len, normlinear=args.normlinear).cuda()
+    # model = models.__dict__['ResNet18'](low_dim=args.low_dim, pool_len=args.pool_len, normlinear=args.normlinear).cuda()
 
-    model = load_checkpoint(args, model)
+    model = resnet18(pretrained=True)
+
+    model = load_checkpoint2(args, model)
 
     if args.cuda:
         model = model.cuda()
@@ -882,7 +914,7 @@ if __name__ == "__main__":
             json.dump(vars(args), f, indent=2)
         logger.info("Full config saved to {}".format(path))
 
-    if args.dataset == 'MNIST':
-        main2(args)
-    else:
-        main3(args)
+    # if args.dataset == 'MNIST':
+    main2(args)
+    # else:
+    #     main3(args)

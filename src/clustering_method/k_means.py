@@ -22,7 +22,9 @@ def kmeans(
         distance='euclidean',
         tol=1e-4,
         device=torch.device('cpu'),
-        sample_weights = None
+        sample_weights = None,
+        existing_cluster_mean_ls = None,
+        total_iter_count=100
 ):
     """
     perform kmeans
@@ -53,8 +55,15 @@ def kmeans(
 
     iteration = 0
     tqdm_meter = tqdm(desc='[running kmeans]')
-    while True:
-        dis = pairwise_distance_function(X, initial_state)
+    # while True:
+    for k in range(0,total_iter_count):
+
+        full_centroid_state = initial_state
+
+        if existing_cluster_mean_ls is not None:
+            full_centroid_state = torch.cat([existing_cluster_mean_ls, full_centroid_state], dim = 0)
+
+        dis = pairwise_distance_function(X, full_centroid_state)
 
         choice_cluster = torch.argmin(dis, dim=1)
 

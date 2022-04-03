@@ -3,6 +3,7 @@ import torchvision
 from torch.utils.data import Subset, Dataset, DataLoader
 import os,sys
 import logging
+import numpy as np
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 # from main.find_valid_set import *
@@ -239,6 +240,11 @@ def random_flip_labels_on_training(train_dataset, ratio = 0.5):
     return train_dataset, origin_labels
 
 def random_flip_labels_on_training2(train_dataset, ratio = 0.5):
+    is_numpy = False
+
+    if type(train_dataset.targets) is np.ndarray:
+        is_numpy = True
+        train_dataset.targets = torch.from_numpy(train_dataset.targets)
     full_ids = torch.tensor(list(range(len(train_dataset.targets))))
 
     full_rand_ids = torch.randperm(len(train_dataset.targets))
@@ -260,6 +266,9 @@ def random_flip_labels_on_training2(train_dataset, ratio = 0.5):
     # rand_err_labels[rand_err_labels == origin_err_labels] = (rand_err_labels[rand_err_labels == origin_err_labels] + 1)%label_type_count
 
     origin_labels[err_label_ids] = rand_err_labels
+
+    if is_numpy:
+        train_dataset.targets = train_dataset.targets.numpy()
 
     return origin_labels
 

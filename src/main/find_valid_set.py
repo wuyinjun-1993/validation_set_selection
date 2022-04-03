@@ -11,9 +11,9 @@ from main.helper_func import *
 from clustering_method.k_means import *
 
 
-def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4, sample_weights = None):
+def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4, sample_weights = None, existing_cluster_centroids = None):
     cluster_ids_x, cluster_centers = kmeans(
-        X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights)
+        X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids)
 
     representive_id_ls = []
     representive_representation_ls = []
@@ -143,7 +143,7 @@ def get_boundary_valid_ids0(train_loader, net, args, valid_count, existing_valid
     return valid_ids
 
 
-def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sample_weights = None):
+def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None):
 
     if args.add_under_rep_samples:
         under_represent_count = int(valid_count/2)
@@ -194,7 +194,11 @@ def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sa
         if cached_sample_weights is not None:
             curr_cached_sample_weights = cached_sample_weights[sample_id_ls]
 
-        valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights)
+        if existing_valid_representation is not None and existing_valid_set is not None:
+            valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights, existing_cluster_centroids=existing_valid_representation[existing_valid_set.targets == label])    
+
+        else:
+            valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights)
 
         valid_ids_ls.append(valid_ids)
         valid_sample_representation_ls.append(valid_sample_representation)
@@ -202,14 +206,103 @@ def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sa
         full_sample_id_ls.append(sample_id_ls.view(-1))
     
     valid_ids = torch.cat(valid_ids_ls)
-    under_represent_count = valid_count - len(valid_ids)
-    if under_represent_count > 0 and args.add_under_rep_samples:
-        # under_represent_valid_ids = obtain_most_under_represent_samples(under_represent_count, torch.cat(full_sample_representation_ls), torch.cat(full_sample_id_ls), torch.cat(valid_sample_representation_ls))
-        # under_represent_valid_ids = random_obtain_other_samples(under_represent_count, torch.cat(full_sample_id_ls), valid_ids)
-        under_represent_valid_ids = get_boundary_valid_ids0(train_loader, net, args, under_represent_count, valid_ids)
-        valid_ids = torch.cat([valid_ids.view(-1), under_represent_valid_ids.view(-1)])
+    valid_sample_representation_tensor = torch.cat(valid_sample_representation_ls)
+    # under_represent_count = valid_count - len(valid_ids)
+    # if under_represent_count > 0 and args.add_under_rep_samples:
+    #     # under_represent_valid_ids = obtain_most_under_represent_samples(under_represent_count, torch.cat(full_sample_representation_ls), torch.cat(full_sample_id_ls), torch.cat(valid_sample_representation_ls))
+    #     # under_represent_valid_ids = random_obtain_other_samples(under_represent_count, torch.cat(full_sample_id_ls), valid_ids)
+    #     under_represent_valid_ids = get_boundary_valid_ids0(train_loader, net, args, under_represent_count, valid_ids)
+    #     valid_ids = torch.cat([valid_ids.view(-1), under_represent_valid_ids.view(-1)])
 
-    return valid_ids
+    return valid_ids, valid_sample_representation_tensor
+
+
+def get_representative_valid_ids2(train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None):
+
+    if args.add_under_rep_samples:
+        under_represent_count = int(valid_count/2)
+        main_represent_count = valid_count - under_represent_count
+    else:
+        under_represent_count = 0
+        main_represent_count = valid_count
+
+
+    # sample_representation_vec_ls_by_class = dict()
+    # sample_id_ls_by_class = dict()
+    sample_representation_vec_ls = []
+
+    sample_id_ls = []
+    with torch.no_grad():
+
+        # all_sample_representations = [None]*len(train_loader.dataset)
+
+
+        for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
+
+            if args.cuda:
+                data = data.cuda()
+                # labels = labels.cuda()
+            
+            sample_representation = net.feature_forward(data)
+
+            sample_representation_vec_ls.append(sample_representation)
+
+            sample_id_ls.append(sample_ids)
+            # for idx in range(len(labels)):
+            #     curr_label = labels[idx].item()
+            #     sample_id = sample_ids[idx]
+            #     if curr_label not in sample_representation_vec_ls_by_class:
+            #         sample_representation_vec_ls_by_class[curr_label] = []
+            #         sample_id_ls_by_class[curr_label] = []
+            #     sample_representation_vec_ls_by_class[curr_label].append(sample_representation[idx])
+            #     sample_id_ls_by_class[curr_label].append(sample_id)
+
+    # valid_ids_ls = []
+    # valid_sample_representation_ls = []
+    # full_sample_representation_ls = []
+    # full_sample_id_ls = []
+
+    # sample_representation_vec_ls = sample_representation_vec_ls_by_class[label]
+
+    all_sample_ids = torch.cat(sample_id_ls)
+    valid_ids, valid_sample_representation_tensor = cluster_per_class(torch.cat(sample_representation_vec_ls), all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids])  
+
+
+    # for label in sample_representation_vec_ls_by_class:
+    #     sample_representation_vec_ls_by_class[label] = torch.stack(sample_representation_vec_ls_by_class[label])
+    
+        
+
+    #     sample_id_ls = torch.tensor(sample_id_ls_by_class[label])
+
+    #     curr_cached_sample_weights = None
+    #     if cached_sample_weights is not None:
+    #         curr_cached_sample_weights = cached_sample_weights[sample_id_ls]
+
+    #     if existing_valid_representation is not None and existing_valid_set is not None:
+    #         valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights, existing_cluster_centroids=existing_valid_representation[existing_valid_set.targets == label])    
+
+    #     else:
+    #         valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights)
+
+    #     valid_ids_ls.append(valid_ids)
+    #     valid_sample_representation_ls.append(valid_sample_representation)
+    #     full_sample_representation_ls.append(sample_representation_vec_ls)
+    #     full_sample_id_ls.append(sample_id_ls.view(-1))
+    
+    # valid_ids = torch.cat(valid_ids_ls)
+    # valid_sample_representation_tensor = torch.cat(valid_sample_representation_ls)
+    # under_represent_count = valid_count - len(valid_ids)
+    # if under_represent_count > 0 and args.add_under_rep_samples:
+    #     # under_represent_valid_ids = obtain_most_under_represent_samples(under_represent_count, torch.cat(full_sample_representation_ls), torch.cat(full_sample_id_ls), torch.cat(valid_sample_representation_ls))
+    #     # under_represent_valid_ids = random_obtain_other_samples(under_represent_count, torch.cat(full_sample_id_ls), valid_ids)
+    #     under_represent_valid_ids = get_boundary_valid_ids0(train_loader, net, args, under_represent_count, valid_ids)
+    #     valid_ids = torch.cat([valid_ids.view(-1), under_represent_valid_ids.view(-1)])
+
+    return valid_ids, valid_sample_representation_tensor
+
+
+
 
 def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
     prob_gap_ls = torch.zeros(len(train_loader.dataset))
@@ -220,7 +313,7 @@ def find_representative_samples(net, train_loader, args, valid_ratio = 0.1):
 
     pred_labels = torch.zeros(len(train_loader.dataset), dtype =torch.long)
 
-    valid_ids = get_representative_valid_ids(train_loader, args, net, valid_count)
+    valid_ids,_ = get_representative_valid_ids(train_loader, args, net, valid_count)
 
     # valid_set = Subset(train_loader.dataset, valid_ids)
     valid_set = new_mnist_dataset2(train_loader.dataset.data[valid_ids].clone(), train_loader.dataset.targets[valid_ids].clone())

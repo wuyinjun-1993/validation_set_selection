@@ -314,21 +314,142 @@ def random_partition_train_valid_datastet0(args, train_dataset, transform, origi
     return train_set, valid_set, meta_set, remaining_origin_labels
 
 
-def find_representative_samples0(net, train_dataset, train_transform, args, origin_labels, cached_sample_weights = None):
+
+def obtain_representations_for_valid_set(args, valid_set, net):
+    validloader = torch.utils.data.DataLoader(valid_set, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
+
+    sample_representation_ls = []
+
+    with torch.no_grad():
+
+        # all_sample_representations = [None]*len(train_loader.dataset)
+
+        for batch_id, (sample_ids, data, labels) in enumerate(validloader):
+
+            if args.cuda:
+                data = data.cuda()
+                # labels = labels.cuda()
+            
+            sample_representation = net.feature_forward(data)
+            sample_representation_ls.append(sample_representation)
+
+    return torch.cat(sample_representation_ls)
+
+
+def determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representations, valid_count):
+
+    existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, device = new_valid_representations.device)
+
+    nearset_new_valid_distance,_ = torch.min(existing_new_dists, dim = 0)
+
+    sorted_min_distance, sorted_min_sample_ids = torch.sort(nearset_new_valid_distance, descending=True)
+
+    remaining_valid_ids = valid_ids[sorted_min_sample_ids[0:valid_count - existing_valid_representations.shape[0]]]
+    
+
+    
+
+
+
+    # nearset_new_valid_ids = torch.argmin(existing_new_dists, dim = 1)
+
+
+    # unique_nearest_new_valid_ids = torch.unique(nearset_new_valid_ids)
+
+    # remaining_new_valid_id_tensor =  torch.ones(new_valid_representations.shape[0])
+
+    # remaining_new_valid_id_tensor[unique_nearest_new_valid_ids] = 0
+
+    # remaining_valid_ids = valid_ids[remaining_new_valid_id_tensor.nonzero().view(-1)]
+
+    # if len(remaining_valid_ids) > valid_count - existing_valid_representations.shape[0]:
+    #     existing_new_dists = existing_new_dists[:, remaining_new_valid_id_tensor.nonzero().view(-1)]
+    #     nearset_new_valid_distances, nearset_new_valid_ids = torch.min(existing_new_dists, dim = 0)
+
+    #     sorted_nearset_new_valid_distances, sorted_nearset_new_valid_ids = torch.sort(nearset_new_valid_distances.view(-1), descending=False)
+
+    #     remaining_valid_ids = remaining_valid_ids[nearset_new_valid_ids[sorted_nearset_new_valid_ids[len(remaining_valid_ids) -(valid_count - existing_valid_representations.shape[0]):]]]
+
+        # nearset_new_valid_ids[sorted_nearset_new_valid_ids]
+
+
+    return remaining_valid_ids
+
+def init_sampling_valid_samples(net, train_dataset, train_transform, args, origin_labels):
+    trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
+
+    pred_prob_ls = []
+
+    sample_id_ls = []
+
+    with torch.no_grad():
+
+        # all_sample_representations = [None]*len(train_loader.dataset)
+
+        for batch_id, (sample_ids, data, labels) in enumerate(trainloader):
+
+            if args.cuda:
+                data = data.cuda()
+                # labels = labels.cuda()
+            
+            output_probs = F.softmax(net(data), dim=1).view(-1)
+
+            pred_prob_ls.append(output_probs)
+
+            sample_id_ls.append(sample_ids)
+
+    sample_id_ls_tensor = torch.cat(sample_id_ls)
+
+    pred_prob_ls_tensor = torch.cat(pred_prob_ls)
+
+    sorted_pred_prob_ls, sorted_train_ids = torch.sort(torch.max(pred_prob_ls_tensor,dim=1)[0], descending=True)
+
+    valid_ids = sample_id_ls_tensor[sorted_train_ids][0:args.valid_count]
+
+    update_train_ids = torch.ones(len(train_dataset))
+    if not args.include_valid_set_in_training:
+        update_train_ids[valid_ids] = 0
+    update_train_ids = update_train_ids.nonzero().view(-1)
+
+
+    train_set, valid_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, train_transform)
+
+    remaining_origin_labels = origin_labels[update_train_ids]
+
+    return train_set, valid_set, meta_set, remaining_origin_labels
+    
+
+
+
+
+def find_representative_samples0(net, train_dataset,validset, train_transform, args, origin_labels, cached_sample_weights = None):
     # valid_ratio = args.valid_ratio
     prob_gap_ls = torch.zeros(len(train_dataset))
 
 
-    valid_count = args.valid_count#int(len(train_dataset)*valid_ratio)
+    valid_count = len(validset) + args.valid_count#int(len(train_dataset)*valid_ratio)
 
     pred_labels = torch.zeros(len(train_dataset), dtype =torch.long)
 
     trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
 
-    valid_ids = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
+    existing_valid_representation = obtain_representations_for_valid_set(args, validset, net)
+
+    
+
+    if not args.cluster_method_two:
+        valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
+        valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count)
+    else:
+
+        valid_ids, new_valid_representations = get_representative_valid_ids2(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
+        valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count)
+        # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
+
     torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
     update_train_ids = torch.ones(len(train_dataset))
-    update_train_ids[valid_ids] = 0
+    if not args.include_valid_set_in_training:
+        update_train_ids[valid_ids] = 0
     update_train_ids = update_train_ids.nonzero().view(-1)
     
     train_set, valid_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, train_transform)
@@ -409,25 +530,32 @@ def evaluate_dataset_with_basic_models(args, dataset, model, criterion):
 
 def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None, cached_sample_weights = None):
     if args.dataset == 'cifar10':
+        # transform_train_list = [
+        #         transforms.RandomResizedCrop(size=32, scale=(0.2,1.)),
+        #         transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
+        #         transforms.RandomGrayscale(p=0.2),
+        #         transforms.RandomHorizontalFlip(),
+        #         transforms.ToTensor(),
+        #         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        #     ]
         transform_train_list = [
-                transforms.RandomResizedCrop(size=32, scale=(0.2,1.)),
-                transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
-                transforms.RandomGrayscale(p=0.2),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-            ]
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ]
         transform_train = transforms.Compose(transform_train_list)
         transform_test = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ])
-    
-        trainset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        trainset = torchvision.datasets.CIFAR10(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train)
+        # trainset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
 
         # trainset, validset, metaset = split_train_valid_func(args, trainset, transform_train, kwargs)
 
-        testset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
+        testset = torchvision.datasets.CIFAR10(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
+        # testset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
         args.pool_len = 4
         # ndata = trainset.__len__()
 
@@ -499,7 +627,7 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
             # evaluate_dataset_with_basic_models(args, trainset, pretrained_model, criterion)
             args.flip_labels = False
-            trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
+            trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
 
 
             validset = concat_valid_set(validset, new_validset)
@@ -535,8 +663,11 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                         torch.save(flipped_labels, flipped_label_dir)
                     flipped_labels = torch.load(flipped_label_dir)
                 trainset.targets = flipped_labels
-            trainset, validset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, transform_train, args, origin_labels)
-
+            # 
+            if args.init_cluster_by_confident:
+                trainset, validset, metaset, remaining_origin_labels = init_sampling_valid_samples(pretrained_model, trainset, transform_train, args, origin_labels)
+            else:
+                trainset, validset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, transform_train, args, origin_labels)
             cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
         
     # if args.flip_labels:

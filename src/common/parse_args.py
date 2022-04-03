@@ -14,6 +14,11 @@ def parse_args(args=None):
 
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
     parser.add_argument('--select_valid_set', action='store_true', help='select valid set')
+    parser.add_argument('--include_valid_set_in_training', action='store_true', help='select valid set')
+    parser.add_argument('--cluster_method_two', action='store_true', help='select valid set')
+    parser.add_argument('--init_cluster_by_confident', action='store_true', help='select valid set')
+
+
     parser.add_argument('--unsup_rep', action='store_true', help='unsupervised representation usage')
 
     parser.add_argument('--add_under_rep_samples', action='store_true', help='add under represented samples')
