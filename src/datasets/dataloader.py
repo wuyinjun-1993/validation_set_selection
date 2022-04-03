@@ -584,7 +584,7 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
     args.valid_count = valid_count
 
     if split_method == 'random':
-
+        logging.info("Split method: random")
         if args.continue_label:
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
             trainset, new_validset, new_metaset, remaining_origin_labels = random_partition_train_valid_datastet0(args, trainset, transform_train, origin_labels)
@@ -609,12 +609,20 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                 # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
                 # flipped_labels = obtain_flipped_labels(train_dataset, args)
                 if not args.load_dataset:
-                    flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
+                    logging.info("Not loading dataset")
+                    if args.adversarial_flip:
+                        flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
+                    else:
+                        flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
                     torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
                 else:
+                    logging.info("Loading dataset")
                     flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
                     if not os.path.exists(flipped_label_dir):
-                        flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
+                        if args.adversarial_flip:
+                            flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
+                        else:
+                            flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
                         torch.save(flipped_labels, flipped_label_dir)
                     flipped_labels = torch.load(flipped_label_dir)
                 trainset.targets = flipped_labels

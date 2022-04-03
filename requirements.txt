@@ -1,0 +1,7 @@
+kmeans-pytorch
+torch
+tqdm
+torchvision
+higher
+pytorch-pretrained-bert
+termcolor

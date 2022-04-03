@@ -1,9 +1,11 @@
 import torch
 import torchvision
 from torch.utils.data import Subset, Dataset, DataLoader
+import math
 import os,sys
 import logging
 import numpy as np
+from clustering_method.k_means import kmeans
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 # from main.find_valid_set import *
@@ -272,6 +274,59 @@ def random_flip_labels_on_training2(train_dataset, ratio = 0.5):
 
     return origin_labels
 
+
+def adversarial_flip_labels(dataset, ratio=0.5):
+    print(dataset.data.shape)
+    X = dataset.data.reshape((dataset.data.shape[0], -1))
+    clusters, centers = kmeans(X.clone(), 10)
+    a = torch.zeros(clusters.shape[0])
+    b = torch.zeros(clusters.shape[0])
+    for i in range(10):
+        c_i = X[clusters == i].float()
+        # Assign a as the mean distance between i and other points in cluster
+        a[clusters == i] = ((1 / (c_i.shape[0] - 1))
+            * torch.sum(torch.cdist(c_i[None], c_i[None])[0], dim=1))
+
+        # Assign b as the smallest mean distance of i to all points in other
+        # clusters
+        for j in range(10):
+            if i == j:
+                continue
+            c_j = X[clusters == j].float()
+            b_tmp = (1 / c_j.shape[0]) * torch.sum(torch.cdist(c_i[None], c_j[None])[0],
+                    dim=1)
+
+            if (i == 0 and j == 1) or j == 0:
+                b[clusters == i] = b_tmp
+            else:
+                for k in range(c_i.shape[0]):
+                    if b_tmp[k] < b[clusters == i][k]:
+                        index = torch.nonzero(clusters == i)[k]
+                        b[index] = b_tmp[k]
+                        assert (b[index] == b_tmp[k])
+
+    silhouette_val = (b - a) / torch.max(torch.stack((a, b), dim=1), dim=1)[0]
+    num_flip = math.ceil(dataset.data.shape[0] * ratio)
+    adv_flip_index = torch.nonzero(silhouette_val < 0)
+    rand_flip_index = torch.nonzero(silhouette_val >= 0)
+
+    # Flip labels for adversarial samples and supplement with random samples if
+    # there are not enough adversarial samples
+    num_adv_flip = min(num_flip, adv_flip_index.shape[0])
+    num_rand_flip = num_flip - num_adv_flip
+    adv_flip_index = adv_flip_index[torch.randperm(adv_flip_index.shape[0])][:num_adv_flip]
+    rand_flip_index = rand_flip_index[torch.randperm(rand_flip_index.shape[0])][:num_rand_flip]
+
+    label_type_count = len(dataset.targets.unique())
+    origin_labels = dataset.targets.clone()
+    adv_err_labels = torch.randint(low=0,high=label_type_count-1,
+            size=[len(adv_flip_index)])
+    rand_err_labels = torch.randint(low=0,high=label_type_count-1,
+            size=[len(rand_flip_index)])
+
+    origin_labels[adv_flip_index.flatten()] = adv_err_labels
+    origin_labels[rand_flip_index.flatten()] = rand_err_labels
+    return origin_labels
 
 
 def obtain_flipped_labels(train_dataset, args):
