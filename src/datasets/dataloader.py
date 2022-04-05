@@ -465,7 +465,9 @@ def find_representative_samples1(net, train_dataset,validset, train_transform, a
 
     prev_w_array_delta_ls_tensor = torch.load(os.path.join(args.prev_save_path, "cached_w_array_delta_ls"), map_location=torch.device('cpu'))
     
-    prev_w_array_total_delta_tensor = torch.load(os.path.join(args.prev_save_path, "cached_w_array_total_delta"), map_location=torch.device('cpu'))
+    prev_w_array_delta_ls_tensor = prev_w_array_delta_ls_tensor[0:344]
+
+    prev_w_array_total_delta_tensor = torch.sum(prev_w_array_delta_ls_tensor, dim = 0)# torch.load(os.path.join(args.prev_save_path, "cached_w_array_total_delta"), map_location=torch.device('cpu'))
 
     if args.cuda:
         prev_w_array_delta_ls_tensor = prev_w_array_delta_ls_tensor.cuda()
@@ -477,8 +479,8 @@ def find_representative_samples1(net, train_dataset,validset, train_transform, a
 
     valid_count = len(validset) + args.valid_count
 
-    cluster_ids_x, cluster_centers = kmeans(
-        X=prev_w_array_delta_ls_tensor, num_clusters=valid_count, distance='euclidean', device=prev_w_array_total_delta_tensor.device)
+    cluster_ids_x, cluster_centers = kmeans(args, 
+        X=torch.transpose(prev_w_array_delta_ls_tensor,0,1), num_clusters=valid_count, distance='euclidean')
 
     sorted_prev_w_array_idx_cluster_idx = cluster_ids_x[sorted_prev_w_array_total_delta_tensor_idx]
 
@@ -715,8 +717,16 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
         if args.continue_label:
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
             # evaluate_dataset_with_basic_models(args, trainset, pretrained_model, criterion)
-            args.flip_labels = False
-            trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
+            # args.flip_labels = False
+            # trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
+
+
+            if args.cluster_method_three:
+                # net, train_dataset,validset, train_transform, args, origin_labels
+                trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, validset, transform_train, args, origin_labels)
+            else:
+                trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
+
 
 
             validset = concat_valid_set(validset, new_validset)
