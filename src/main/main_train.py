@@ -119,9 +119,24 @@ def cache_sample_weights_given_epoch(epoch):
 
     torch.save(best_model, os.path.join(args.save_path, cached_model_name))
 
+def resume_meta_training_by_loading_cached_info(args, net):
+
+    # if args.resume_meta_train:
+    #     prev_net, prev_weights, start_epoch= resume_meta_training_by_loading_cached_info()
+    #     net.load_state_dict(prev_net.state_dict(), strict=False)
+
+    # if args.cuda:
+    #     net = net.cuda()
 
 
-def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, valid_loader, test_loader, to_device, cached_w_array = None, scheduler = None, target_id = None):
+
+    model = torch.load(os.path.join(args.save_path, 'curr_refined_model'), map_location=torch.device('cpu'))
+    w_array = torch.load(os.path.join(args.save_path, 'curr_sample_weights'), map_location=torch.device('cpu'))
+    start_ep = torch.load(os.path.join(args.save_path, "curr_epoch")).item()
+    net.load_state_dict(model.state_dict(), strict=False)
+    return net, w_array, start_ep
+
+def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, valid_loader, test_loader, to_device, cached_w_array = None, scheduler = None, target_id = None, start_ep = 0):
     
     # train_loader = DataLoader(train_dataset, batch_size=args['bs'], shuffle=True, num_workers=2, pin_memory=True)
     # test_loader =  DataLoader(test_dataset, batch_size=args['bs'], shuffle=False, num_workers=2, pin_memory=True)
@@ -175,11 +190,13 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
     valid_acc_ls = []
     test_loss_ls = []
     test_acc_ls = []
+    w_array_delta_ls = []
 
     model.train()
-    for ep in tqdm(range(1, args.epochs+1)):
+    for ep in tqdm(range(start_ep + 1, args.epochs+1)):
         
         train_loss, train_acc = 0, 0
+        curr_w_array_delta = torch.zeros_like(w_array)
         for idx, inputs in enumerate(train_loader):
             # inputs, labels = inputs.to(device=args['device'], non_blocking=True),\
                                 # labels.to(device=args['device'], non_blocking=True)
@@ -256,11 +273,13 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             
             w_array.requires_grad = False
             
+            prev_w_array = w_array[train_ids].detach().clone()
+
             w_array[train_ids] =  w_array[train_ids]-curr_ilp_learning_rate*eps_grads
             
             w_array[train_ids] = torch.clamp(w_array[train_ids], max=1, min=1e-7) #torch.relu(w_array[train_ids])
 
-            
+            curr_w_array_delta[train_ids] = w_array[train_ids].detach() - prev_w_array
 
 
             # if args.learning_decay and total_iter_count%warm_up_steps == 0:
@@ -363,20 +382,30 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
 
         if args.lr_decay:
             if ep > 100:
+                
                 curr_ilp_learning_rate = args.meta_lr*0.1
+                logging.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
             # min_valid_loss_epoch = numpy.argmin(numpy.array(valid_loss_ls))
             # if min_valid_loss_epoch < ep-1:
             # opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
 
                 
-
+        w_array_delta_ls.append(curr_w_array_delta)
             
 
         torch.save(model, os.path.join(args.save_path, 'refined_model_' + str(ep)))
         torch.save(w_array, os.path.join(args.save_path, 'sample_weights_' + str(ep)))
+
+        torch.save(model, os.path.join(args.save_path, 'curr_refined_model'))
+        torch.save(w_array, os.path.join(args.save_path, 'curr_sample_weights'))
+        torch.save(torch.tensor(ep), os.path.join(args.save_path, "curr_epoch"))
+        torch.save(torch.stack(w_array_delta_ls, dim = 0), os.path.join(args.save_path, "curr_w_array_delta_ls"))
     # cache_sample_weights_for_min_loss_epoch(args, test_loss_ls)
     report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
-
+    w_array_delta_ls_tensor = torch.stack(w_array_delta_ls, dim = 0)
+    torch.save(w_array_delta_ls_tensor, os.path.join(args.save_path, "cached_w_array_delta_ls"))
+    
+    torch.save(torch.sum(w_array_delta_ls_tensor, dim = 1), os.path.join(args.save_path, "cached_w_array_total_delta"))
 
 def update_lr(optimizer, lr):    
     for param_group in optimizer.param_groups:
@@ -762,22 +791,34 @@ def main2(args):
     else:
         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='random', pretrained_model=net)
 
+    prev_weights = None
+    start_epoch = 0
+
     if not args.use_pretrained_model:
         if args.dataset == 'MNIST':
             net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
             
         else:
             net = ResNet18()
-            
-        if args.cuda:
-            net = net.cuda()
+    
+
+    if args.resume_meta_train:
+        net, prev_weights, start_epoch = resume_meta_training_by_loading_cached_info(args, net)
+
+    if args.cuda:
+        net = net.cuda()
     if args.dataset == 'MNIST':
         optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
         scheduler = None
     else:
         optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                        milestones=[100, 150], last_epoch=-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+        optimizer.param_groups[0]['initial_lr'] = args.lr
+        if args.do_train:
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
+                                                        milestones=[100, 150], last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+
+        else:
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=[150, 180], last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     
     if args.do_train:
         logging.info("start basic training")
@@ -785,7 +826,7 @@ def main2(args):
     else:
         logging.info("start meta training")
         # meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), trainloader, metaloader, validloader, testloader)
-        meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = None, target_id = None)
+        meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = prev_weights, target_id = None, start_ep=start_epoch)
 
 def main3(args):
 
@@ -883,9 +924,6 @@ def main(args):
         train_loader, valid_loader, meta_loader, test_loader = get_mnist_data_loader2(args)
 
     net = DNN_two_layers()
-
-    if args.cuda:
-        net = net.cuda()
     
     optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
 

@@ -459,6 +459,87 @@ def find_representative_samples0(net, train_dataset,validset, train_transform, a
     return train_set, valid_set, meta_set, remaining_origin_labels
 
 
+def find_representative_samples1(net, train_dataset,validset, train_transform, args, origin_labels, cached_sample_weights = None):
+    # valid_ratio = args.valid_ratio
+    prob_gap_ls = torch.zeros(len(train_dataset))
+
+    prev_w_array_delta_ls_tensor = torch.load(os.path.join(args.prev_save_path, "cached_w_array_delta_ls"), map_location=torch.device('cpu'))
+    
+    prev_w_array_total_delta_tensor = torch.load(os.path.join(args.prev_save_path, "cached_w_array_total_delta"), map_location=torch.device('cpu'))
+
+    if args.cuda:
+        prev_w_array_delta_ls_tensor = prev_w_array_delta_ls_tensor.cuda()
+        prev_w_array_total_delta_tensor = prev_w_array_total_delta_tensor.cuda()
+
+    sorted_prev_w_array_total_delta_tensor, sorted_prev_w_array_total_delta_tensor_idx = torch.sort(torch.abs(prev_w_array_total_delta_tensor), descending=False)
+
+    all_sample_ids = torch.tensor(list(range(len(train_dataset))))
+
+    valid_count = len(validset) + args.valid_count
+
+    cluster_ids_x, cluster_centers = kmeans(
+        X=prev_w_array_delta_ls_tensor, num_clusters=valid_count, distance='euclidean', device=prev_w_array_total_delta_tensor.device)
+
+    sorted_prev_w_array_idx_cluster_idx = cluster_ids_x[sorted_prev_w_array_total_delta_tensor_idx]
+
+    selected_count = 0
+
+    covered_cluster_id_set = set()
+
+    idx = 0
+
+    valid_idx_ls = []
+
+    while selected_count < args.valid_count:
+        curr_cluster_idx = sorted_prev_w_array_idx_cluster_idx[idx].item()
+        curr_sample_idx = sorted_prev_w_array_total_delta_tensor_idx[idx].item()
+        idx += 1
+        if curr_cluster_idx in covered_cluster_id_set:
+            continue
+
+        covered_cluster_id_set.add(curr_cluster_idx)
+
+        valid_idx_ls.append(curr_sample_idx)
+
+    valid_ids = torch.tensor(valid_idx_ls)
+
+
+
+
+
+    # valid_count = len(validset) + args.valid_count#int(len(train_dataset)*valid_ratio)
+
+    # pred_labels = torch.zeros(len(train_dataset), dtype =torch.long)
+
+    # trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
+
+    # existing_valid_representation = obtain_representations_for_valid_set(args, validset, net)
+
+    
+
+    # if not args.cluster_method_two:
+    #     valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
+    #     valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count)
+    # else:
+
+    #     valid_ids, new_valid_representations = get_representative_valid_ids2(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
+    #     valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count)
+        # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
+
+    torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
+    update_train_ids = torch.ones(len(train_dataset))
+    if not args.include_valid_set_in_training:
+        update_train_ids[valid_ids] = 0
+    update_train_ids = update_train_ids.nonzero().view(-1)
+    
+    train_set, valid_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, train_transform)
+
+    remaining_origin_labels = origin_labels[update_train_ids]
+
+    return train_set, valid_set, meta_set, remaining_origin_labels
+
+
+
     # valid_set = Subset(train_loader.dataset, valid_ids)
     # valid_set = new_mnist_dataset2(train_dataset.data[valid_ids].clone(), train_dataset.targets[valid_ids].clone())
 
@@ -672,8 +753,11 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                     flipped_labels = torch.load(flipped_label_dir)
                 trainset.targets = flipped_labels
             # 
-            if args.init_cluster_by_confident:
-                trainset, validset, metaset, remaining_origin_labels = init_sampling_valid_samples(pretrained_model, trainset, transform_train, args, origin_labels)
+            # if args.init_cluster_by_confident:
+            #     trainset, validset, metaset, remaining_origin_labels = init_sampling_valid_samples(pretrained_model, trainset, transform_train, args, origin_labels)
+            # else:
+            if args.cluster_method_three:
+                trainset, validset, metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, transform_train, args, origin_labels)
             else:
                 trainset, validset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, transform_train, args, origin_labels)
             cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)

@@ -18,6 +18,8 @@ def parse_args(args=None):
     parser.add_argument('--include_valid_set_in_training', action='store_true', help='select valid set')
     parser.add_argument('--cluster_method_two', action='store_true', help='select valid set')
     parser.add_argument('--init_cluster_by_confident', action='store_true', help='select valid set')
+    parser.add_argument('--resume_meta_train', action='store_true', help='resume meta training')
+    parser.add_argument('--cluster_method_three', action='store_true', help='cache_loss_per_epoch')
 
 
     parser.add_argument('--unsup_rep', action='store_true', help='unsupervised representation usage')
