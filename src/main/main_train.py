@@ -939,11 +939,13 @@ def main(args):
 
 if __name__ == "__main__":
     args = parse_args()
-
-    torch.cuda.set_device(args.local_rank)
     torch.distributed.init_process_group(backend='nccl', init_method='env://')
-    cudnn.benchmark = True
+    args.world_size = torch.distributed.get_world_size()
+    args.local_rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(args.local_rank)
 
+    cudnn.benchmark = True
+    
     os.makedirs(args.save_path, exist_ok=True)
     logger = setup_logger(output=args.save_path, distributed_rank=dist.get_rank(), name="moco+cld")
     if dist.get_rank() == 0:
@@ -951,7 +953,7 @@ if __name__ == "__main__":
         with open(path, 'w') as f:
             json.dump(vars(args), f, indent=2)
         logger.info("Full config saved to {}".format(path))
-
+    args.device = torch.device("cuda", args.local_rank)
     # if args.dataset == 'MNIST':
     main2(args)
     # else:

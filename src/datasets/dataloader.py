@@ -465,9 +465,9 @@ def find_representative_samples1(net, train_dataset,validset, train_transform, a
 
     prev_w_array_delta_ls_tensor = torch.load(os.path.join(args.prev_save_path, "cached_w_array_delta_ls"), map_location=torch.device('cpu'))
     
-    prev_w_array_delta_ls_tensor = prev_w_array_delta_ls_tensor[0:344]
+    # prev_w_array_delta_ls_tensor = prev_w_array_delta_ls_tensor
 
-    prev_w_array_total_delta_tensor = torch.sum(prev_w_array_delta_ls_tensor, dim = 0)# torch.load(os.path.join(args.prev_save_path, "cached_w_array_total_delta"), map_location=torch.device('cpu'))
+    prev_w_array_total_delta_tensor,_ = torch.max(torch.abs(prev_w_array_delta_ls_tensor), dim = 0)# torch.sum(prev_w_array_delta_ls_tensor, dim = 0)# torch.load(os.path.join(args.prev_save_path, "cached_w_array_total_delta"), map_location=torch.device('cpu'))
 
     if args.cuda:
         prev_w_array_delta_ls_tensor = prev_w_array_delta_ls_tensor.cuda()
@@ -479,8 +479,8 @@ def find_representative_samples1(net, train_dataset,validset, train_transform, a
 
     valid_count = len(validset) + args.valid_count
 
-    cluster_ids_x, cluster_centers = kmeans(args, 
-        X=torch.transpose(prev_w_array_delta_ls_tensor,0,1), num_clusters=valid_count, distance='euclidean')
+    cluster_ids_x, cluster_centers = kmeans( 
+        X=torch.transpose(prev_w_array_delta_ls_tensor,0,1), num_clusters=valid_count, distance='euclidean', device = prev_w_array_delta_ls_tensor.device, tol=1e-3)
 
     sorted_prev_w_array_idx_cluster_idx = cluster_ids_x[sorted_prev_w_array_total_delta_tensor_idx]
 
@@ -502,6 +502,8 @@ def find_representative_samples1(net, train_dataset,validset, train_transform, a
         covered_cluster_id_set.add(curr_cluster_idx)
 
         valid_idx_ls.append(curr_sample_idx)
+
+        selected_count += 1
 
     valid_ids = torch.tensor(valid_idx_ls)
 

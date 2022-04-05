@@ -17,7 +17,7 @@ def initialize(X, num_clusters):
 
 
 def kmeans(
-        args,
+        # args,
         X,
         num_clusters,
         distance='euclidean',
@@ -49,8 +49,9 @@ def kmeans(
     X = X.float()
 
     # transfer to device
-    if args.cuda:
-        X = X.cuda()
+    # if args.cuda:
+    #     X = X.cuda()
+    X = X.to(device)
 
     # initialize
     initial_state = initialize(X, num_clusters)
@@ -72,9 +73,9 @@ def kmeans(
         initial_state_pre = initial_state.clone()
 
         for index in range(num_clusters):
-            selected = torch.nonzero(choice_cluster == index).squeeze()
-            if args.cuda:
-                selected = selected.cuda()
+            selected = torch.nonzero(choice_cluster == index).squeeze().to(device)
+            # if args.cuda:
+            #     selected = selected.cuda()
 
             if sample_weights is not None:
                 selected_sample_weights = torch.index_select(sample_weights, 0, selected)
