@@ -66,7 +66,7 @@ def kmeans(
         if existing_cluster_mean_ls is not None:
             full_centroid_state = torch.cat([existing_cluster_mean_ls, full_centroid_state], dim = 0)
 
-        dis = pairwise_distance_function(X, full_centroid_state)
+        dis = pairwise_distance_function(X, full_centroid_state,device)
 
         choice_cluster = torch.argmin(dis, dim=1)
 
@@ -78,8 +78,10 @@ def kmeans(
             #     selected = selected.cuda()
 
             if sample_weights is not None:
-                selected_sample_weights = torch.index_select(sample_weights, 0, selected)
-            selected = torch.index_select(X, 0, selected)
+                # selected_sample_weights = torch.index_select(sample_weights, 0, selected)
+                selected_sample_weights = sample_weights[selected]
+            # selected = torch.index_select(X, 0, selected)
+            selected = X[selected]
             
             if sample_weights is None:
                 initial_state[index] = selected.mean(dim=0)
@@ -143,19 +145,35 @@ def kmeans_predict(
     return choice_cluster.cpu()
 
 
-def pairwise_distance(data1, data2, device=torch.device('cpu')):
+def pairwise_distance(data1, data2, device=torch.device('cpu'), batch_size = 128):
     # transfer to device
-    data1, data2 = data1.to(device), data2.to(device)
-
+    # data1, data2 = data1.to(device), data2.to(device)
+    data2 = data2.to(device)
     # N*1*M
     A = data1.unsqueeze(dim=1)
 
     # 1*N*M
     B = data2.unsqueeze(dim=0)
 
-    dis = (A - B) ** 2.0
-    # return N*N matrix for pairwise distance
-    dis = dis.sum(dim=-1).squeeze()
+    full_dist_ls = []
+
+    for start_id in range(0, A.shape[0], batch_size):
+        end_id = start_id + batch_size
+        if end_id > A.shape[0]:
+            end_id = A.shape[0]
+
+        curr_A = A[start_id: end_id]
+        curr_A = curr_A.to(device)
+
+        curr_dist = ((curr_A - B) **2.0).sum(dim=-1).squeeze()
+        full_dist_ls.append(curr_dist)
+        del curr_A
+
+    dis = torch.cat(full_dist_ls)
+
+    # dis = (A - B) ** 2.0
+    # # return N*N matrix for pairwise distance
+    # dis = dis.sum(dim=-1).squeeze()
     return dis
 
 
