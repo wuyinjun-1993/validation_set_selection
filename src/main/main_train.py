@@ -136,7 +136,7 @@ def resume_meta_training_by_loading_cached_info(args, net):
     net.load_state_dict(model.state_dict(), strict=False)
     return net, w_array, start_ep
 
-def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, valid_loader, test_loader, to_device, cached_w_array = None, scheduler = None, target_id = None, start_ep = 0):
+def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, valid_loader, test_loader, to_device, cached_w_array = None, scheduler = None, target_id = None, start_ep = 0, mile_stones_epochs = None):
     
     # train_loader = DataLoader(train_dataset, batch_size=args['bs'], shuffle=True, num_workers=2, pin_memory=True)
     # test_loader =  DataLoader(test_dataset, batch_size=args['bs'], shuffle=False, num_workers=2, pin_memory=True)
@@ -381,10 +381,24 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             logging.info("learning rate at iteration %d after using scheduler: %f" %(int(ep), float(opt.param_groups[0]['lr'])))
 
         if args.lr_decay:
-            if ep > 100:
-                
-                curr_ilp_learning_rate = args.meta_lr*0.1
+            if mile_stones_epochs is not None:
+                ms_idx = 0
+                for ms_ep_idx in range(len(mile_stones_epochs)-1):
+                    if ep >= mile_stones_epochs[ms_ep_idx] and ep < mile_stones_epochs[ms_ep_idx+1]:
+                        ms_idx = ms_ep_idx + 1
+                        break
+                if ep >= mile_stones_epochs[-1]:
+                    ms_idx = len(mile_stones_epochs)
+
+                curr_ilp_learning_rate = args.meta_lr*(0.1**(ms_idx))
                 logging.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
+            else:
+
+
+                if ep > 100:
+                    
+                    curr_ilp_learning_rate = args.meta_lr*0.1
+                    logging.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
             # min_valid_loss_epoch = numpy.argmin(numpy.array(valid_loss_ls))
             # if min_valid_loss_epoch < ep-1:
             # opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
@@ -801,6 +815,7 @@ def main2(args):
         else:
             net = ResNet18()
     
+    mile_stones_epochs = None
 
     if args.resume_meta_train:
         net, prev_weights, start_epoch = resume_meta_training_by_loading_cached_info(args, net)
@@ -814,11 +829,13 @@ def main2(args):
         optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
         if args.do_train:
+            mile_stones_epochs = [100, 150]
             scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                        milestones=[100, 150], last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+                                                        milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
         else:
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=[150, 180], last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+            mile_stones_epochs = [120,160]
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     
     if args.do_train:
         logging.info("start basic training")
@@ -826,7 +843,7 @@ def main2(args):
     else:
         logging.info("start meta training")
         # meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), trainloader, metaloader, validloader, testloader)
-        meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = prev_weights, target_id = None, start_ep=start_epoch)
+        meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = prev_weights, target_id = None, start_ep=start_epoch, mile_stones_epochs = mile_stones_epochs)
 
 def main3(args):
 
