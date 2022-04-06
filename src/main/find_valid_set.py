@@ -11,9 +11,13 @@ from main.helper_func import *
 from clustering_method.k_means import *
 
 
-def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4, sample_weights = None, existing_cluster_centroids = None):
-    cluster_ids_x, cluster_centers = kmeans(
-        X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids)
+def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4, sample_weights = None, existing_cluster_centroids = None, cosin_distance = False):
+    if not cosin_distance:
+        cluster_ids_x, cluster_centers = kmeans(
+            X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids)
+    else:
+        cluster_ids_x, cluster_centers = kmeans(
+            X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids)
 
     representive_id_ls = []
     representive_representation_ls = []
@@ -195,10 +199,10 @@ def get_representative_valid_ids(train_loader, args, net, valid_count, cached_sa
             curr_cached_sample_weights = cached_sample_weights[sample_id_ls]
 
         if existing_valid_representation is not None and existing_valid_set is not None:
-            valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights, existing_cluster_centroids=existing_valid_representation[existing_valid_set.targets == label])    
+            valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights, existing_cluster_centroids=existing_valid_representation[existing_valid_set.targets == label], cosin_distance=args.cosin_dist)    
 
         else:
-            valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights)
+            valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights, cosin_distance=args.cosin_dist)
 
         valid_ids_ls.append(valid_ids)
         valid_sample_representation_ls.append(valid_sample_representation)
@@ -265,7 +269,7 @@ def get_representative_valid_ids2(train_loader, args, net, valid_count, cached_s
     # sample_representation_vec_ls = sample_representation_vec_ls_by_class[label]
 
     all_sample_ids = torch.cat(sample_id_ls)
-    valid_ids, valid_sample_representation_tensor = cluster_per_class(torch.cat(sample_representation_vec_ls), all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids])  
+    valid_ids, valid_sample_representation_tensor = cluster_per_class(torch.cat(sample_representation_vec_ls), all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist)  
 
 
     # for label in sample_representation_vec_ls_by_class:

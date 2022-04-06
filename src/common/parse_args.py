@@ -20,6 +20,7 @@ def parse_args(args=None):
     parser.add_argument('--init_cluster_by_confident', action='store_true', help='select valid set')
     parser.add_argument('--resume_meta_train', action='store_true', help='resume meta training')
     parser.add_argument('--cluster_method_three', action='store_true', help='cache_loss_per_epoch')
+    parser.add_argument('--cosin_dist', action='store_true', help='use cosine distance for k-means clustering')
 
 
     parser.add_argument('--unsup_rep', action='store_true', help='unsupervised representation usage')
@@ -34,7 +35,6 @@ def parse_args(args=None):
     parser.add_argument('--err_label_ratio', default=0.2, type=float)
     parser.add_argument('--data_dir', default=None, type=str)
     parser.add_argument('--save_path', default=None, type=str)
-    parser.add_argument('--prev_save_path', default=None, type=str)
 
     parser.add_argument('--batch_size', default=4, type=int)
     parser.add_argument('--gpu_id', default=4, type=int)

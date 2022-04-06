@@ -177,15 +177,33 @@ def pairwise_distance(data1, data2, device=torch.device('cpu'), batch_size = 128
     return dis
 
 
-def pairwise_cosine(data1, data2, device=torch.device('cpu')):
+def pairwise_cosine(data1, data2, device=torch.device('cpu'), batch_size = 128):
     # transfer to device
-    data1, data2 = data1.to(device), data2.to(device)
+    # data1, data2 = data1.to(device), data2.to(device)
+    data2 = data2.to(device)
 
     # N*1*M
     A = data1.unsqueeze(dim=1)
 
     # 1*N*M
     B = data2.unsqueeze(dim=0)
+
+    full_dist_ls = []
+
+    for start_id in range(0, A.shape[0], batch_size):
+        end_id = start_id + batch_size
+        if end_id > A.shape[0]:
+            end_id = A.shape[0]
+
+        curr_A = A[start_id: end_id]
+        curr_A = curr_A.to(device)
+        curr_A_normalized = curr_A / curr_A.norm(dim=-1, keepdim=True)
+        B_normalized = B / B.norm(dim=-1, keepdim=True)
+        curr_cosine = curr_A_normalized * B_normalized    
+        curr_cosine_dis = 1 - curr_cosine.sum(dim=-1).squeeze()
+        full_dist_ls.append(curr_cosine_dis)
+
+    full_dist_tensor = torch.cat(full_dist_ls)
 
     # normalize the points  | [0.3, 0.4] -> [0.3/sqrt(0.09 + 0.16), 0.4/sqrt(0.09 + 0.16)] = [0.3/0.5, 0.4/0.5]
     A_normalized = A / A.norm(dim=-1, keepdim=True)
