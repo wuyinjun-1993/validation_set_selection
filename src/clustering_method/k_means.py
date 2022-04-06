@@ -205,13 +205,14 @@ def pairwise_cosine(data1, data2, device=torch.device('cpu'), batch_size = 128):
 
     full_dist_tensor = torch.cat(full_dist_ls)
 
+    return full_dist_tensor
     # normalize the points  | [0.3, 0.4] -> [0.3/sqrt(0.09 + 0.16), 0.4/sqrt(0.09 + 0.16)] = [0.3/0.5, 0.4/0.5]
-    A_normalized = A / A.norm(dim=-1, keepdim=True)
-    B_normalized = B / B.norm(dim=-1, keepdim=True)
+    # A_normalized = A / A.norm(dim=-1, keepdim=True)
+    # B_normalized = B / B.norm(dim=-1, keepdim=True)
 
-    cosine = A_normalized * B_normalized
+    # cosine = A_normalized * B_normalized
 
-    # return N*N matrix for pairwise distance
-    cosine_dis = 1 - cosine.sum(dim=-1).squeeze()
-    return cosine_dis
+    # # return N*N matrix for pairwise distance
+    # cosine_dis = 1 - cosine.sum(dim=-1).squeeze()
+    # return cosine_dis
 

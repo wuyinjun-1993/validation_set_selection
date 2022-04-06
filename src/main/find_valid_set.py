@@ -305,6 +305,94 @@ def get_representative_valid_ids2(train_loader, args, net, valid_count, cached_s
 
     return valid_ids, valid_sample_representation_tensor
 
+def get_representative_valid_ids3(train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None):
+
+    if args.add_under_rep_samples:
+        under_represent_count = int(valid_count/2)
+        main_represent_count = valid_count - under_represent_count
+    else:
+        under_represent_count = 0
+        main_represent_count = valid_count
+
+
+    # sample_representation_vec_ls_by_class = dict()
+    # sample_id_ls_by_class = dict()
+    sample_representation_vec_ls = []
+
+    sample_id_ls = []
+    with torch.no_grad():
+
+        # all_sample_representations = [None]*len(train_loader.dataset)
+
+
+        for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
+
+            if args.cuda:
+                data = data.cuda()
+                # labels = labels.cuda()
+            
+            sample_representation = net.feature_forward(data)
+
+            sample_representation_vec_ls.append(sample_representation)
+
+            sample_id_ls.append(sample_ids)
+    
+    
+    all_sample_ids = torch.cat(sample_id_ls)
+    sample_weights=cached_sample_weights[all_sample_ids]
+    sample_representation_vec_tensor = torch.cat(sample_representation_vec_ls)
+
+    num_clusters = main_represent_count
+
+    if not args.cosin_dist:
+        cluster_ids_x, cluster_centers = kmeans(
+            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights)
+    else:
+        cluster_ids_x, cluster_centers = kmeans(
+            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='cosine', device=sample_representation_vec_ls.device, sample_weights=sample_weights)
+
+
+    if not args.cosin_dist:
+        existing_valid_training_dists = pairwise_distance(sample_representation_vec_tensor,existing_valid_representation, device = sample_representation_vec_tensor.device)
+    else:
+        existing_valid_training_dists = pairwise_cosine(sample_representation_vec_tensor, existing_valid_representation, device = sample_representation_vec_tensor.device)
+
+    min_existing_valid_training_dists,_ = torch.min(existing_valid_training_dists, dim = 1)
+
+    sorted_min_existing_valid_training_dists, sorted_min_existing_valid_training_ids  = torch.sort(min_existing_valid_training_dists, descending=True)
+
+    
+    covered_cluster_id_set = set()
+
+    idx = 0
+
+    selected_count = 0
+
+    valid_idx_ls = []
+
+    while selected_count < args.valid_count:
+        curr_sample_idx = sorted_min_existing_valid_training_ids[idx].item()
+        curr_cluster_idx = cluster_ids_x[curr_sample_idx].item()
+        
+        idx += 1
+        if curr_cluster_idx in covered_cluster_id_set:
+            continue
+
+        covered_cluster_id_set.add(curr_cluster_idx)
+
+        valid_idx_ls.append(curr_sample_idx)
+
+        selected_count += 1
+
+    valid_ids = torch.tensor(valid_idx_ls)
+
+
+    valid_sample_representation_tensor = sample_representation_vec_tensor[valid_ids]
+    
+    # valid_ids, valid_sample_representation_tensor = cluster_per_class(, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, , cosin_distance=args.cosin_dist)  
+
+
+    return valid_ids, valid_sample_representation_tensor
 
 
 

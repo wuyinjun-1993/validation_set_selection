@@ -336,9 +336,12 @@ def obtain_representations_for_valid_set(args, valid_set, net):
     return torch.cat(sample_representation_ls)
 
 
-def determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representations, valid_count):
+def determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representations, valid_count, cosine_dist = False):
 
-    existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, device = new_valid_representations.device)
+    if not cosine_dist:
+        existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, device = new_valid_representations.device)
+    else:
+        existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, device = new_valid_representations.device)
 
     nearset_new_valid_distance,_ = torch.min(existing_new_dists, dim = 0)
 
@@ -438,12 +441,16 @@ def find_representative_samples0(net, train_dataset,validset, train_transform, a
     
 
     if not args.cluster_method_two:
-        valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
-        valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count)
+        if args.cluster_method_three:
+            valid_ids, new_valid_representations = get_representative_valid_ids3(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
+            
+        else:
+            valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
+            valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist)
     else:
 
         valid_ids, new_valid_representations = get_representative_valid_ids2(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
-        valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count)
+        valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
 
     torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
@@ -725,11 +732,11 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
             # trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
 
 
-            if args.cluster_method_three:
-                # net, train_dataset,validset, train_transform, args, origin_labels
-                trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, validset, transform_train, args, origin_labels)
-            else:
-                trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
+            # if args.cluster_method_three:
+            #     # net, train_dataset,validset, train_transform, args, origin_labels
+            #     trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, validset, transform_train, args, origin_labels)
+            # else:
+            trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
 
 
 
@@ -770,10 +777,10 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
             # if args.init_cluster_by_confident:
             #     trainset, validset, metaset, remaining_origin_labels = init_sampling_valid_samples(pretrained_model, trainset, transform_train, args, origin_labels)
             # else:
-            if args.cluster_method_three:
-                trainset, validset, metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, transform_train, args, origin_labels)
-            else:
-                trainset, validset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, transform_train, args, origin_labels)
+            # if args.cluster_method_three:
+            #     trainset, validset, metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, transform_train, args, origin_labels)
+            # else:
+            trainset, validset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, transform_train, args, origin_labels)
             cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
         
     # if args.flip_labels:
