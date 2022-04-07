@@ -36,7 +36,7 @@ cd ../src/main/
 
 
 add_valid_in_training_flag="--cluster_method_two --cosin_dist"
-lr_decay_flag=""
+lr_decay_flag="--lr_decay"
 
 <<cmd
 if (( add_valid_in_training_set == true ))
