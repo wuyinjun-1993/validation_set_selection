@@ -269,7 +269,10 @@ def get_representative_valid_ids2(train_loader, args, net, valid_count, cached_s
     # sample_representation_vec_ls = sample_representation_vec_ls_by_class[label]
 
     all_sample_ids = torch.cat(sample_id_ls)
-    valid_ids, valid_sample_representation_tensor = cluster_per_class(torch.cat(sample_representation_vec_ls), all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist)  
+    if cached_sample_weights is not None:
+        valid_ids, valid_sample_representation_tensor = cluster_per_class(torch.cat(sample_representation_vec_ls), all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist)  
+    else:
+        valid_ids, valid_sample_representation_tensor = cluster_per_class(torch.cat(sample_representation_vec_ls), all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist)  
 
 
     # for label in sample_representation_vec_ls_by_class:
@@ -346,10 +349,10 @@ def get_representative_valid_ids3(train_loader, args, net, valid_count, cached_s
 
     if not args.cosin_dist:
         cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights)
+            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_tensor.device, sample_weights=sample_weights)
     else:
         cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='cosine', device=sample_representation_vec_ls.device, sample_weights=sample_weights)
+            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='cosine', device=sample_representation_vec_tensor.device, sample_weights=sample_weights)
 
 
     if not args.cosin_dist:

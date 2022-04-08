@@ -19,7 +19,7 @@ import models
 from lib.NCECriterion import NCESoftmaxLoss
 from lib.lr_scheduler import get_scheduler
 from models.resnet import *
-
+import collections
 
 cached_model_name="cached_model"
 
@@ -678,7 +678,10 @@ def load_checkpoint2(args, model):
             
             state = torch.load(cached_model_file_name, map_location=torch.device("cpu"))
 
-            model.load_state_dict(state.state_dict())
+            if type(state) is collections.OrderedDict:
+                model.load_state_dict(state)
+            else:
+                model.load_state_dict(state.state_dict())
             logger.info('==> Loading cached model successfully')
 
     return model
@@ -764,7 +767,12 @@ def find_boundary_and_representative_samples(net, train_loader, args, valid_rati
     return train_loader, valid_loader, meta_loader
     # torch.sort(prob_gap_ls, dim = 0, descending = False)
 
+def load_pretrained_model(args, net):
+    pretrained_model_state = torch.load(os.path.join(args.data_dir, "pretrained_model"))
 
+    net.load_state_dict(pretrained_model_state, strict=False)
+
+    return net
 
 def main2(args):
 
@@ -808,13 +816,24 @@ def main2(args):
     prev_weights = None
     start_epoch = 0
 
-    if not args.use_pretrained_model:
-        if args.dataset == 'MNIST':
-            net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
+    # if not args.use_pretrained_model:
+    if args.dataset == 'MNIST':
+        net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
+        
+    else:
+        net = ResNet18()
+
+    if args.use_pretrained_model:
+        net = load_pretrained_model(args, net)
+
+    # else:
+    #     if args.dataset == 'MNIST':
+    #         net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
             
-        else:
-            net = ResNet18()
-    
+    #     else:
+    #         net = ResNet18()
+
+        
     mile_stones_epochs = None
 
     if args.resume_meta_train:
@@ -834,7 +853,10 @@ def main2(args):
                                                         milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
         else:
-            mile_stones_epochs = [120,160]
+            if args.use_pretrained_model:
+                mile_stones_epochs = [20,60]
+            else:
+                mile_stones_epochs = [120,160]
             scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     
     if args.do_train:
