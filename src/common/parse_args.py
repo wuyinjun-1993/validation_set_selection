@@ -10,6 +10,7 @@ def parse_args(args=None):
     parser.add_argument('--cuda', action='store_true', help='use GPU')
     parser.add_argument('--flip_labels', action='store_true', help='flip labels')
     parser.add_argument('--adversarial_flip', action='store_true', help='flip labels')
+    parser.add_argument('--bias_classes', action='store_true', help='Create class bias')
     parser.add_argument('--load_dataset', action='store_true', help='load dataset')
     parser.add_argument('--continue_label', action='store_true', help='load dataset')
 

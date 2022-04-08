@@ -695,6 +695,35 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                 origin_labels = trainset.targets.clone()
 
             flipped_labels = None
+
+            if args.bias_classes:
+                # Assume class labels are in [0, C) where C is number of classes
+                class_bias = torch.tensor([0.95, 0.85, 0.75, 0.65, 0.55, 0.45,
+                    0.35, 0.25, 0.15, 0.05])
+                train_rand = torch.rand(trainset.targets.shape[0])
+                test_rand = torch.rand(testset.targets.shape[0])
+
+                # Boolean tensors where i is True if we will keep this sample in
+                # biased set
+                keep_train = torch.zeros(trainset.targets.shape[0],
+                        dtype=torch.bool)
+                keep_test = torch.zeros(testset.targets.shape[0],
+                        dtype=torch.bool)
+                for label in range(class_bias.shape[0]):
+                    keep_train_for_class = (trainset.targets[
+                        train_rand <= class_bias[label]] == label)
+                    keep_train[keep_train_for_class] = True
+                    keep_test_for_class = (testset.targets[
+                        test_rand <= class_bias[label]] == label)
+                    keep_test[keep_test_for_class] = True
+
+                trainset.data = trainset.data[keep_train]
+                trainset.targets = trainset.targets[keep_train]
+                testset.data = testset.data[keep_test]
+                testset.targets = testset.targets[keep_test]
+
+                logging.info("Total number of training samples: %d".format(torch.sum(keep_train).item()))
+                logging.info("Total number of test samples: %d".format(torch.sum(keep_test).item()))
             
             if args.flip_labels:
 
