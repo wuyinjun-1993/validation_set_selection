@@ -76,9 +76,10 @@ def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test
     for epoch in best_valid_acc_epochs:
         all_best = True
         for k in range(1, tol+1):
-            if not valid_acc_ls[epoch + k] == best_valid_acc:
-                all_best = False
-                break
+            if epoch + k <= len(valid_acc_ls) - 1:
+                if not valid_acc_ls[epoch + k] == best_valid_acc:
+                    all_best = False
+                    break
 
         if all_best:
             break
