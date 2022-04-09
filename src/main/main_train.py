@@ -62,7 +62,7 @@ def report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, te
 
     logging.info("best test performance so far is in epoch %d: %f, %f"%(min_loss_epoch, min_test_loss, min_test_acc))
 
-def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5):
+def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=True):
     valid_acc_arr = numpy.array(valid_acc_ls)
 
     best_valid_acc = numpy.max(valid_acc_arr)
@@ -89,8 +89,10 @@ def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test
     final_test_acc = test_acc_ls[final_epoch]
 
     logging.info("final test performance is in epoch %d: %f, %f"%(final_epoch, final_test_loss, final_test_acc))
-
-    cache_sample_weights_given_epoch(final_epoch)
+    if is_meta:
+        cache_sample_weights_given_epoch(final_epoch)
+    else:
+        cache_sample_weights_given_epoch_basic_train(final_epoch)
 
 def cache_sample_weights_for_min_loss_epoch(args, test_loss_ls):
     min_loss_epoch = numpy.argmin(test_loss_ls)
@@ -116,6 +118,19 @@ def cache_sample_weights_given_epoch(epoch):
 
 
     torch.save(best_w_array, os.path.join(args.save_path, "cached_sample_weights"))
+
+    torch.save(best_model, os.path.join(args.save_path, cached_model_name))
+
+
+def cache_sample_weights_given_epoch_basic_train(epoch):
+    # best_w_array = torch.load(os.path.join(args.save_path, 'sample_weights_' + str(epoch)))
+
+    best_model = torch.load(os.path.join(args.save_path, 'model_' + str(epoch)))
+
+    # logging.info("caching sample weights at epoch %d"%(epoch))
+
+
+    # torch.save(best_w_array, os.path.join(args.save_path, "cached_sample_weights"))
 
     torch.save(best_model, os.path.join(args.save_path, cached_model_name))
 
@@ -474,7 +489,7 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
             report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, test_acc)
 
 
-    report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
+    report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=False)
         # if (epoch+1) % 40 == 0:
         #     curr_lr /= 10
         #     update_lr(optimizer, curr_lr)
