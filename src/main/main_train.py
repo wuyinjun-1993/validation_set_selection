@@ -156,6 +156,8 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
 
     if cached_w_array is None:
         w_array =torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
+        # w_array.data[:] = 1e-1
+        # w_array =torch.ones(len(train_loader.dataset), requires_grad=True, device = device)*1e-4
     else:
         cached_w_array.requires_grad = False
         w_array = cached_w_array.clone()
@@ -429,6 +431,10 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
 
     network.train()
     curr_lr = args.lr
+    valid_loss_ls = []
+    valid_acc_ls = []
+    test_loss_ls = []
+    test_acc_ls = []
     for epoch in range(args.epochs):
 
         for batch_idx, (_, data, target) in enumerate(train_loader):
@@ -453,12 +459,22 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
         # logging.info("train performance at epoch %d"%(epoch))
         # test(train_loader,network, args)
         logging.info("learning rate at epoch %d: %f"%(epoch, float(optimizer.param_groups[0]['lr'])))
-        logging.info("valid performance at epoch %d"%(epoch))
-        if valid_loader is not None:
-            test(valid_loader,network, criterion, args, "valid")
-        logging.info("test performance at epoch %d"%(epoch))
-        test(test_loader,network, criterion,args, "test")
+        
+        
+        with torch.no_grad():
+        
+            logging.info("valid performance at epoch %d"%(epoch))
+                
+            if valid_loader is not None:
+                valid_loss, valid_acc = test(valid_loader,network, criterion, args, "valid")
+                report_best_test_performance_so_far(valid_loss_ls, valid_acc_ls, valid_loss, valid_acc)
+            logging.info("test performance at epoch %d"%(epoch))
+            test_loss, test_acc = test(test_loader,network, criterion,args, "test")
 
+            report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, test_acc)
+
+
+    report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
         # if (epoch+1) % 40 == 0:
         #     curr_lr /= 10
         #     update_lr(optimizer, curr_lr)
