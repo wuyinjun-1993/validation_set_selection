@@ -3,7 +3,7 @@ trap "exit" INT
 
 
 
-err_label_ratio=0.6
+err_label_ratio=0.9
 
 dataset_name=$1
 data_dir=$2
@@ -36,7 +36,7 @@ cd ../src/main/
 
 
 add_valid_in_training_flag="--cluster_method_two --cosin_dist"
-lr_decay_flag="--lr_decay"
+lr_decay_flag=""
 
 <<cmd
 if (( add_valid_in_training_set == true ))
@@ -55,7 +55,7 @@ cmd
 
 
 
-exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py --load_dataset --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio ${valid_ratio_each_run} --meta_lr ${meta_lr} --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_do_train/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --lr_decay --do_train"
+exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py --load_dataset --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio ${valid_ratio_each_run} --meta_lr ${meta_lr} --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_do_train/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --do_train"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_0.txt
@@ -67,7 +67,7 @@ echo "${exe_cmd} > ${output_file_name}"
 #${exe_cmd} > ${output_file_name} 2>&1
 
 
-exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py  --load_dataset --select_valid_set --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio ${valid_ratio_each_run} --meta_lr ${meta_lr} --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_seq_select_0/ --prev_save_path ${save_path_prefix}_do_train/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --cluster_method_two --cosin_dist --lr_decay"
+exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py  --load_dataset --select_valid_set --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio ${valid_ratio_each_run} --meta_lr ${meta_lr} --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_seq_select_0/ --prev_save_path ${save_path_prefix}_do_train/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --cluster_method_two --cosin_dist "
 
 
 
@@ -92,7 +92,7 @@ echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
 for (( k=1; k<=repeat_times; k++ ))
 do
 
-	exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py --select_valid_set --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio ${valid_ratio_each_run} --meta_lr ${meta_lr} --not_save_dataset --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_seq_select_$k/ --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --cluster_method_two --cosin_dist --lr_decay"
+	exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py --select_valid_set --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio ${valid_ratio_each_run} --meta_lr ${meta_lr} --not_save_dataset --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_seq_select_$k/ --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --cluster_method_two --cosin_dist"
 
 	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_$k.txt
 
