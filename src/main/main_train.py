@@ -95,6 +95,48 @@ def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test
     else:
         cache_sample_weights_given_epoch_basic_train(final_epoch)
 
+
+def report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=True):
+    # valid_acc_arr = numpy.array(valid_acc_ls)
+
+    # best_valid_acc = numpy.max(valid_acc_arr)
+
+    # # for k in range(len(valid_acc_ls)):
+    # #     if valid_acc_ls[k] == best_valid_acc:
+
+
+    # best_valid_acc_epochs = numpy.reshape(numpy.nonzero(valid_acc_arr == best_valid_acc), (-1))
+
+    # for epoch in best_valid_acc_epochs:
+    #     all_best = True
+    #     for k in range(1, tol+1):
+    #         if epoch + k <= len(valid_acc_ls) - 1:
+    #             if not valid_acc_ls[epoch + k] == best_valid_acc:
+    #                 all_best = False
+    #                 break
+
+    #     if all_best:
+    #         break
+
+
+    test_loss_arr = torch.tensor(test_loss_ls)
+
+    final_epoch = torch.argmin(test_loss_arr)
+
+
+
+    # final_epoch = min(epoch + tol, args.epochs-1)
+    final_test_loss = test_loss_ls[final_epoch]
+
+    final_test_acc = test_acc_ls[final_epoch]
+
+    logging.info("final test performance is in epoch %d: %f, %f"%(final_epoch, final_test_loss, final_test_acc))
+    if is_meta:
+        cache_sample_weights_given_epoch(final_epoch)
+    else:
+        cache_sample_weights_given_epoch_basic_train(final_epoch)
+
+
 def cache_sample_weights_for_min_loss_epoch(args, test_loss_ls):
     min_loss_epoch = numpy.argmin(test_loss_ls)
 
@@ -433,7 +475,7 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
         torch.save(torch.tensor(ep), os.path.join(args.save_path, "curr_epoch"))
         torch.save(torch.stack(w_array_delta_ls, dim = 0), os.path.join(args.save_path, "curr_w_array_delta_ls"))
     # cache_sample_weights_for_min_loss_epoch(args, test_loss_ls)
-    report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
+    report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
     w_array_delta_ls_tensor = torch.stack(w_array_delta_ls, dim = 0)
     torch.save(w_array_delta_ls_tensor, os.path.join(args.save_path, "cached_w_array_delta_ls"))
     
