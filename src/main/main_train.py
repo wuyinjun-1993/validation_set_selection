@@ -121,7 +121,7 @@ def report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, tes
 
     test_loss_arr = torch.tensor(test_loss_ls)
 
-    final_epoch = torch.argmin(test_loss_arr)
+    final_epoch = torch.argmin(test_loss_arr).item()
 
 
 
