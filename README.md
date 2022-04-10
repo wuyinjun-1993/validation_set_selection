@@ -18,18 +18,38 @@ in which "--flip_labels" determines whether to pollute the training set and  "--
 
 
 
-In contrast, we can use the following command to select 0.2% validation samples by using our clustering method. Note that this is separated into two phases. In the first phase, we use random sampling method to select 0.1% samples, which is assumed to have log directory "/path/to/logs0/". Then in the second phase, we use our clustering method to collect the remaining set of samples, which will use some cached information from the previous run with random sampling. So it will use two log directories, one is "/path/to/logs0/" (the log directory of the first run with random sampling) while the other one is "/path/to/logs1/" (the log directory of the current run with our clustering method):
+In contrast, we can use the following command to select 0.2% validation samples by using our clustering method. Note that this is separated into three phases. In the first phase, we pretrain the model by using all the noisy training samples, which is assumed to have log directory "/path/to/logs0/". Then in the second phase, we use our clustering method to collect the remaining set of samples, which will use some cached information from the previous run with random sampling. So it will use two log directories, one is "/path/to/logs0/" (the log directory of the first run with random sampling) while the other one is "/path/to/logs1/" (the log directory of the current run with our clustering method):
 
 ```
 cd src/main/
-###initial random sampling 0.1% samples
-CUDA_VISIBLE_DEVICES=${gpu_id} python -m torch.distributed.launch --nproc_per_node ${num_gpus} --master_port 10032 main_train.py --load_dataset --nce-k 200 --data_dir /path/to/data/ --dataset MNIST --valid_ratio 0.002 --meta_lr 50 --flip_labels --err_label_ratio 0.9 --save_path /path/to/logs0/ --cuda --lr 0.1 --batch_size 4096 --test_batch_size 256 --epochs 1000
+###initial training by using all noisy training samples
+## for cifar10 dataset:
+CUDA_VISIBLE_DEVICES=${gpu_id} python -m torch.distributed.launch --nproc_per_node ${num_gpus} --master_port 10032 main_train.py --load_dataset --nce-k 200 --data_dir /path/to/data/ --dataset cifar10 --valid_ratio 0.002 --meta_lr 20 --flip_labels --err_label_ratio 0.6 --save_path /path/to/logs0/ --cuda --lr 0.1 --batch_size 128 --test_batch_size 128 --epochs 200 --lr_decay --do_train
 
-###sampling by using our clustering method
-CUDA_VISIBLE_DEVICES=${gpu_id} python -m torch.distributed.launch --nproc_per_node ${num_gpus} --master_port 10032 main_train.py --select_valid_set --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights --cached_model_name MNIST_current.pth --nce-k 200 --data_dir /path/to/data/ --dataset MNIST --valid_ratio 0.001 --meta_lr 50 --flip_labels --err_label_ratio 0.9 --save_path /path/to/logs1/ --prev_save_path /path/to/logs0/ --cuda --lr 0.1 --batch_size 4096 --test_batch_size 256 --epochs 1000
+## for MNIST dataset:
+
+CUDA_VISIBLE_DEVICES=${gpu_id} python -m torch.distributed.launch --nproc_per_node ${num_gpus} --master_port 10032 main_train.py --load_dataset --nce-k 200 --data_dir /path/to/data/ --dataset MNIST --valid_ratio 0.002 --meta_lr 50 --flip_labels --err_label_ratio 0.9 --save_path /path/to/logs0/ --cuda --lr 0.1 --batch_size 4096 --test_batch_size 128 --epochs 1000 --do_train
+
+
+###sampling by using our clustering method 
+
+## for MNIST dataset (for the first time)
+CUDA_VISIBLE_DEVICES=${gpu_id} python -m torch.distributed.launch --nproc_per_node ${num_gpus} --master_port 10032 main_train.py --select_valid_set  --nce-k 200 --data_dir /path/to/data/ --dataset MNIST --valid_ratio 0.001 --meta_lr 50 --flip_labels --err_label_ratio 0.9 --save_path /path/to/logs1/ --prev_save_path /path/to/logs0/ --cuda --lr 0.1 --batch_size 4096 --test_batch_size 256 --epochs 1000 --cluster_method_two --cosin_dist
+
+
+## for MNIST dataset (for the second time and onwards)
+CUDA_VISIBLE_DEVICES=${gpu_id} python -m torch.distributed.launch --nproc_per_node ${num_gpus} --master_port 10032 main_train.py --select_valid_set --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights --cached_model_name MNIST_current.pth --nce-k 200 --data_dir /path/to/data/ --dataset MNIST --valid_ratio 0.001 --meta_lr 50 --flip_labels --err_label_ratio 0.9 --save_path /path/to/logs1/ --prev_save_path /path/to/logs0/ --cuda --lr 0.1 --batch_size 4096 --test_batch_size 256 --epochs 1000 --cluster_method_two --cosin_dist
+
+## for cifar10 dataset (first time)
+CUDA_VISIBLE_DEVICES=${gpu_id} python -m torch.distributed.launch --nproc_per_node ${num_gpus} --master_port 10032 main_train.py  --load_dataset --select_valid_set --nce-k 200 --data_dir /path/to/data/ --dataset cifar10 --valid_ratio 0.001 --meta_lr 40 --flip_labels --err_label_ratio 0.6 --save_path /path/to/logs1/ --prev_save_path /path/to/logs0/ --cuda --lr 0.1 --batch_size 128 --test_batch_size 128 --epochs 200 --cluster_method_two --cosin_dist --lr_decay
+
+## for cifar10 dataset (for the second time and onwards)
+CUDA_VISIBLE_DEVICES=${gpu_id} python -m torch.distributed.launch --nproc_per_node ${num_gpus} --master_port 10032 main_train.py --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights  --load_dataset --select_valid_set --nce-k 200 --data_dir /path/to/data/ --dataset cifar10 --valid_ratio 0.001 --meta_lr 40 --flip_labels --err_label_ratio 0.6 --save_path /path/to/logs2/ --prev_save_path /path/to/logs1/ --cuda --lr 0.1 --batch_size 128 --test_batch_size 128 --epochs 200 --cluster_method_two --cosin_dist --lr_decay
+
 ```
 
-in which "--continue_label" represents to load the cached training datasets from the previous run (from which we can further select the remaining 0.1% validation samples), "--load_cached_weights" is a flag to indicate the cached weights on training samples produced by the previous run, "--cached_sample_weights_name" represents the file name of cached weights from the previous run, "--prev_save_path" represents the log directory of the previous run, "--select_valid_set" is a flag to indicate the use of our clustering method.
+
+in which "--continue_label" represents to load the cached training datasets from the previous run (from which we can further select the remaining 0.1% validation samples), "--load_cached_weights" is a flag to indicate the cached weights on training samples produced by the previous run, "--cached_sample_weights_name" represents the file name of cached weights from the previous run, "--prev_save_path" represents the log directory of the previous run, "--select_valid_set" is a flag to indicate the use of our clustering method, "--lr_decay" is a flag for decaying the learning rate for meta-learning, "--cosin_dist" is a flag for using cosine similarity during k-means clustering, "--cluster_method_two" indicates the cluster method that we are using, which is the default method (so this flag will be deprecated in the next version).
 
 
 
