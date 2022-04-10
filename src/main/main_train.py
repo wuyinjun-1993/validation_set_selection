@@ -813,6 +813,17 @@ def main2(args):
     else:
         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='random', pretrained_model=net)
 
+    if args.bias_classes:
+        num_train = trainloader.dataset.targets.shape[0]
+        num_val = metaloader.dataset.targets.shape[0]
+        num_test = testloader.dataset.targets.shape[0]
+        for c in range(10):
+            logging.info(f"Training set class {c} percentage: {torch.sum(trainloader.dataset.targets == c) / num_train}")
+        for c in range(10):
+            logging.info(f"Training set class {c} percentage: {torch.sum(metaloader.dataset.targets == c) / num_val}")
+        for c in range(10):
+            logging.info(f"Training set class {c} percentage: {torch.sum(testloader.dataset.targets == c) / num_test}")
+
     prev_weights = None
     start_epoch = 0
 
