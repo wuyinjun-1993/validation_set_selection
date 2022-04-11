@@ -257,6 +257,11 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
         
         train_loss, train_acc = 0, 0
         curr_w_array_delta = torch.zeros_like(w_array)
+
+        avg_train_loss = 0
+
+        train_pred_correct = 0
+
         for idx, inputs in enumerate(train_loader):
             # inputs, labels = inputs.to(device=args['device'], non_blocking=True),\
                                 # labels.to(device=args['device'], non_blocking=True)
@@ -363,7 +368,11 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             if criterion is not None:
                 criterion.reduction = 'none'
             
-            minibatch_loss = torch.mean(criterion(model(inputs[1]), inputs[2])*w_array[train_ids])
+            model_out = model(inputs[1])
+
+            minibatch_loss = torch.mean(criterion(model_out, inputs[2])*w_array[train_ids])
+
+            
             # minibatch_loss,_ = loss_func(inputs, model, criterion, w_array[train_ids])
             
             # logging.info("Training Loss at the iteration %d: %f" %(int(idx), float(minibatch_loss.item())))
@@ -406,6 +415,14 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             minibatch_loss.backward()
             opt.step()
             
+
+            avg_train_loss += minibatch_loss.detach().cpu().item()*inputs[1].shape[0]
+
+            model_pred = torch.max(model_out, dim = 1)[1]
+
+            train_pred_correct += torch.sum(model_pred.view(-1) == inputs[2].view(-1)).detach().cpu().item()
+
+
             total_iter_count += 1
 
             # if total_iter_count%warm_up_steps == 0:
@@ -423,6 +440,12 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
     
         # inference after epoch
         with torch.no_grad():
+
+            avg_train_loss = avg_train_loss/len(train_loader.dataset)
+            train_pred_acc_rate = train_pred_correct*1.0/len(train_loader.dataset)
+            logging.info("average training loss at epoch %d:%f"%(avg_train_loss))
+
+            logging.info("training accuracy at epoch %d:%f"%(train_pred_acc_rate))
             if criterion is not None:
                 criterion.reduction = 'mean'
             logging.info("valid performance at epoch %d"%(ep))
