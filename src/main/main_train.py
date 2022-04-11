@@ -954,7 +954,7 @@ def main2(args):
                 mile_stones_epochs = [20,60]
             else:
                 mile_stones_epochs = [120,160]
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+            scheduler = None#torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     
     if args.do_train:
         logging.info("start basic training")
