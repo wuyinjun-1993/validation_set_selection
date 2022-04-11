@@ -443,9 +443,9 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
 
             avg_train_loss = avg_train_loss/len(train_loader.dataset)
             train_pred_acc_rate = train_pred_correct*1.0/len(train_loader.dataset)
-            logging.info("average training loss at epoch %d:%f"%(avg_train_loss))
+            logging.info("average training loss at epoch %d:%f"%(ep, avg_train_loss))
 
-            logging.info("training accuracy at epoch %d:%f"%(train_pred_acc_rate))
+            logging.info("training accuracy at epoch %d:%f"%(ep, train_pred_acc_rate))
             if criterion is not None:
                 criterion.reduction = 'mean'
             logging.info("valid performance at epoch %d"%(ep))
