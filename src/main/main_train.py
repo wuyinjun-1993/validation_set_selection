@@ -95,6 +95,48 @@ def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test
     else:
         cache_sample_weights_given_epoch_basic_train(final_epoch)
 
+
+def report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=True):
+    # valid_acc_arr = numpy.array(valid_acc_ls)
+
+    # best_valid_acc = numpy.max(valid_acc_arr)
+
+    # # for k in range(len(valid_acc_ls)):
+    # #     if valid_acc_ls[k] == best_valid_acc:
+
+
+    # best_valid_acc_epochs = numpy.reshape(numpy.nonzero(valid_acc_arr == best_valid_acc), (-1))
+
+    # for epoch in best_valid_acc_epochs:
+    #     all_best = True
+    #     for k in range(1, tol+1):
+    #         if epoch + k <= len(valid_acc_ls) - 1:
+    #             if not valid_acc_ls[epoch + k] == best_valid_acc:
+    #                 all_best = False
+    #                 break
+
+    #     if all_best:
+    #         break
+
+
+    test_loss_arr = torch.tensor(test_loss_ls)
+
+    final_epoch = torch.argmin(test_loss_arr).item()
+
+
+
+    # final_epoch = min(epoch + tol, args.epochs-1)
+    final_test_loss = test_loss_ls[final_epoch]
+
+    final_test_acc = test_acc_ls[final_epoch]
+
+    logging.info("final test performance is in epoch %d: %f, %f"%(final_epoch, final_test_loss, final_test_acc))
+    if is_meta:
+        cache_sample_weights_given_epoch(final_epoch)
+    else:
+        cache_sample_weights_given_epoch_basic_train(final_epoch)
+
+
 def cache_sample_weights_for_min_loss_epoch(args, test_loss_ls):
     min_loss_epoch = numpy.argmin(test_loss_ls)
 
@@ -215,6 +257,11 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
         
         train_loss, train_acc = 0, 0
         curr_w_array_delta = torch.zeros_like(w_array)
+
+        avg_train_loss = 0
+
+        train_pred_correct = 0
+
         for idx, inputs in enumerate(train_loader):
             # inputs, labels = inputs.to(device=args['device'], non_blocking=True),\
                                 # labels.to(device=args['device'], non_blocking=True)
@@ -321,7 +368,11 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             if criterion is not None:
                 criterion.reduction = 'none'
             
-            minibatch_loss = torch.mean(criterion(model(inputs[1]), inputs[2])*w_array[train_ids])
+            model_out = model(inputs[1])
+
+            minibatch_loss = torch.mean(criterion(model_out, inputs[2])*w_array[train_ids])
+
+            
             # minibatch_loss,_ = loss_func(inputs, model, criterion, w_array[train_ids])
             
             # logging.info("Training Loss at the iteration %d: %f" %(int(idx), float(minibatch_loss.item())))
@@ -364,6 +415,14 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
             minibatch_loss.backward()
             opt.step()
             
+
+            avg_train_loss += minibatch_loss.detach().cpu().item()*inputs[1].shape[0]
+
+            model_pred = torch.max(model_out, dim = 1)[1]
+
+            train_pred_correct += torch.sum(model_pred.view(-1) == inputs[2].view(-1)).detach().cpu().item()
+
+
             total_iter_count += 1
 
             # if total_iter_count%warm_up_steps == 0:
@@ -381,6 +440,12 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
     
         # inference after epoch
         with torch.no_grad():
+
+            avg_train_loss = avg_train_loss/len(train_loader.dataset)
+            train_pred_acc_rate = train_pred_correct*1.0/len(train_loader.dataset)
+            logging.info("average training loss at epoch %d:%f"%(ep, avg_train_loss))
+
+            logging.info("training accuracy at epoch %d:%f"%(ep, train_pred_acc_rate))
             if criterion is not None:
                 criterion.reduction = 'mean'
             logging.info("valid performance at epoch %d"%(ep))
@@ -433,7 +498,7 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
         torch.save(torch.tensor(ep), os.path.join(args.save_path, "curr_epoch"))
         torch.save(torch.stack(w_array_delta_ls, dim = 0), os.path.join(args.save_path, "curr_w_array_delta_ls"))
     # cache_sample_weights_for_min_loss_epoch(args, test_loss_ls)
-    report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
+    report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
     w_array_delta_ls_tensor = torch.stack(w_array_delta_ls, dim = 0)
     torch.save(w_array_delta_ls_tensor, os.path.join(args.save_path, "cached_w_array_delta_ls"))
     
@@ -900,7 +965,7 @@ def main2(args):
                 mile_stones_epochs = [20,60]
             else:
                 mile_stones_epochs = [120,160]
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+            scheduler = None#torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     
     if args.do_train:
         logging.info("start basic training")
