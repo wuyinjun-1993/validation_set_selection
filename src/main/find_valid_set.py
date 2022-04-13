@@ -43,7 +43,7 @@ def find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance
     for k in range(10, 100, 5):
         cluster_ids_x, cluster_centers = kmeans(
             X=sample_representation_vec_ls, num_clusters=k, distance=distance, device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=None)
-        s_score2 = calculate_silhouette_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, sample_representation_vec_ls.device, sample_weights = None, distance = distance, sample_weights = sample_weights)
+        s_score2 = calculate_silhouette_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, sample_representation_vec_ls.device, distance = distance, sample_weights = sample_weights)
         s_score_ls.append(s_score2)
 
     print(s_score_ls)
