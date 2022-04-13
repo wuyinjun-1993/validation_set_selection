@@ -77,14 +77,14 @@ def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test
         all_best = True
         for k in range(1, tol+1):
             if epoch + k <= len(valid_acc_ls) - 1:
-                if not valid_acc_ls[epoch + k] == best_valid_acc:
+                if not valid_acc_ls[epoch + k] <= best_valid_acc:
                     all_best = False
                     break
 
         if all_best:
             break
 
-    final_epoch = min(epoch + tol, args.epochs-1)
+    final_epoch = min(epoch, args.epochs-1)
     final_test_loss = test_loss_ls[final_epoch]
 
     final_test_acc = test_acc_ls[final_epoch]
@@ -498,7 +498,10 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
         torch.save(torch.tensor(ep), os.path.join(args.save_path, "curr_epoch"))
         torch.save(torch.stack(w_array_delta_ls, dim = 0), os.path.join(args.save_path, "curr_w_array_delta_ls"))
     # cache_sample_weights_for_min_loss_epoch(args, test_loss_ls)
-    report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
+    # if args.dataset == 'MNIST':
+    report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
+    # else:
+    #     report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
     w_array_delta_ls_tensor = torch.stack(w_array_delta_ls, dim = 0)
     torch.save(w_array_delta_ls_tensor, os.path.join(args.save_path, "cached_w_array_delta_ls"))
     
@@ -954,7 +957,10 @@ def main2(args):
                 mile_stones_epochs = [20,60]
             else:
                 mile_stones_epochs = [120,160]
-            scheduler = None#torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+            if args.lr_decay:
+                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+            else:
+                scheduler = None
     
     if args.do_train:
         logging.info("start basic training")

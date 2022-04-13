@@ -103,7 +103,7 @@ class ResNet(nn.Module):
         out = self.linear(out)
         return out
 
-    def feature_forward(self, x):
+    def feature_forward(self, x, all_layer=False):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)

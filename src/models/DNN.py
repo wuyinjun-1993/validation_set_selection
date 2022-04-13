@@ -99,14 +99,24 @@ class DNN_three_layers(nn.Module):
                 x = self.fc3(x)
                 return F.log_softmax(x, dim=1)
 
-    def feature_forward(self, x):
+    def feature_forward(self, x, all_layer=False):
         # x = F.relu(F.max_pool2d(self.conv1(x), 2))
         # x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
         # x = x.view(-1, 320)
-        x = F.relu(self.fc1(x.view(x.shape[0],-1)))
-        x = F.relu(self.fc2(x))
+        if all_layer:
+            x_ls = []
+            x = F.relu(self.fc1(x.view(x.shape[0],-1)))
+            x_ls.append(x.clone().view(x.shape[0],-1))
+
+            x = F.relu(self.fc2(x))
+            x_ls.append(x.clone().view(x.shape[0], -1))
+            return torch.cat(x_ls, dim = 1)
+        else:
+            x = F.relu(self.fc1(x.view(x.shape[0],-1)))
+            x = F.relu(self.fc2(x))
+            return x
         # x = F.relu(self.fc3(x))
         # x = F.dropout(x, training=self.training)
         # x = self.fc2(x)
-        return x
+        
         # return F.log_softmax(x, dim=1)

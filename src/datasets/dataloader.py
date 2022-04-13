@@ -629,6 +629,42 @@ def evaluate_dataset_with_basic_models(args, dataset, model, criterion):
 
     model.load_state_dict(curr_model_state)
 
+def randomly_produce_valid_set(testset, transform_test, rate = 0.1):
+    rand_test_ids = torch.randperm(len(testset.data))
+
+    selected_valid_count = int(len(rand_test_ids)*rate)
+
+    selected_valid_ids = rand_test_ids[0:selected_valid_count]
+
+    selected_test_ids = rand_test_ids[selected_valid_count:]
+
+    # print("selected_valid_ids::", selected_valid_ids)
+    # print("test targets::", testset.targets)
+
+    selected_valid_data = testset.data[selected_valid_ids]
+
+    
+
+    selected_test_data = testset.data[selected_test_ids]
+
+    if type(testset.targets) is torch.Tensor:
+
+        selected_valid_labels = testset.targets[selected_valid_ids]
+
+        selected_test_labels = testset.targets[selected_test_ids]
+    else:
+        if type(testset.targets) is list:
+            selected_valid_labels = [testset.targets[idx] for idx  in selected_valid_ids]
+
+            selected_test_labels = [testset.targets[idx] for idx  in selected_test_ids]
+
+
+    validset = dataset_wrapper(selected_valid_data, selected_valid_labels, transform_test)
+
+    testset = dataset_wrapper(selected_test_data, selected_test_labels, transform_test)
+
+    return validset, testset
+
 def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None, cached_sample_weights = None):
     if args.dataset == 'cifar10':
         # transform_train_list = [
@@ -714,7 +750,10 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                     if args.adversarial_flip:
                         flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
                     else:
-                        flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+                        if args.biased_flip:
+                            flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
+                        else:
+                            flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
                     torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
                 else:
                     logging.info("Loading dataset")
@@ -723,7 +762,10 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                         if args.adversarial_flip:
                             flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
                         else:
-                            flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+                            if args.biased_flip:
+                                flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
+                            else:
+                                flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
                         torch.save(flipped_labels, flipped_label_dir)
                     flipped_labels = torch.load(flipped_label_dir)
                 trainset.targets = flipped_labels
@@ -799,7 +841,10 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
     # train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
     # valid_sampler = torch.utils.data.distributed.DistributedSampler(validset)
     # meta_sampler = torch.utils.data.distributed.DistributedSampler(metaset)
-    testset = dataset_wrapper(testset.data, testset.targets, transform_test)
+
+    validset, testset = randomly_produce_valid_set(testset, transform_test, rate = 0.1)
+
+    # testset = dataset_wrapper(testset.data, testset.targets, transform_test)
     train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
     # valid_sampler = torch.utils.data.distributed.DistributedSampler(validset)
     meta_sampler = torch.utils.data.distributed.DistributedSampler(metaset)
