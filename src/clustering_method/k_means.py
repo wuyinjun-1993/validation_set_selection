@@ -317,10 +317,10 @@ def pairwise_cosine(data1, data2, device=torch.device('cpu'), batch_size = 128):
 
         curr_A = A[start_id: end_id]
         curr_A = curr_A.to(device)
-        curr_A_normalized = curr_A / curr_A.norm(dim=-1, keepdim=True)
-        B_normalized = B / B.norm(dim=-1, keepdim=True)
+        curr_A_normalized = curr_A# / curr_A.norm(dim=-1, keepdim=True)
+        B_normalized = B# / B.norm(dim=-1, keepdim=True)
         curr_cosine = curr_A_normalized * B_normalized    
-        curr_cosine_dis = 1 - torch.abs(curr_cosine.sum(dim=-1)).squeeze()
+        curr_cosine_dis = - torch.abs(curr_cosine.sum(dim=-1)).squeeze()
         full_dist_ls.append(curr_cosine_dis)
 
     full_dist_tensor = torch.cat(full_dist_ls)
