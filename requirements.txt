@@ -5,3 +5,4 @@ torchvision
 higher
 pytorch-pretrained-bert
 termcolor
+scikit-learn
