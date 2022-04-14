@@ -103,14 +103,31 @@ class ResNet(nn.Module):
         out = self.linear(out)
         return out
 
-    def feature_forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
-        out = out.view(out.size(0), -1)
+    def feature_forward(self, x, all_layer=False):
+        if not all_layer:
+            out = F.relu(self.bn1(self.conv1(x)))
+            out = self.layer1(out)
+            out = self.layer2(out)
+            out = self.layer3(out)
+            out = self.layer4(out)
+            out = F.avg_pool2d(out, 4)
+            out = out.view(out.size(0), -1)
+        else:
+            out_ls = []
+            out = F.relu(self.bn1(self.conv1(x)))
+            out_ls.append(out.clone().view(out.shape[0],-1))
+            out = self.layer1(out)
+            out_ls.append(out.clone().view(out.shape[0],-1))
+            out = self.layer2(out)
+            out_ls.append(out.clone().view(out.shape[0],-1))
+            out = self.layer3(out)
+            out_ls.append(out.clone().view(out.shape[0],-1))
+            out = self.layer4(out)
+            out_ls.append(out.clone().view(out.shape[0],-1))
+            out = F.avg_pool2d(out, 4)
+            out_ls.append(out.clone().view(out.shape[0],-1))
+            out = torch.cat(out_ls, dim = 1)
+            # out = out.view(out.size(0), -1)
         # out = self.linear(out)
         return out
 

@@ -16,6 +16,126 @@ def initialize(X, num_clusters):
     return initial_state
 
 
+def calculate_silhouette_scores(X, cluster_ids, cluster_centroids, device, sample_weights = None, distance = 'euclidean', batch_size = 100):
+    if distance == 'euclidean':
+        pairwise_distance_function = pairwise_distance
+    elif distance == 'cosine':
+        pairwise_distance_function = pairwise_cosine
+    else:
+        raise NotImplementedError
+
+    new_cluster_centroids = []
+
+    for k in range(len(cluster_centroids)):
+        curr_cluster_centroid = torch.mean(X[cluster_ids == k])
+        new_cluster_centroids.append(curr_cluster_centroid.view(-1))
+
+    cluster_centroids = torch.stack(new_cluster_centroids)
+
+    pairwise_distance_tensor = pairwise_distance_function(X, cluster_centroids,device)
+
+    sorted_distance_by_dim, sorted_idx_by_dim = torch.sort(pairwise_distance_tensor,dim=1, descending=False)
+
+    nearest_nb_cluster_ids = sorted_idx_by_dim[:,1]
+
+    selected_cluster_ids = sorted_idx_by_dim[:,0]
+
+    # assert torch.max(torch.abs(selected_cluster_ids.cpu().view(-1) - cluster_ids.view(-1))).item() <= 0.0
+    
+    mean_s_value = 0
+
+    s_value_count = 0
+
+    s_value_ls = torch.zeros([X.shape[0]])
+
+    cluster_ids = cluster_ids.to(device)
+    X = X.to(device)
+    intra_clust_dists_ls = []
+    inter_clust_dists_ls = []
+    
+    label_freqs = torch.bincount(cluster_ids)
+    for start_id in range(0, X.shape[0], batch_size):
+        end_id = start_id + batch_size
+        if end_id >= X.shape[0]:
+            end_id = X.shape[0]
+
+        curr_X = X[start_id:end_id]
+
+        curr_X_and_X_distance = pairwise_distance_function(curr_X, X, device)
+
+        clust_dists = torch.zeros((len(curr_X), cluster_centroids.shape[0]),
+                           dtype=X.dtype, device = device)
+
+        for i in range(len(curr_X)):
+            clust_dists[i] += torch.bincount(cluster_ids, weights=curr_X_and_X_distance[i],
+                                        minlength=len(label_freqs))
+
+        intra_index = cluster_ids[start_id:end_id]# (np.arange(len(curr_X)), labels[start:start + len(D_chunk)])
+        # intra_clust_dists are averaged over cluster size outside this function
+        intra_clust_dists = clust_dists[torch.tensor(list(range(clust_dists.shape[0]))), intra_index]
+        # of the remaining distances we normalise and extract the minimum
+        clust_dists[torch.tensor(list(range(clust_dists.shape[0]))), intra_index] = torch.inf
+        clust_dists /= label_freqs
+        inter_clust_dists = torch.min(clust_dists,dim=1)[0]# clust_dists.min(dim=1)
+        intra_clust_dists_ls.append(intra_clust_dists.view(-1))
+        inter_clust_dists_ls.append(inter_clust_dists.view(-1))
+
+    intra_clust_dists_tensor = torch.cat(intra_clust_dists_ls)
+    inter_clust_dists_tensor = torch.cat(inter_clust_dists_ls)
+
+
+    denom = (label_freqs - 1).take(cluster_ids)
+    intra_clust_dists_tensor = intra_clust_dists_tensor/denom
+    sil_samples = inter_clust_dists_tensor - intra_clust_dists_tensor
+
+    sil_samples /= torch.maximum(intra_clust_dists_tensor, inter_clust_dists_tensor)
+
+    sil_samples = torch.nan_to_num(sil_samples)
+    # for c_id1 in range(len(cluster_centroids)):
+        
+    #     curr_cluster_samples = X[cluster_ids == c_id1]
+
+    #     for c_id2 in range(len(cluster_centroids)):
+    #         curr_sample_ids = torch.logical_and((cluster_ids == c_id1), (nearest_nb_cluster_ids == c_id2))
+
+    #         nearest_cluster_samples = X[cluster_ids == c_id2]
+
+    #         curr_X = X[curr_sample_ids]
+
+    #         if curr_X.shape[0] <= 0:
+    #             continue
+
+    #         curr_weight = None
+    #         if sample_weights is not None:
+    #             curr_weight = sample_weights[curr_sample_ids]
+
+
+    #         a_value = pairwise_distance_function(curr_cluster_samples, curr_X,device).view(-1,curr_X.shape[0])
+    #         a_value = torch.sum(a_value, dim = 0)/(len(curr_cluster_samples)-1)
+
+    #         b_value = pairwise_distance_function(nearest_cluster_samples, curr_X, device).view(-1, curr_X.shape[0])
+    #         b_value = torch.mean(b_value, dim = 0)
+
+    #         a_b_value_arr = torch.stack([a_value, b_value], dim = 1)
+    #         s_value = (b_value - a_value)/(torch.max(a_b_value_arr, dim=1)[0])
+
+    #         if sample_weights is not None:
+    #             s_value = s_value*curr_weight
+
+    #         # s_value_ls.append(s_value.cpu())
+    #         s_value_ls[curr_sample_ids] = s_value.cpu()
+
+    #         mean_s_value += torch.sum(s_value).cpu()
+
+    #         s_value_count += s_value.shape[0]
+
+    # s_value_array = torch.cat(s_value_ls)
+    if sample_weights is None:
+        return torch.mean(sil_samples)
+    else:
+        return torch.sum(sil_samples.view(-1)*sample_weights.view(-1))/len(sil_samples)
+    # return mean_s_value/X.shape[0]
+
 def kmeans(
         # args,
         X,
@@ -25,7 +145,7 @@ def kmeans(
         device=torch.device('cpu'),
         sample_weights = None,
         existing_cluster_mean_ls = None,
-        total_iter_count=100
+        total_iter_count=1000
 ):
     """
     perform kmeans
@@ -165,7 +285,7 @@ def pairwise_distance(data1, data2, device=torch.device('cpu'), batch_size = 128
         curr_A = A[start_id: end_id]
         curr_A = curr_A.to(device)
 
-        curr_dist = ((curr_A - B) **2.0).sum(dim=-1).squeeze()
+        curr_dist = torch.sqrt(((curr_A - B) **2.0).sum(dim=-1).squeeze())
         full_dist_ls.append(curr_dist)
         del curr_A
 

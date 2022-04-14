@@ -58,6 +58,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
   main_train.py \
+  --load_dataset \
   --nce-t 0.07 \
   --nce-k 200 \
   --data_dir ${data_dir} \
@@ -68,11 +69,10 @@ exe_cmd="python -m torch.distributed.launch \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr ${lr} \
+  --lr 0.02 \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  --lr_decay \
   --do_train"
 
 
@@ -90,11 +90,12 @@ exe_cmd="python -m torch.distributed.launch \
   --master_port ${port_num} \
   main_train.py \
   --load_dataset \
+  --select_valid_set \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
   --valid_ratio ${valid_ratio_each_run} \
-  --meta_lr ${meta_lr} \
+  --meta_lr 5 \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_all_rand_0/ \
@@ -105,8 +106,7 @@ exe_cmd="python -m torch.distributed.launch \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
   --cluster_method_two \
-  --cosin_dist \
-  --lr_decay"
+  --cosin_dist"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_all_rand.txt
@@ -147,13 +147,13 @@ do
     --err_label_ratio ${err_label_ratio} \
     --save_path ${save_path_prefix}_seq_select_$k/ \
     --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
-    --cuda --lr ${lr} \
+    --cuda \
+    --lr ${lr} \
     --batch_size ${batch_size} \
     --test_batch_size ${test_batch_size} \
     --epochs ${epochs} \
     --cluster_method_two \
-    --cosin_dist \
-    --lr_decay"
+    --cosin_dist"
 
 	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_$k.txt
 

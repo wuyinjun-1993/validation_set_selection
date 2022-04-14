@@ -9,15 +9,69 @@ from datasets.mnist import *
 from common.utils import *
 from main.helper_func import *
 from clustering_method.k_means import *
+from sklearn import metrics
 
+
+
+def test_s_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, num_clusters, distance = 'euclidean'):
+
+    all_sample_ids = []
+    for k in range(num_clusters):
+        curr_sample_ids = torch.nonzero(cluster_ids_x == k)
+
+        # rand_curr_sample_id_ids = torch.randperm(curr_sample_ids.shape[0])[0:10]
+        rand_curr_sample_id_ids = torch.tensor(list(range(10)))
+
+        all_sample_ids.append(curr_sample_ids[rand_curr_sample_id_ids])
+
+    all_sample_ids_tensor = torch.cat(all_sample_ids).view(-1)
+
+    selected_samples = sample_representation_vec_ls[all_sample_ids_tensor].view(all_sample_ids_tensor.shape[0],-1)
+    selected_sample_cluster_ids = cluster_ids_x[all_sample_ids_tensor].view(-1)
+
+    s_score1 = metrics.silhouette_score(selected_samples.cpu().numpy(), selected_sample_cluster_ids.cpu().numpy(), metric=distance)
+
+    s_score2 = calculate_silhouette_scores(selected_samples, selected_sample_cluster_ids, cluster_centers, sample_representation_vec_ls.device, sample_weights = None, distance = distance)
+
+
+    print()
+
+
+def find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance = 'euclidean'):
+
+    s_score_ls = []
+    for k in range(5, 100, 5):
+        cluster_ids_x, cluster_centers = kmeans(
+            X=sample_representation_vec_ls, num_clusters=k, distance=distance, device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=None)
+        s_score2 = calculate_silhouette_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, sample_representation_vec_ls.device, distance = distance, sample_weights = sample_weights)
+        logging.info("s score for cluste count %d: %f" %(k, s_score2))
+        s_score_ls.append(s_score2)
+
+    print(s_score_ls)
 
 def cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4, sample_weights = None, existing_cluster_centroids = None, cosin_distance = False):
-    if not cosin_distance:
-        cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids)
+    
+    if num_clusters > 0:
+        if not cosin_distance:
+            cluster_ids_x, cluster_centers = kmeans(
+                X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids)
+
+
+            # distance = 'euclidean'
+            # test_s_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, num_clusters, distance = 'euclidean')
+        else:
+            cluster_ids_x, cluster_centers = kmeans(
+                X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids)
+            # distance = 'cosine'
+
     else:
-        cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', device=sample_representation_vec_ls.device, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids)
+        if not cosin_distance:
+            find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance = 'euclidean')
+        else:
+            find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance = 'cosine')
+
+
+    
 
     representive_id_ls = []
     representive_representation_ls = []
@@ -247,7 +301,7 @@ def get_representative_valid_ids2(train_loader, args, net, valid_count, cached_s
                 data = data.cuda()
                 # labels = labels.cuda()
             
-            sample_representation = net.feature_forward(data)
+            sample_representation = net.feature_forward(data, all_layer=args.all_layer)
 
             sample_representation_vec_ls.append(sample_representation)
 
@@ -269,6 +323,11 @@ def get_representative_valid_ids2(train_loader, args, net, valid_count, cached_s
     # sample_representation_vec_ls = sample_representation_vec_ls_by_class[label]
 
     all_sample_ids = torch.cat(sample_id_ls)
+
+    if args.cluster_no_reweighting:
+        logging.info("no reweighting for k-means")
+        cached_sample_weights = None
+
     if cached_sample_weights is not None:
         valid_ids, valid_sample_representation_tensor = cluster_per_class(torch.cat(sample_representation_vec_ls), all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist)  
     else:
