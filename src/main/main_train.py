@@ -916,13 +916,19 @@ def main2(args):
         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='random', pretrained_model=net)
 
     if args.bias_classes:
-        num_train = trainloader.dataset.targets.shape[0]
-        num_val = metaloader.dataset.targets.shape[0]
-        num_test = testloader.dataset.targets.shape[0]
+        num_train = len(trainloader.dataset.targets)
+        num_val = len(metaloader.dataset.targets)
+        num_test = len(testloader.dataset.targets)
         if type(trainloader.dataset.targets) is numpy.ndarray:
             vsum = np.sum
         else:
             vsum = torch.sum
+
+        if type(testloader.dataset.targets) is list:
+            if type(testloader.dataset.data) is numpy.ndarray:
+                testloader.dataset.targets = np.array(testloader.dataset.targets)
+            else:
+                testloader.dataset.targets = torch.tensor(testloader.dataset.targets)
 
         for c in range(10):
             logging.info(f"Training set class {c} percentage: {vsum(trainloader.dataset.targets == c) / num_train}")
