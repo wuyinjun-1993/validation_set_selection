@@ -704,6 +704,11 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
             flipped_labels = None
 
             if args.bias_classes:
+                if type(trainset.data) is numpy.ndarray:
+                    trainset.targets = torch.from_numpy(trainset.targets)
+                if type(testset.targets) is list:
+                    testset.targets = torch.tensor(testset.targets)
+
                 # Assume class labels are in [0, C) where C is number of classes
                 class_bias = torch.tensor([1, 0.5, 0.25, 0.1, 0.1, 0.1,
                     0.1, 0.1, 0.05, 0.05])
@@ -733,6 +738,10 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                 origin_labels = origin_labels[keep_train]
                 testset.data = testset.data[keep_test]
                 testset.targets = testset.targets[keep_test]
+
+                if type(trainset.data) is numpy.ndarray:
+                    trainset.targets = trainset.targets.numpy()
+                    testset.targets = testset.targets.numpy()
 
                 logging.info(f"Total number of training samples: {torch.sum(keep_train).item()}")
                 logging.info(f"Total number of testing samples: {torch.sum(keep_test).item()}")
@@ -797,6 +806,49 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                 origin_labels = trainset.targets.clone()
 
             flipped_labels = None
+
+            if args.bias_classes:
+                if type(trainset.data) is numpy.ndarray:
+                    trainset.targets = torch.from_numpy(trainset.targets)
+                if type(testset.targets) is list:
+                    testset.targets = torch.tensor(testset.targets)
+
+                # Assume class labels are in [0, C) where C is number of classes
+                class_bias = torch.tensor([1, 0.5, 0.25, 0.1, 0.1, 0.1,
+                    0.1, 0.1, 0.05, 0.05])
+                train_rand = torch.rand(trainset.targets.shape[0])
+                test_rand = torch.rand(testset.targets.shape[0])
+
+                # Boolean tensors where i is True if we will keep this sample in
+                # biased set
+                keep_train = torch.zeros(trainset.targets.shape[0],
+                        dtype=torch.bool)
+                keep_test = torch.zeros(testset.targets.shape[0],
+                        dtype=torch.bool)
+                for label in range(class_bias.shape[0]):
+                    keep_train_for_class = torch.logical_and(
+                        train_rand <= class_bias[label],
+                        trainset.targets == label
+                    )
+                    keep_train[keep_train_for_class] = True
+                    keep_test_for_class = torch.logical_and(
+                        test_rand <= class_bias[label],
+                        testset.targets == label
+                    )
+                    keep_test[keep_test_for_class] = True
+
+                trainset.data = trainset.data[keep_train]
+                trainset.targets = trainset.targets[keep_train]
+                origin_labels = origin_labels[keep_train]
+                testset.data = testset.data[keep_test]
+                testset.targets = testset.targets[keep_test]
+
+                if type(trainset.data) is numpy.ndarray:
+                    trainset.targets = trainset.targets.numpy()
+                    testset.targets = testset.targets.numpy()
+
+                logging.info(f"Total number of training samples: {torch.sum(keep_train).item()}")
+                logging.info(f"Total number of testing samples: {torch.sum(keep_test).item()}")
             
             if args.flip_labels:
 

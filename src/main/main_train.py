@@ -13,6 +13,7 @@ from main.find_valid_set import *
 from main.meta_reweighting_rl import *
 from datasets.dataloader import *
 import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 import json
 from utils.logger import setup_logger
 import models
@@ -760,7 +761,8 @@ def load_checkpoint(args, model):
     logger.info('==> Loading...')
     state = torch.load(os.path.join(args.data_dir, args.cached_model_name), map_location=torch.device("cpu"))
 
-    model_state = state['model']
+    # model_state = state['model']
+    model_state = state
 
     model.load_state_dict(model_state, strict=False)
 
@@ -914,12 +916,17 @@ def main2(args):
         num_train = trainloader.dataset.targets.shape[0]
         num_val = metaloader.dataset.targets.shape[0]
         num_test = testloader.dataset.targets.shape[0]
+        if type(trainloader.dataset.targets) is numpy.ndarray:
+            vsum = np.sum
+        else:
+            vsum = torch.sum
+
         for c in range(10):
-            logging.info(f"Training set class {c} percentage: {torch.sum(trainloader.dataset.targets == c) / num_train}")
+            logging.info(f"Training set class {c} percentage: {vsum(trainloader.dataset.targets == c) / num_train}")
         for c in range(10):
-            logging.info(f"Training set class {c} percentage: {torch.sum(metaloader.dataset.targets == c) / num_val}")
+            logging.info(f"Validation set class {c} percentage: {vsum(metaloader.dataset.targets == c) / num_val}")
         for c in range(10):
-            logging.info(f"Training set class {c} percentage: {torch.sum(testloader.dataset.targets == c) / num_test}")
+            logging.info(f"Test set class {c} percentage: {vsum(testloader.dataset.targets == c) / num_test}")
 
     prev_weights = None
     start_epoch = 0
@@ -932,16 +939,9 @@ def main2(args):
         net = ResNet18()
 
     if args.use_pretrained_model:
-        net = load_pretrained_model(args, net)
+        # net = load_pretrained_model(args, net)
+        net = load_checkpoint(args, net)
 
-    # else:
-    #     if args.dataset == 'MNIST':
-    #         net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
-            
-    #     else:
-    #         net = ResNet18()
-
-        
     mile_stones_epochs = None
 
     if args.resume_meta_train:
@@ -1086,8 +1086,8 @@ def main(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    torch.distributed.init_process_group(backend='nccl', init_method='env://')
-    args.world_size = torch.distributed.get_world_size()
+    dist.init_process_group(backend='nccl', init_method='env://')
+    args.world_size = dist.get_world_size()
     args.local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(args.local_rank)
 
