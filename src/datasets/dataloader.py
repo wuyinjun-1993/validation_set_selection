@@ -441,11 +441,11 @@ def find_representative_samples0(net, train_dataset,validset, train_transform, a
         update_train_ids[valid_ids] = 0
     update_train_ids = update_train_ids.nonzero().view(-1)
     
-    train_set, valid_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, train_transform)
+    train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, train_transform)
 
     remaining_origin_labels = origin_labels[update_train_ids]
 
-    return train_set, valid_set, meta_set, remaining_origin_labels
+    return train_set, meta_set, remaining_origin_labels
 
 
 def find_representative_samples1(net, train_dataset,validset, train_transform, args, origin_labels, cached_sample_weights = None):
@@ -640,7 +640,7 @@ def randomly_produce_valid_set(testset, transform_test, rate = 0.1):
 
     return validset, testset
 
-def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None, cached_sample_weights = None):
+def get_dataloader_for_meta(args, split_method, pretrained_model=None, cached_sample_weights = None):
     if args.dataset == 'cifar10':
         # transform_train_list = [
         #         transforms.RandomResizedCrop(size=32, scale=(0.2,1.)),
@@ -758,9 +758,8 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
             #     # net, train_dataset,validset, train_transform, args, origin_labels
             #     trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, validset, transform_train, args, origin_labels)
             # else:
-            trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
+            trainset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
 
-            validset = concat_valid_set(validset, new_validset)
             metaset = concat_valid_set(metaset, new_metaset)
         else:
             if type(trainset.data) is numpy.ndarray:
@@ -801,7 +800,7 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
             # if args.cluster_method_three:
             #     trainset, validset, metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, transform_train, args, origin_labels)
             # else:
-            trainset, validset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, None, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
+            trainset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, None, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
         
     # if args.flip_labels:
 

@@ -195,7 +195,23 @@ def resume_meta_training_by_loading_cached_info(args, net):
     net.load_state_dict(model.state_dict(), strict=False)
     return net, w_array, start_ep
 
-def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, valid_loader, test_loader, to_device, cached_w_array = None, scheduler = None, target_id = None, start_ep = 0, mile_stones_epochs = None):
+def meta_learning_model(
+    args,
+    model,
+    opt,
+    criterion,
+    meta_criterion,
+    train_loader,
+    meta_loader,
+    valid_loader,
+    test_loader,
+    to_device,
+    cached_w_array=None,
+    scheduler=None,
+    target_id=None,
+    start_ep=0,
+    mile_stones_epochs=None,
+):
     
     # train_loader = DataLoader(train_dataset, batch_size=args['bs'], shuffle=True, num_workers=2, pin_memory=True)
     # test_loader =  DataLoader(test_dataset, batch_size=args['bs'], shuffle=False, num_workers=2, pin_memory=True)
@@ -298,12 +314,13 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
                 
                 meta_train_outputs = meta_model(inputs[1])
 
-                meta_train_loss = torch.mean(criterion(meta_train_outputs, inputs[2])*eps)
+                labels = inputs[2]
+                if isinstance(criterion, torch.nn.L1Loss):
+                    labels = torch.nn.functional.one_hot(inputs[2],
+                            num_classes=10)
+                    meta_train_outputs = F.softmax(meta_train_outputs)
+                meta_train_loss = torch.mean(criterion(meta_train_outputs, labels)*eps)
                 
-                # 
-                # meta_train_loss = criterion(meta_train_outputs, labels.type_as(meta_train_outputs))
-                #
-                # meta_train_loss = torch.sum(eps * meta_train_loss)
                 
                 meta_opt.step(meta_train_loss)
     
@@ -322,7 +339,13 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
                 
                 # meta_val_loss,meta_valid_numbers = loss_func(meta_inputs, meta_model, criterion, no_agg = False)
                 
-                meta_val_loss = criterion(meta_model(meta_inputs[1]), meta_inputs[2])
+                meta_out = meta_inputs[2]
+                model_out = meta_model(meta_inputs[1])
+                if isinstance(meta_criterion, torch.nn.L1Loss):
+                    meta_out = torch.nn.functional.one_hot(meta_inputs[2],
+                            num_classes=10)
+                    model_out = F.softmax(model_out)
+                meta_val_loss = meta_criterion(model_out, meta_out)
 
                 # meta_val_outputs = meta_model(meta_inputs)
                 #
@@ -370,49 +393,13 @@ def meta_learning_model(args, model, opt, criterion, train_loader, meta_loader, 
                 criterion.reduction = 'none'
             
             model_out = model(inputs[1])
+            labels = inputs[2]
+            if isinstance(criterion, torch.nn.L1Loss):
+                labels = torch.nn.functional.one_hot(inputs[2],
+                        num_classes=10)
+                model_out = F.softmax(meta_train_outputs)
+            minibatch_loss = torch.mean(criterion(model_out, labels)*w_array[train_ids])
 
-            minibatch_loss = torch.mean(criterion(model_out, inputs[2])*w_array[train_ids])
-
-            
-            # minibatch_loss,_ = loss_func(inputs, model, criterion, w_array[train_ids])
-            
-            # logging.info("Training Loss at the iteration %d: %f" %(int(idx), float(minibatch_loss.item())))
-            
-            # logging.info("Validation Loss at the iteration %d: %f" %(int(idx), float(meta_val_loss.item())))
-            
-            # logging.info("meta_train_loss at the iteration %d: %f" %(int(idx), float(meta_train_loss.item())))
-
-            # logging.info("learning rate at the iteration %d: %f" %(int(idx), float(curr_learning_rate)))
-
-            # logging.info("meta learning rate at the iteration %d: %f" %(int(idx), float(curr_ilp_learning_rate)))
-        
-            # if torch.sum(torch.isnan(minibatch_loss)) > 0:
-                
-            #     print("epsilon at the iteration", str(idx), eps)
-                
-            #     print("epsilon grad at the iteration", str(idx), eps_grads)
-                
-            #     print("w at the iteration", str(idx), w_array[train_ids])
-                
-            #     print("train ids::", str(idx), train_ids)
-                
-            #     for number in meta_numbers:
-            #         print('number::', number)
-            #         # del number
-                
-            #     for number in meta_valid_numbers:
-            #         print('valid number::', number)
-            #         # del number
-                
-            #     output_model_param(model)
-                
-            #     output_model_param(meta_model)
-            
-            # del meta_numbers, meta_valid_numbers
-            
-            # outputs = model(inputs)
-            # minibatch_loss = criterion(outputs, labels.type_as(outputs))
-            # minibatch_loss = torch.sum(w * minibatch_loss)
             minibatch_loss.backward()
             opt.step()
             
@@ -527,7 +514,10 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
             if args.cuda:
                 data = data.cuda()
                 target = target.cuda()
-            output = network(data, full_pred=True)
+            output = network(data)
+            if isinstance(criterion, torch.nn.L1Loss):
+                target = torch.nn.functional.one_hot(target, num_classes=10)
+                output = F.softmax(output)
             loss = criterion(output, target)
             loss.backward()
             optimizer.step()
@@ -881,39 +871,46 @@ def main2(args):
     set_logger(args)
     
     logging.info("start")
-
     print('==> Preparing data..')
 
-
-    # net = DNN_two_layers()
     if args.dataset == 'MNIST':
-        net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
-        criterion = torch.nn.NLLLoss()
+        pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
     else:
-        net = ResNet18().cuda()
-        criterion = torch.nn.CrossEntropyLoss()
+        pretrained_rep_net = ResNet18().cuda()
+    criterion = torch.nn.CrossEntropyLoss()
 
-    # net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
+    meta_criterion = criterion
+    if args.l1_meta_loss:
+        meta_criterion = torch.nn.L1Loss()
+
     if args.unsup_rep:
-        net = load_checkpoint(args, net)
+        pretrained_rep_net = load_checkpoint(args, pretrained_rep_net)
     else:
-        net = load_checkpoint2(args, net)
-        # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
+        pretrained_rep_net = load_checkpoint2(args, pretrained_rep_net)
 
-    # net.load_state_dict(net_state_dict, strict=False)
     cached_sample_weights = None
     if args.load_cached_weights:
         cached_sample_weights = torch.load(os.path.join(args.prev_save_path, args.cached_sample_weights_name))
-        logging.info("load sample weights successfully")
+        logging.info("sample weights loaded successfully")
     if args.cuda:
-        net = net.cuda()
-    # trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, split_method='cluster', pretrained_model=net)
-    
+        pretrained_rep_net = pretrained_rep_net.cuda()
     
     if args.select_valid_set:
-        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='cluster', pretrained_model=net, cached_sample_weights = cached_sample_weights)
+        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(
+            args,
+            split_method='cluster',
+            pretrained_model=pretrained_rep_net,
+            cached_sample_weights=cached_sample_weights,
+        )
     else:
-        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='random', pretrained_model=net)
+        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(
+            args,
+            split_method='random',
+            pretrained_model=pretrained_rep_net,
+        )
+
+    if args.l1_loss:
+        criterion = torch.nn.L1Loss()
 
     if args.bias_classes:
         num_train = len(trainloader.dataset.targets)
@@ -931,11 +928,14 @@ def main2(args):
                 testloader.dataset.targets = torch.tensor(testloader.dataset.targets)
 
         for c in range(10):
-            logging.info(f"Training set class {c} percentage: {vsum(trainloader.dataset.targets == c) / num_train}")
+            logging.info(f"Training set class {c} percentage: \
+                {vsum(trainloader.dataset.targets == c) / num_train}")
         for c in range(10):
-            logging.info(f"Validation set class {c} percentage: {vsum(metaloader.dataset.targets == c) / num_val}")
+            logging.info(f"Validation set class {c} percentage: \
+                {vsum(metaloader.dataset.targets == c) / num_val}")
         for c in range(10):
-            logging.info(f"Test set class {c} percentage: {vsum(testloader.dataset.targets == c) / num_test}")
+            logging.info(f"Test set class {c} percentage: \
+                {vsum(testloader.dataset.targets == c) / num_test}")
 
     prev_weights = None
     start_epoch = 0
@@ -985,7 +985,23 @@ def main2(args):
     else:
         logging.info("start meta training")
         # meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), trainloader, metaloader, validloader, testloader)
-        meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = prev_weights, target_id = None, start_ep=start_epoch, mile_stones_epochs = mile_stones_epochs)
+        meta_learning_model(
+            args,
+            net,
+            optimizer,
+            criterion,
+            meta_criterion,
+            trainloader,
+            metaloader,
+            validloader,
+            testloader,
+            mnist_to_device,
+            scheduler=scheduler,
+            cached_w_array=prev_weights,
+            target_id=None,
+            start_ep=start_epoch,
+            mile_stones_epochs=mile_stones_epochs,
+        )
 
 def main3(args):
 

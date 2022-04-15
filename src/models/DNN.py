@@ -60,49 +60,17 @@ class DNN_two_layers(nn.Module):
 class DNN_three_layers(nn.Module):
     def __init__(self, hidden_dim=100, low_dim = 128):
         super(DNN_three_layers, self).__init__()
-        # self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
-        # self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
-        # self.conv2_drop = nn.Dropout2d()
         self.fc1 = nn.Linear(28*28, hidden_dim)
-        # self.fc3 = nn.Linear(200, 100)
         self.fc2 = nn.Linear(hidden_dim, low_dim)
         self.fc3 = nn.Linear(low_dim, 10)
 
-
-        # self.fc1 = nn.Linear(28*28, 10)
-        self.groupDis = nn.Sequential(
-            nn.Linear(hidden_dim, low_dim),
-            Normalize(2))
-
-    def forward(self, x,two_branch=False, full_pred=True):
-        # x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        # x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        # x = x.view(-1, 320)
-        # x = F.relu(self.fc1(x.view(x.shape[0],-1)))
-        # # x = F.relu(self.fc3(x))
-        # # x = F.dropout(x, training=self.training)
-        # x = self.fc2(x)
-
-
+    def forward(self, x):
         x_ = F.relu(self.fc1(x.view(x.shape[0],-1)))
-        # x = F.relu(self.fc3(x))
-        # x = F.dropout(x, training=self.training)
         x = F.relu(self.fc2(x_))
-
-        if two_branch:
-            x2 = self.groupDis(x_)
-            return x,x2
-        else:
-            if not full_pred:
-                return x
-            else:
-                x = self.fc3(x)
-                return F.log_softmax(x, dim=1)
+        x = self.fc3(x)
+        return x
 
     def feature_forward(self, x, all_layer=False):
-        # x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        # x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        # x = x.view(-1, 320)
         if all_layer:
             x_ls = []
             x = F.relu(self.fc1(x.view(x.shape[0],-1)))
@@ -115,8 +83,3 @@ class DNN_three_layers(nn.Module):
             x = F.relu(self.fc1(x.view(x.shape[0],-1)))
             x = F.relu(self.fc2(x))
             return x
-        # x = F.relu(self.fc3(x))
-        # x = F.dropout(x, training=self.training)
-        # x = self.fc2(x)
-        
-        # return F.log_softmax(x, dim=1)
