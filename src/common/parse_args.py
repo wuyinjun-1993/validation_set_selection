@@ -17,6 +17,8 @@ def parse_args(args=None):
     parser.add_argument('--adversarial_flip', action='store_true', help='flip labels')
     parser.add_argument('--bias_classes', action='store_true', help='Create class bias')
     parser.add_argument('--l1_loss', action='store_true', help='Use the L1 loss for the basic learning step')
+    parser.add_argument('--soft_bootstrapping_loss', action='store_true', help='Use the Bootstrapping loss for the basic learning step')
+    parser.add_argument('--hard_bootstrapping_loss', action='store_true', help='Use the Bootstrapping loss for the basic learning step')
     parser.add_argument('--l1_meta_loss', action='store_true', help='Use the L1 loss for meta learning step')
     parser.add_argument('--load_dataset', action='store_true', help='load dataset')
     parser.add_argument('--continue_label', action='store_true', help='load dataset')

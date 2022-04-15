@@ -19,6 +19,7 @@ from utils.logger import setup_logger
 import models
 from lib.NCECriterion import NCESoftmaxLoss
 from lib.lr_scheduler import get_scheduler
+from lib.BootstrappingLoss import SoftBootstrappingLoss, HardBootstrappingLoss
 from models.resnet import *
 import collections
 
@@ -911,6 +912,10 @@ def main2(args):
 
     if args.l1_loss:
         criterion = torch.nn.L1Loss()
+    elif args.soft_bootstrapping_loss:
+        criterion = SoftBootstrappingLoss()
+    elif args.hard_bootstrapping_loss:
+        criterion = HardBootstrappingLoss()
 
     if args.bias_classes:
         num_train = len(trainloader.dataset.targets)
