@@ -48,7 +48,7 @@ def vary_learning_rate(current_learning_rate, eps, args, model=None):
 
     return optimizer, current_learning_rate
 
-def report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, test_acc):
+def report_best_test_performance_so_far(logger, test_loss_ls, test_acc_ls, test_loss, test_acc):
     test_loss_ls.append(test_loss)
     test_acc_ls.append(test_acc)
 
@@ -62,7 +62,7 @@ def report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, te
 
     min_test_acc = test_acc_array[min_loss_epoch]
 
-    logging.info("best test performance so far is in epoch %d: %f, %f"%(min_loss_epoch, min_test_loss, min_test_acc))
+    logger.info("best test performance so far is in epoch %d: %f, %f"%(min_loss_epoch, min_test_loss, min_test_acc))
 
 def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=True):
     valid_acc_arr = numpy.array(valid_acc_ls)
@@ -198,6 +198,7 @@ def resume_meta_training_by_loading_cached_info(args, net):
 
 def meta_learning_model(
     args,
+    logger,
     model,
     opt,
     criterion,
@@ -294,7 +295,7 @@ def meta_learning_model(
             w_array.requires_grad = True
             
             opt.zero_grad()
-            with higher.innerloop_ctx(model, opt) as (meta_model, meta_opt):
+            with higher.innerloop_ctx(model.module, opt) as (meta_model, meta_opt):
                 
                 # 1. Update meta model on training data
                 # if type(inputs) is tuple:
@@ -414,43 +415,29 @@ def meta_learning_model(
 
             total_iter_count += 1
 
-            # if total_iter_count%warm_up_steps == 0:
-            #     warm_up_steps*=3
-            #     curr_ilp_learning_rate = curr_ilp_learning_rate/10
-            #     opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
-    
-            # keep track of epoch loss/accuracy
-            # if type(inputs) is tuple:
-            #     train_loss += minibatch_loss.item()*inputs[0].shape[0]
-            # else:
-            #     train_loss += minibatch_loss.item()*inputs.shape[0]
-            # pred_labels = (F.sigmoid(outputs) > 0.5).int()
-            # train_acc += torch.sum(torch.eq(pred_labels, labels)).item()
-    
         # inference after epoch
         with torch.no_grad():
+            if args.local_rank == 0:
+                avg_train_loss = avg_train_loss/len(train_loader.dataset)
+                train_pred_acc_rate = train_pred_correct*1.0/len(train_loader.dataset)
+                logger.info("average training loss at epoch %d:%f"%(ep, avg_train_loss))
 
-            avg_train_loss = avg_train_loss/len(train_loader.dataset)
-            train_pred_acc_rate = train_pred_correct*1.0/len(train_loader.dataset)
-            logging.info("average training loss at epoch %d:%f"%(ep, avg_train_loss))
+                logger.info("training accuracy at epoch %d:%f"%(ep, train_pred_acc_rate))
+                if criterion is not None:
+                    criterion.reduction = 'mean'
+                logger.info("valid performance at epoch %d"%(ep))
+                valid_loss, valid_acc = test(valid_loader, model, criterion, args, logger, "valid")
+                logger.info("test performance at epoch %d"%(ep))
+                test_loss, test_acc = test(test_loader, model, criterion, args, logger, "test")
 
-            logging.info("training accuracy at epoch %d:%f"%(ep, train_pred_acc_rate))
-            if criterion is not None:
-                criterion.reduction = 'mean'
-            logging.info("valid performance at epoch %d"%(ep))
-            valid_loss, valid_acc = test(valid_loader, model, criterion, args, "valid")
-            logging.info("test performance at epoch %d"%(ep))
-            test_loss, test_acc = test(test_loader, model, criterion, args, "test")
-
-            report_best_test_performance_so_far(valid_loss_ls, valid_acc_ls, valid_loss, valid_acc)
-
-            report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, test_acc)
+                report_best_test_performance_so_far(logger, valid_loss_ls, valid_acc_ls, valid_loss, valid_acc)
+                report_best_test_performance_so_far(logger, test_loss_ls, test_acc_ls, test_loss, test_acc)
 
         if scheduler is not None:
-            logging.info("learning rate at iteration %d before using scheduler: %f" %(int(ep), float(opt.param_groups[0]['lr'])))
+            logger.info("learning rate at iteration %d before using scheduler: %f" %(int(ep), float(opt.param_groups[0]['lr'])))
 
             scheduler.step()
-            logging.info("learning rate at iteration %d after using scheduler: %f" %(int(ep), float(opt.param_groups[0]['lr'])))
+            logger.info("learning rate at iteration %d after using scheduler: %f" %(int(ep), float(opt.param_groups[0]['lr'])))
 
         if args.lr_decay:
             if mile_stones_epochs is not None:
@@ -463,14 +450,11 @@ def meta_learning_model(
                     ms_idx = len(mile_stones_epochs)
 
                 curr_ilp_learning_rate = args.meta_lr*(0.1**(ms_idx))
-                logging.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
+                logger.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
             else:
-
-
                 if ep > 100:
-                    
                     curr_ilp_learning_rate = args.meta_lr*0.1
-                    logging.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
+                    logger.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
             # min_valid_loss_epoch = numpy.argmin(numpy.array(valid_loss_ls))
             # if min_valid_loss_epoch < ep-1:
             # opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
@@ -479,22 +463,21 @@ def meta_learning_model(
         w_array_delta_ls.append(curr_w_array_delta)
             
 
-        torch.save(model, os.path.join(args.save_path, 'refined_model_' + str(ep)))
-        torch.save(w_array, os.path.join(args.save_path, 'sample_weights_' + str(ep)))
+        if args.local_rank == 0:
+            torch.save(model.module, os.path.join(args.save_path, 'refined_model_' + str(ep)))
+            torch.save(w_array, os.path.join(args.save_path, 'sample_weights_' + str(ep)))
+            torch.save(model.module, os.path.join(args.save_path, 'curr_refined_model'))
+            torch.save(w_array, os.path.join(args.save_path, 'curr_sample_weights'))
+            torch.save(torch.tensor(ep), os.path.join(args.save_path, "curr_epoch"))
+            torch.save(torch.stack(w_array_delta_ls, dim = 0), os.path.join(args.save_path, "curr_w_array_delta_ls"))
 
-        torch.save(model, os.path.join(args.save_path, 'curr_refined_model'))
-        torch.save(w_array, os.path.join(args.save_path, 'curr_sample_weights'))
-        torch.save(torch.tensor(ep), os.path.join(args.save_path, "curr_epoch"))
-        torch.save(torch.stack(w_array_delta_ls, dim = 0), os.path.join(args.save_path, "curr_w_array_delta_ls"))
-    # cache_sample_weights_for_min_loss_epoch(args, test_loss_ls)
-    # if args.dataset == 'MNIST':
-    report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
-    # else:
-    #     report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
+    if args.local_rank == 0:
+        report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
     w_array_delta_ls_tensor = torch.stack(w_array_delta_ls, dim = 0)
-    torch.save(w_array_delta_ls_tensor, os.path.join(args.save_path, "cached_w_array_delta_ls"))
-    
-    torch.save(torch.sum(w_array_delta_ls_tensor, dim = 1), os.path.join(args.save_path, "cached_w_array_total_delta"))
+
+    if args.local_rank == 0:
+        torch.save(w_array_delta_ls_tensor, os.path.join(args.save_path, "cached_w_array_delta_ls"))
+        torch.save(torch.sum(w_array_delta_ls_tensor, dim = 1), os.path.join(args.save_path, "cached_w_array_total_delta"))
 
 def update_lr(optimizer, lr):    
     for param_group in optimizer.param_groups:
@@ -531,26 +514,28 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
 
         # logging.info("Train Epoch: %d \tLoss: %f", (
         # epoch, loss.item()))
-        torch.save(network.state_dict(), os.path.join(args.save_path, "model_" + str(epoch)))
+        if args.local_rank == 0:
+            torch.save(network.module.state_dict(), os.path.join(args.save_path, "model_" + str(epoch)))
         # logging.info("train performance at epoch %d"%(epoch))
         # test(train_loader,network, args)
-        logging.info("learning rate at epoch %d: %f"%(epoch, float(optimizer.param_groups[0]['lr'])))
+        logger.info("learning rate at epoch %d: %f"%(epoch, float(optimizer.param_groups[0]['lr'])))
         
         
         with torch.no_grad():
         
-            logging.info("valid performance at epoch %d"%(epoch))
+            logger.info("valid performance at epoch %d"%(epoch))
                 
-            if valid_loader is not None:
-                valid_loss, valid_acc = test(valid_loader,network, criterion, args, "valid")
-                report_best_test_performance_so_far(valid_loss_ls, valid_acc_ls, valid_loss, valid_acc)
-            logging.info("test performance at epoch %d"%(epoch))
-            test_loss, test_acc = test(test_loader,network, criterion,args, "test")
+            if valid_loader is not None and args.local_rank == 0:
+                valid_loss, valid_acc = test(valid_loader, network, criterion, args, logger, "valid")
+                report_best_test_performance_so_far(logger, valid_loss_ls, valid_acc_ls, valid_loss, valid_acc)
+            logger.info("test performance at epoch %d"%(epoch))
+            test_loss, test_acc = test(test_loader, network, criterion, args, logger, "test")
 
-            report_best_test_performance_so_far(test_loss_ls, test_acc_ls, test_loss, test_acc)
+            report_best_test_performance_so_far(logger, test_loss_ls, test_acc_ls, test_loss, test_acc)
 
 
-    report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=False)
+    if args.local_rank == 0:
+        report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=False)
         # if (epoch+1) % 40 == 0:
         #     curr_lr /= 10
         #     update_lr(optimizer, curr_lr)
@@ -867,12 +852,9 @@ def load_pretrained_model(args, net):
 
     return net
 
-def main2(args):
-
-    set_logger(args)
-    
-    logging.info("start")
-    print('==> Preparing data..')
+def main2(args, logger):
+    logger.info("start")
+    logger.info('==> Preparing data..')
 
     if args.dataset == 'MNIST':
         pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
@@ -892,7 +874,7 @@ def main2(args):
     cached_sample_weights = None
     if args.load_cached_weights:
         cached_sample_weights = torch.load(os.path.join(args.prev_save_path, args.cached_sample_weights_name))
-        logging.info("sample weights loaded successfully")
+        logger.info("sample weights loaded successfully")
     if args.cuda:
         pretrained_rep_net = pretrained_rep_net.cuda()
     
@@ -933,13 +915,13 @@ def main2(args):
                 testloader.dataset.targets = torch.tensor(testloader.dataset.targets)
 
         for c in range(10):
-            logging.info(f"Training set class {c} percentage: \
+            logger.info(f"Training set class {c} percentage: \
                 {vsum(trainloader.dataset.targets == c) / num_train}")
         for c in range(10):
-            logging.info(f"Validation set class {c} percentage: \
+            logger.info(f"Validation set class {c} percentage: \
                 {vsum(metaloader.dataset.targets == c) / num_val}")
         for c in range(10):
-            logging.info(f"Test set class {c} percentage: \
+            logger.info(f"Test set class {c} percentage: \
                 {vsum(testloader.dataset.targets == c) / num_test}")
 
     prev_weights = None
@@ -963,6 +945,7 @@ def main2(args):
 
     if args.cuda:
         net = net.cuda()
+    net = DDP(net, device_ids=[args.local_rank])
     if args.dataset == 'MNIST':
         optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
         scheduler = None
@@ -985,13 +968,13 @@ def main2(args):
                 scheduler = None
     
     if args.do_train:
-        logging.info("start basic training")
+        logger.info("start basic training")
         basic_train(trainloader, validloader, testloader, criterion, args, net, optimizer, scheduler = scheduler)
     else:
-        logging.info("start meta training")
-        # meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), trainloader, metaloader, validloader, testloader)
+        logger.info("start meta training")
         meta_learning_model(
             args,
+            logger,
             net,
             optimizer,
             criterion,
@@ -1127,14 +1110,11 @@ if __name__ == "__main__":
     cudnn.benchmark = True
     
     os.makedirs(args.save_path, exist_ok=True)
-    logger = setup_logger(output=args.save_path, distributed_rank=dist.get_rank(), name="moco+cld")
+    logger = setup_logger(output=args.save_path, distributed_rank=dist.get_rank(), name="valid-selec")
     if dist.get_rank() == 0:
         path = os.path.join(args.save_path, "config.json")
         with open(path, 'w') as f:
             json.dump(vars(args), f, indent=2)
         logger.info("Full config saved to {}".format(path))
     args.device = torch.device("cuda", args.local_rank)
-    # if args.dataset == 'MNIST':
-    main2(args)
-    # else:
-    #     main3(args)
+    main2(args, logger)

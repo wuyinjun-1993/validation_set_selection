@@ -814,11 +814,31 @@ def get_dataloader_for_meta(args, split_method, pretrained_model=None, cached_sa
     validset, testset = randomly_produce_valid_set(testset, transform_test, rate = 0.1)
     cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
 
-    train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
-    meta_sampler = torch.utils.data.distributed.DistributedSampler(metaset)
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+        trainset,
+        num_replicas=args.world_size,
+        rank=args.local_rank,
+    )
+    meta_sampler = torch.utils.data.distributed.DistributedSampler(
+        metaset,
+        num_replicas=args.world_size,
+        rank=args.local_rank,
+    )
 
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
-    metaloader = torch.utils.data.DataLoader(metaset, batch_size=args.test_batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=meta_sampler)
+    trainloader = torch.utils.data.DataLoader(
+        trainset,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        pin_memory=False,
+        sampler=train_sampler,
+    )
+    metaloader = torch.utils.data.DataLoader(
+        metaset,
+        batch_size=args.test_batch_size,
+        num_workers=args.num_workers,
+        pin_memory=False,
+        sampler=meta_sampler,
+    )
     validloader = torch.utils.data.DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
 
