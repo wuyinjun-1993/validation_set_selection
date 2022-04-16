@@ -17,6 +17,13 @@ from PIL import Image
 import numpy
 import os, sys
 
+# To ensure each process will produce the same dataset separately. Random flips
+# of labels become deterministic so we can perform them independently per
+# process.
+torch.manual_seed(0)
+random.seed(0)
+numpy.random.seed(0)
+
 class GaussianBlur(object):
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
 
@@ -699,7 +706,6 @@ def get_dataloader_for_meta(args, split_method, pretrained_model=None, cached_sa
             validset = concat_valid_set(validset, new_validset)
             metaset = concat_valid_set(metaset, new_metaset)
         else:
-
             if type(trainset.data) is numpy.ndarray:
                 trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
                 origin_labels = numpy.copy(trainset.targets)
@@ -716,7 +722,6 @@ def get_dataloader_for_meta(args, split_method, pretrained_model=None, cached_sa
                 logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
             
             if args.flip_labels:
-
                 logging.info("add errors to train set")
 
                 # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
@@ -829,14 +834,14 @@ def get_dataloader_for_meta(args, split_method, pretrained_model=None, cached_sa
         trainset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        pin_memory=False,
+        pin_memory=True,
         sampler=train_sampler,
     )
     metaloader = torch.utils.data.DataLoader(
         metaset,
         batch_size=args.test_batch_size,
         num_workers=args.num_workers,
-        pin_memory=False,
+        pin_memory=True,
         sampler=meta_sampler,
     )
     validloader = torch.utils.data.DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
