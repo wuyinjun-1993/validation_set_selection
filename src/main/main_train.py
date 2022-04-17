@@ -872,13 +872,13 @@ def main2(args, logger):
         pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
     else:
         if args.dataset.startswith('cifar'):
-            net = ResNet18().cuda()
+            pretrained_rep_net = ResNet18().cuda()
             criterion = torch.nn.CrossEntropyLoss()
         else:
             if args.dataset.startswith('sst2'):
-                net = Bert(2, args.cuda)
+                pretrained_rep_net = Bert(2, args.cuda)
                 criterion = torch.nn.CrossEntropyLoss()
-        pretrained_rep_net = ResNet18().cuda()
+        # pretrained_rep_net = ResNet18().cuda()
     criterion = torch.nn.CrossEntropyLoss()
 
     meta_criterion = criterion
