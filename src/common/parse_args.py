@@ -37,6 +37,7 @@ def parse_args(args=None):
     parser.add_argument('--lr_decay', action='store_true', help='load_cached_weights')
 
     parser.add_argument('--use_pretrained_model', action='store_true', help='use pretrained models')
+    parser.add_argument('--reduce_dimension_all_layer', action='store_true', help='use pretrained models')
     parser.add_argument('--err_label_ratio', default=0.2, type=float)
     parser.add_argument('--data_dir', default=None, type=str)
     parser.add_argument('--save_path', default=None, type=str)

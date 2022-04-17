@@ -22,6 +22,7 @@ from models.resnet import *
 import collections
 
 cached_model_name="cached_model"
+pretrained_model_name="pretrained_model"
 
 def vary_learning_rate(current_learning_rate, eps, args, model=None):
     # current_learning_rate = current_learning_rate / 2
@@ -164,6 +165,8 @@ def cache_sample_weights_given_epoch(epoch):
 
     torch.save(best_model, os.path.join(args.save_path, cached_model_name))
 
+    torch.save(best_model, os.path.join(args.save_path, pretrained_model_name))
+
 
 def cache_sample_weights_given_epoch_basic_train(epoch):
     # best_w_array = torch.load(os.path.join(args.save_path, 'sample_weights_' + str(epoch)))
@@ -176,6 +179,8 @@ def cache_sample_weights_given_epoch_basic_train(epoch):
     # torch.save(best_w_array, os.path.join(args.save_path, "cached_sample_weights"))
 
     torch.save(best_model, os.path.join(args.save_path, cached_model_name))
+
+    torch.save(best_model, os.path.join(args.save_path, pretrained_model_name))
 
 def resume_meta_training_by_loading_cached_info(args, net):
 
@@ -868,11 +873,18 @@ def find_boundary_and_representative_samples(net, train_loader, args, valid_rati
     # torch.sort(prob_gap_ls, dim = 0, descending = False)
 
 def load_pretrained_model(args, net):
-    pretrained_model_state = torch.load(os.path.join(args.data_dir, "pretrained_model"))
+    if os.path.exists(os.path.join(args.prev_save_path, pretrained_model_name)):
+        logging.info("load pretrained models")
 
-    net.load_state_dict(pretrained_model_state, strict=False)
+        pretrained_model_state = torch.load(os.path.join(args.prev_save_path, pretrained_model_name))
+
+        if hasattr(pretrained_model_state, "state_dict"):
+            pretrained_model_state = pretrained_model_state.state_dict()
+
+        net.load_state_dict(pretrained_model_state, strict=False)
 
     return net
+    
 
 def main2(args):
 
@@ -888,8 +900,13 @@ def main2(args):
         net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
         criterion = torch.nn.NLLLoss()
     else:
-        net = ResNet18().cuda()
-        criterion = torch.nn.CrossEntropyLoss()
+        if args.dataset.startswith('cifar'):
+            net = ResNet18().cuda()
+            criterion = torch.nn.CrossEntropyLoss()
+        else:
+            if args.dataset.startswith('sst2'):
+                net = Bert(2, args.cuda)
+                criterion = torch.nn.CrossEntropyLoss()
 
     # net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
     if args.unsup_rep:
@@ -967,6 +984,7 @@ def main2(args):
         basic_train(trainloader, validloader, testloader, criterion, args, net, optimizer, scheduler = scheduler)
     else:
         logging.info("start meta training")
+        logging.info("meta dataset size::%d"%(len(metaloader.dataset)))
         # meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), trainloader, metaloader, validloader, testloader)
         meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = prev_weights, target_id = None, start_ep=start_epoch, mile_stones_epochs = mile_stones_epochs)
 

@@ -126,7 +126,7 @@ class ResNet(nn.Module):
             out_ls.append(out.clone().view(out.shape[0],-1))
             out = F.avg_pool2d(out, 4)
             out_ls.append(out.clone().view(out.shape[0],-1))
-            out = torch.cat(out_ls, dim = 1)
+            out = out_ls#torch.cat(out_ls, dim = 1).detach().cpu()
             # out = out.view(out.size(0), -1)
         # out = self.linear(out)
         return out
