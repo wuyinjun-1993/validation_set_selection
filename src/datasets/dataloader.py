@@ -17,6 +17,13 @@ from PIL import Image
 import numpy
 import os, sys
 
+# To ensure each process will produce the same dataset separately. Random flips
+# of labels become deterministic so we can perform them independently per
+# process.
+torch.manual_seed(0)
+random.seed(0)
+numpy.random.seed(0)
+
 class GaussianBlur(object):
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
 
@@ -253,49 +260,24 @@ def concat_valid_set(valid_set, new_valid_set):
 
 def split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, transform):
     if not type(train_dataset.data) is numpy.ndarray:
-        valid_data = train_dataset.data[valid_ids].clone()
-
-        valid_labels = origin_labels[valid_ids].clone()
-
-        meta_data = valid_data.clone()
-
-        meta_labels = valid_labels.clone()
+        meta_data = train_dataset.data[valid_ids].clone()
+        meta_labels = origin_labels[valid_ids].clone()
 
         train_data = train_dataset.data[update_train_ids].clone()
-
         train_labels = train_dataset.targets[update_train_ids].clone()
     else:
-        valid_data = numpy.copy(train_dataset.data[valid_ids])
-
-        valid_labels = numpy.copy(origin_labels[valid_ids])
-
-        meta_data = numpy.copy(valid_data)
-
-        meta_labels = numpy.copy(valid_labels)
+        meta_data = numpy.copy(train_dataset.data[valid_ids])
+        meta_labels = numpy.copy(origin_labels[valid_ids])
 
         train_data = numpy.copy(train_dataset.data[update_train_ids])
-
         train_labels = numpy.copy(train_dataset.targets[update_train_ids])
 
     train_set = dataset_wrapper(train_data, train_labels, transform)
-
-    valid_set = dataset_wrapper(valid_data, valid_labels, transform)
-
     meta_set = dataset_wrapper(meta_data, meta_labels, transform)
 
-    # flipped_labels = None
-    # if args.flip_labels:
+    return train_set, meta_set
 
-    #     logging.info("add errors to train set")
-
-    #     # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
-    #     # flipped_labels = obtain_flipped_labels(train_dataset, args)
-    #     flipped_labels = random_flip_labels_on_training2(train_set, ratio = args.err_label_ratio)
-    #     train_set.targets = flipped_labels
-
-    return train_set, valid_set, meta_set
-
-def random_partition_train_valid_datastet0(args, train_dataset, transform, origin_labels):
+def random_partition_train_valid_dataset0(args, train_dataset, transform, origin_labels):
     # valid_ratio = args.valid_ratio
 
     train_ids = torch.tensor(list(range(len(train_dataset))))
@@ -309,9 +291,9 @@ def random_partition_train_valid_datastet0(args, train_dataset, transform, origi
     update_train_ids = rand_train_ids[valid_size:]
 
     torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
-    train_set, valid_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, transform)
+    train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, transform)
     remaining_origin_labels = origin_labels[update_train_ids]
-    return train_set, valid_set, meta_set, remaining_origin_labels
+    return train_set, meta_set, remaining_origin_labels
 
 
 
@@ -469,11 +451,11 @@ def find_representative_samples0(net, train_dataset,validset, train_transform, a
         update_train_ids[valid_ids] = 0
     update_train_ids = update_train_ids.nonzero().view(-1)
     
-    train_set, valid_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, train_transform)
+    train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids, train_transform)
 
     remaining_origin_labels = origin_labels[update_train_ids]
 
-    return train_set, valid_set, meta_set, remaining_origin_labels
+    return train_set, meta_set, remaining_origin_labels
 
 
 def find_representative_samples1(net, train_dataset,validset, train_transform, args, origin_labels, cached_sample_weights = None):
@@ -668,7 +650,7 @@ def randomly_produce_valid_set(testset, transform_test, rate = 0.1):
 
     return validset, testset
 
-def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None, cached_sample_weights = None):
+def get_dataloader_for_meta(args, split_method, pretrained_model=None, cached_sample_weights = None):
     if args.dataset == 'cifar10':
         # transform_train_list = [
         #         transforms.RandomResizedCrop(size=32, scale=(0.2,1.)),
@@ -690,14 +672,9 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                 transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ])
         trainset = torchvision.datasets.CIFAR10(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train)
-        # trainset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
-
-        # trainset, validset, metaset = split_train_valid_func(args, trainset, transform_train, kwargs)
 
         testset = torchvision.datasets.CIFAR10(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
-        # testset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
         args.pool_len = 4
-        # ndata = trainset.__len__()
 
     elif args.dataset == 'MNIST':
 
@@ -723,6 +700,7 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
     valid_count = int(len(trainset)*valid_ratio)
     args.valid_count = valid_count
 
+    remaining_origin_labels = []
     if split_method == 'random':
         logging.info("Split method: random")
         if args.continue_label:
@@ -730,9 +708,7 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
             trainset, new_validset, new_metaset, remaining_origin_labels = random_partition_train_valid_datastet0(args, trainset, transform_train, origin_labels)
             validset = concat_valid_set(validset, new_validset)
             metaset = concat_valid_set(metaset, new_metaset)
-            cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
         else:
-
             if type(trainset.data) is numpy.ndarray:
                 trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
                 origin_labels = numpy.copy(trainset.targets)
@@ -741,9 +717,14 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                 origin_labels = trainset.targets.clone()
 
             flipped_labels = None
+
+            if args.bias_classes:
+                trainset = datasets.ImbalanceDataset(trainset)
+                origin_labels = origin_labels[trainset.mask]
+                logging.info(f"Total number of training samples: {trainset.data.shape[0]}")
+                logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
             
             if args.flip_labels:
-
                 logging.info("add errors to train set")
 
                 # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
@@ -772,10 +753,7 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                         torch.save(flipped_labels, flipped_label_dir)
                     flipped_labels = torch.load(flipped_label_dir)
                 trainset.targets = flipped_labels
-            trainset, validset, metaset, remaining_origin_labels = random_partition_train_valid_datastet0(args, trainset, transform_train, origin_labels)
-
-            cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
-
+            trainset, metaset, remaining_origin_labels = random_partition_train_valid_dataset0(args, trainset, transform_train, origin_labels)
     elif split_method == 'cluster':
         if args.continue_label:
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
@@ -788,17 +766,9 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
             #     # net, train_dataset,validset, train_transform, args, origin_labels
             #     trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, validset, transform_train, args, origin_labels)
             # else:
-            trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
+            trainset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
 
-
-
-            validset = concat_valid_set(validset, new_validset)
             metaset = concat_valid_set(metaset, new_metaset)
-            cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
-            # evaluate_dataset_with_basic_models(args, trainset, pretrained_model, criterion)
-            # evaluate_dataset_with_basic_models(args, validset, pretrained_model, criterion)
-
-            # print()
         else:
             if type(trainset.data) is numpy.ndarray:
                 trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
@@ -808,6 +778,12 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
                 origin_labels = trainset.targets.clone()
 
             flipped_labels = None
+
+            if args.bias_classes:
+                trainset = datasets.ImbalanceDataset(trainset)
+                origin_labels = origin_labels[trainset.mask]
+                logging.info(f"Total number of training samples: {trainset.data.shape[0]}")
+                logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
             
             if args.flip_labels:
 
@@ -832,9 +808,7 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
             # if args.cluster_method_three:
             #     trainset, validset, metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, transform_train, args, origin_labels)
             # else:
-            trainset, validset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, None, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
-            # trainset, validset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, transform_train, args, origin_labels)
-            cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
+            trainset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, None, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
         
     # if args.flip_labels:
 
@@ -846,23 +820,34 @@ def get_dataloader_for_meta(args, criterion, split_method, pretrained_model=None
     # meta_sampler = torch.utils.data.distributed.DistributedSampler(metaset)
 
     validset, testset = randomly_produce_valid_set(testset, transform_test, rate = 0.1)
+    cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
 
-    # testset = dataset_wrapper(testset.data, testset.targets, transform_test)
-    train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
-    # valid_sampler = torch.utils.data.distributed.DistributedSampler(validset)
-    meta_sampler = torch.utils.data.distributed.DistributedSampler(metaset)
-    
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+        trainset,
+        num_replicas=args.world_size,
+        rank=args.local_rank,
+    )
+    meta_sampler = torch.utils.data.distributed.DistributedSampler(
+        metaset,
+        num_replicas=args.world_size,
+        rank=args.local_rank,
+    )
 
-    
-    metaloader = torch.utils.data.DataLoader(metaset, batch_size=args.test_batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=meta_sampler)
-
+    trainloader = torch.utils.data.DataLoader(
+        trainset,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        pin_memory=True,
+        sampler=train_sampler,
+    )
+    metaloader = torch.utils.data.DataLoader(
+        metaset,
+        batch_size=args.test_batch_size,
+        num_workers=args.num_workers,
+        pin_memory=True,
+        sampler=meta_sampler,
+    )
     validloader = torch.utils.data.DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
 
-
-
-
-
     return trainloader, validloader, metaloader, testloader
-

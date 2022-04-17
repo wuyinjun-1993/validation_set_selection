@@ -55,44 +55,99 @@ cmd
 
 
 
-exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio 0.05 --meta_lr ${meta_lr} --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_do_train/ --cuda --lr 0.01 --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --do_train"
+exe_cmd="python -m torch.distributed.launch \
+  --nproc_per_node 1 \
+  --master_port ${port_num} \
+  main_train.py \
+  --nce-t 0.07 \
+  --nce-k 200 \
+  --data_dir ${data_dir} \
+  --dataset ${dataset_name} \
+  --valid_ratio 0.05 \
+  --meta_lr ${meta_lr} \
+  --flip_labels \
+  --err_label_ratio ${err_label_ratio} \
+  --save_path ${save_path_prefix}_do_train/ \
+  --cuda \
+  --lr 0.01 \
+  --batch_size ${batch_size} \
+  --test_batch_size ${test_batch_size} \
+  --epochs ${epochs} \
+  --do_train"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_0.txt
 
 
-echo "${exe_cmd} > ${output_file_name}"
+# echo "${exe_cmd} > ${output_file_name}"
+# 
+# ${exe_cmd} > ${output_file_name} 2>&1
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+exe_cmd="python -m torch.distributed.launch \
+  --nproc_per_node 1 \
+  --master_port ${port_num} \
+  main_train.py \
+  --load_dataset \
+  --select_valid_set \
+  --nce-k 200 \
+  --data_dir ${data_dir} \
+  --dataset ${dataset_name} \
+  --valid_ratio ${valid_ratio_each_run} \
+  --meta_lr ${meta_lr} \
+  --flip_labels \
+  --err_label_ratio ${err_label_ratio} \
+  --save_path ${save_path_prefix}_seq_select_0/ \
+  --prev_save_path ${save_path_prefix}_do_train/ \
+  --cuda --lr ${lr} \
+  --batch_size ${batch_size} \
+  --test_batch_size ${test_batch_size} \
+  --epochs ${epochs} \
+  --cluster_method_two \
+  --cosin_dist"
 
-
-exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py  --load_dataset --select_valid_set --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio 0.001 --meta_lr ${meta_lr} --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_seq_select_0/ --prev_save_path ${save_path_prefix}_do_train/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --cluster_method_two --cosin_dist "
-
-
-
-
-#exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py --load_dataset --cached_model_name ${cached_model_name} --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio ${valid_ratio_each_run} --meta_lr ${meta_lr} --not_save_dataset --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_seq_select_0/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} ${add_valid_in_training_flag} ${lr_decay_flag}"
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0.txt
 
-echo "${exe_cmd} > ${output_file_name}"
-
-${exe_cmd} > ${output_file_name} 2>&1 
+# echo "${exe_cmd} > ${output_file_name}"
+# 
+# ${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
-
-#cp ${save_path_prefix}_seq_select_0/* ${save_path_prefix}_no_reweighting_seq_select_0/
-
 
 echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
 
 
-#for k in {1..${repeat_times}}
 for (( k=1; k<=repeat_times; k++ ))
 do
 
-	exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py --select_valid_set --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio ${valid_ratio_each_run} --meta_lr ${meta_lr} --not_save_dataset --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_seq_select_$k/ --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --cluster_method_two --cosin_dist"
+	exe_cmd="python -m torch.distributed.launch \
+    --nproc_per_node 1 \
+    --master_port ${port_num} \
+    main_train.py \
+    --load_dataset \
+    --select_valid_set \
+    --continue_label \
+    --load_cached_weights \
+    --cached_sample_weights_name cached_sample_weights \
+    --nce-t 0.07 \
+    --nce-k 200 \
+    --data_dir ${data_dir} \
+    --dataset ${dataset_name} \
+    --valid_ratio ${valid_ratio_each_run} \
+    --meta_lr ${meta_lr} \
+    --not_save_dataset \
+    --flip_labels \
+    --err_label_ratio ${err_label_ratio} \
+    --save_path ${save_path_prefix}_seq_select_$k/ \
+    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
+    --cuda \
+    --lr ${lr} \
+    --batch_size ${batch_size} \
+    --test_batch_size ${test_batch_size} \
+    --epochs ${epochs} \
+    --cluster_method_two \
+    --cosin_dist"
 
 	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_${k}_2.txt
 
@@ -100,13 +155,6 @@ do
 	
 	${exe_cmd} > ${output_file_name} 2>&1 
 	
-#	exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port $(( port_num + 1 )) main_train.py --select_valid_set --continue_label --cached_model_name ${cached_model_name} --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio ${valid_ratio_each_run} --meta_lr ${meta_lr} --not_save_dataset --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_no_reweighting_seq_select_${k}/ --prev_save_path ${save_path_prefix}_no_reweighting_seq_select_$(( k - 1 ))/ --cuda --lr ${lr} --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} ${add_valid_in_training_flag}"
-
-#	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_no_reweighting_seq_select_$k.txt
-
-#	echo "${exe_cmd} > ${output_file_name}"
-
-#	${exe_cmd} > ${output_file_name} 2>&1
 done
 
 

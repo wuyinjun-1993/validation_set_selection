@@ -131,7 +131,6 @@ class ResNet(nn.Module):
         # out = self.linear(out)
         return out
 
-
 def ResNet18():
     return ResNet(BasicBlock, [2, 2, 2, 2])
 
