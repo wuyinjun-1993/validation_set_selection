@@ -174,7 +174,7 @@ def kmeans(
     X = X.to(device)
 
     # initialize
-    initial_state = initialize(X, num_clusters)
+    initial_state = initialize(X, num_clusters).to(device)
 
     iteration = 0
     tqdm_meter = tqdm(desc='[running kmeans]')
@@ -199,7 +199,7 @@ def kmeans(
 
             if sample_weights is not None:
                 # selected_sample_weights = torch.index_select(sample_weights, 0, selected)
-                selected_sample_weights = sample_weights[selected]
+                selected_sample_weights = sample_weights[selected].to(device)
             # selected = torch.index_select(X, 0, selected)
             selected = X[selected]
             
