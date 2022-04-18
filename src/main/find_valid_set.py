@@ -378,7 +378,7 @@ def get_representative_valid_ids2(train_loader, args, net, valid_count, cached_s
         for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
 
             if args.cuda:
-                data = data.cuda()
+                data, labels = train_loader.dataset.to_cuda(data, labels)
                 # labels = labels.cuda()
             
             sample_representation = net.feature_forward(data, all_layer=args.all_layer)

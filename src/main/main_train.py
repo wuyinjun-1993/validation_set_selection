@@ -21,6 +21,7 @@ from lib.NCECriterion import NCESoftmaxLoss
 from lib.lr_scheduler import get_scheduler
 from lib.BootstrappingLoss import SoftBootstrappingLoss, HardBootstrappingLoss
 from models.resnet import *
+from models.bert import *
 import collections
 
 cached_model_name="cached_model"
@@ -295,7 +296,8 @@ def meta_learning_model(
                 assert len(torch.nonzero(train_loader.dataset.__getitem__(train_ids[0])[1] - inputs[1][0])) == 0
 
             
-            inputs = to_device(inputs, args)
+            # inputs = to_device(inputs, args)
+            inputs[1], inputs[2] = train_loader.dataset.to_cuda(inputs[1], inputs[2])
             
             w_array.requires_grad = True
             
@@ -501,8 +503,9 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
         for batch_idx, (_, data, target) in enumerate(train_loader):
             optimizer.zero_grad()
             if args.cuda:
-                data = data.cuda()
-                target = target.cuda()
+                data, target = train_loader.dataset.to_cuda(data, target)
+                # data = data.cuda()
+                # target = target.cuda()
             output = network(data)
             if isinstance(criterion, torch.nn.L1Loss):
                 target = torch.nn.functional.one_hot(target, num_classes=10)
@@ -876,8 +879,16 @@ def main2(args, logger):
             criterion = torch.nn.CrossEntropyLoss()
         else:
             if args.dataset.startswith('sst2'):
-                pretrained_rep_net = Bert(2, args.cuda)
+                pretrained_rep_net = custom_Bert(2)
+                # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
                 criterion = torch.nn.CrossEntropyLoss()
+            else:
+                if args.dataset.startswith('sst5'):
+                    pretrained_rep_net = custom_Bert(5)
+                    # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+                    criterion = torch.nn.CrossEntropyLoss()
+                else:
+                    raise NotImplementedError
         # pretrained_rep_net = ResNet18().cuda()
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -951,7 +962,18 @@ def main2(args, logger):
         net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
         
     else:
-        net = ResNet18()
+        if args.dataset.startswith('cifar'):
+            net = ResNet18()
+        else:
+            if args.dataset.startswith('sst2'):
+                net = custom_Bert(2)
+                # net = init_model_with_pretrained_model_weights(net)
+            else:
+                if args.dataset.startswith('sst5'):
+                    net = custom_Bert(5)
+                    # net = init_model_with_pretrained_model_weights(net)
+                else:
+                    raise NotImplementedError
 
     if args.use_pretrained_model:
         # net = load_pretrained_model(args, net)
@@ -969,21 +991,26 @@ def main2(args, logger):
         optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
         scheduler = None
     else:
-        optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
-        optimizer.param_groups[0]['initial_lr'] = args.lr
-        if args.do_train:
-            mile_stones_epochs = [100, 150]
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                        milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+        if args.dataset.startswith('cifar'):
+            optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+            optimizer.param_groups[0]['initial_lr'] = args.lr
+            if args.do_train:
+                mile_stones_epochs = [100, 150]
+                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
+                                                            milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
+            else:
+                if args.use_pretrained_model:
+                    mile_stones_epochs = [20,60]
+                else:
+                    mile_stones_epochs = [120,160]
+                if args.lr_decay:
+                    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+                else:
+                    scheduler = None
         else:
-            if args.use_pretrained_model:
-                mile_stones_epochs = [20,60]
-            else:
-                mile_stones_epochs = [120,160]
-            if args.lr_decay:
-                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-            else:
+            if args.dataset.startswith('sst'):
+                optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
                 scheduler = None
     
     if args.do_train:
