@@ -318,12 +318,15 @@ def obtain_representations_for_valid_set(args, valid_set, net):
     return torch.cat(sample_representation_ls)
 
 
-def determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representations, valid_count, cosine_dist = False):
+def determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representations, valid_count, cosine_dist = False, all_layer = False, is_cuda = False):
 
     if not cosine_dist:
-        existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, device = new_valid_representations.device)
+        existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
     else:
-        existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, device = new_valid_representations.device)
+        if not all_layer:
+            existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+        else:
+            existing_new_dists = pairwise_cosine_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
 
     nearset_new_valid_distance,_ = torch.min(existing_new_dists, dim = 0)
 
@@ -434,12 +437,12 @@ def find_representative_samples0(net, train_dataset,validset, train_transform, a
         else:
             valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
             if existing_valid_representation is not None:
-                valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist)
+                valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda)
     else:
 
         valid_ids, new_valid_representations = get_representative_valid_ids2(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
         if existing_valid_representation is not None:
-            valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist)
+            valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
 
     torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))

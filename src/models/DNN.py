@@ -73,13 +73,45 @@ class DNN_three_layers(nn.Module):
     def feature_forward(self, x, all_layer=False):
         if all_layer:
             x_ls = []
-            x = F.relu(self.fc1(x.view(x.shape[0],-1)))
-            x_ls.append(x.clone().view(x.shape[0],-1))
+            x1 = F.relu(self.fc1(x.view(x.shape[0],-1)))
+            # x_ls.append(x.clone().detach().cpu().view(x.shape[0],-1))
+            x_ls.append(x1)
 
-            x = F.relu(self.fc2(x))
-            x_ls.append(x.clone().view(x.shape[0], -1))
-            return torch.cat(x_ls, dim = 1)
+            x = F.relu(self.fc2(x1))
+            # x_ls.append(x.clone().detach().cpu().view(x.shape[0], -1))
+            x_ls.append(x)
+            return x_ls
         else:
             x = F.relu(self.fc1(x.view(x.shape[0],-1)))
             x = F.relu(self.fc2(x))
             return x
+        # x = F.relu(self.fc3(x))
+        # x = F.dropout(x, training=self.training)
+        # x = self.fc2(x)
+        
+        # return F.log_softmax(x, dim=1)
+
+    def obtain_gradient_last_layer_by_sample_representation(self, sample_representation_last_layer, target, criterion):
+        output = self.fc3(sample_representation_last_layer)
+        loss = criterion(output, target)
+        sample_representation_last_layer_grad = torch.autograd.grad(loss, sample_representation_last_layer)[0]
+        return sample_representation_last_layer_grad
+
+
+    def obtain_gradient_all_layer_by_sample_representation(self, sample, target, criterion):
+
+        x1 = F.relu(self.fc1(sample.view(sample.shape[0],-1)))
+        
+        # x_ls.append(x.clone().detach().cpu().view(x.shape[0],-1))
+        x2 = F.relu(self.fc2(x1))
+
+        output = self.fc3(x2)
+        loss = criterion(output, target)
+        x1_grad = torch.autograd.grad(loss, x1, retain_graph=True)[0]
+        x2_grad = torch.autograd.grad(loss, x2)[0]
+        return [x1_grad, x2_grad]
+        # output = self.fc3(sample_representation_last_layer)
+        # loss = criterion(output, target)
+        # sample_representation_last_layer_grad = torch.autograd.grad(loss, sample_representation_last_layer)[0]
+        # return sample_representation_last_layer_grad
+            # return x
