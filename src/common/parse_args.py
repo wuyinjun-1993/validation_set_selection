@@ -11,6 +11,7 @@ def parse_args(args=None):
     parser.add_argument('--biased_flip', action='store_true', help='use GPU')
 
     parser.add_argument('--all_layer', action='store_true', help='use GPU')
+    parser.add_argument('--all_layer_grad', action='store_true', help='use GPU')
 
     parser.add_argument('--cluster_no_reweighting', action='store_true', help='use GPU')
     parser.add_argument('--flip_labels', action='store_true', help='flip labels')

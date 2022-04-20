@@ -297,7 +297,8 @@ def meta_learning_model(
 
             
             # inputs = to_device(inputs, args)
-            inputs[1], inputs[2] = train_loader.dataset.to_cuda(inputs[1], inputs[2])
+            if args.cuda:
+                inputs[1], inputs[2] = train_loader.dataset.to_cuda(inputs[1], inputs[2])
             
             w_array.requires_grad = True
             
@@ -340,8 +341,9 @@ def meta_learning_model(
                 meta_inputs =  next(meta_loader)
                 
                 # print(meta_inputs)
-    
-                meta_inputs = to_device(meta_inputs, args)
+                if args.cuda:
+                    meta_inputs[1], meta_inputs[2] = train_loader.dataset.to_cuda(meta_inputs[1], meta_inputs[2])
+                # meta_inputs = to_device(meta_inputs, args)
                 
                 if criterion is not None:
                     criterion.reduction = 'mean'
@@ -413,7 +415,7 @@ def meta_learning_model(
             opt.step()
             
 
-            avg_train_loss += minibatch_loss.detach().cpu().item()*inputs[1].shape[0]
+            avg_train_loss += minibatch_loss.detach().cpu().item()*inputs[2].shape[0]
 
             model_pred = torch.max(model_out, dim = 1)[1]
 
@@ -873,20 +875,25 @@ def main2(args, logger):
 
     if args.dataset == 'MNIST':
         pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
+        optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr)
     else:
         if args.dataset.startswith('cifar'):
             pretrained_rep_net = ResNet18().cuda()
             criterion = torch.nn.CrossEntropyLoss()
+            optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+            optimizer.param_groups[0]['initial_lr'] = args.lr
         else:
             if args.dataset.startswith('sst2'):
                 pretrained_rep_net = custom_Bert(2)
                 # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
                 criterion = torch.nn.CrossEntropyLoss()
+                optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
             else:
                 if args.dataset.startswith('sst5'):
                     pretrained_rep_net = custom_Bert(5)
                     # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
                     criterion = torch.nn.CrossEntropyLoss()
+                    optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
                 else:
                     raise NotImplementedError
         # pretrained_rep_net = ResNet18().cuda()
@@ -910,6 +917,7 @@ def main2(args, logger):
     
     if args.select_valid_set:
         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(
+            criterion, optimizer,
             args,
             split_method='cluster',
             pretrained_model=pretrained_rep_net,
@@ -917,6 +925,7 @@ def main2(args, logger):
         )
     else:
         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(
+            criterion, optimizer,
             args,
             split_method='random',
             pretrained_model=pretrained_rep_net,
@@ -977,7 +986,7 @@ def main2(args, logger):
 
     if args.use_pretrained_model:
         # net = load_pretrained_model(args, net)
-        net = load_checkpoint(args, net)
+        net = load_checkpoint2(args, net)
 
     mile_stones_epochs = None
 
@@ -1017,8 +1026,8 @@ def main2(args, logger):
         logger.info("start basic training")
         basic_train(trainloader, validloader, testloader, criterion, args, net, optimizer, scheduler = scheduler)
     else:
-        logging.info("start meta training")
-        logging.info("meta dataset size::%d"%(len(metaloader.dataset)))
+        logger.info("start meta training")
+        logger.info("meta dataset size::%d"%(len(metaloader.dataset)))
         # meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), trainloader, metaloader, validloader, testloader)
         # meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = prev_weights, target_id = None, start_ep=start_epoch, mile_stones_epochs = mile_stones_epochs)
         # logger.info("start meta training")
@@ -1041,114 +1050,114 @@ def main2(args, logger):
             mile_stones_epochs=mile_stones_epochs,
         )
 
-def main3(args):
+# def main3(args):
 
-    set_logger(args)
+#     set_logger(args)
     
-    logging.info("start")
+#     logging.info("start")
 
-    print('==> Preparing data..')
+#     print('==> Preparing data..')
 
-    if args.dataset == 'cifar10':
-        args.pool_len = 4
+#     if args.dataset == 'cifar10':
+#         args.pool_len = 4
 
-    # model = models.__dict__['ResNet18'](low_dim=args.low_dim, pool_len=args.pool_len, normlinear=args.normlinear).cuda()
+#     # model = models.__dict__['ResNet18'](low_dim=args.low_dim, pool_len=args.pool_len, normlinear=args.normlinear).cuda()
 
-    model = resnet18(pretrained=True)
+#     model = resnet18(pretrained=True)
 
-    model = load_checkpoint2(args, model)
+#     model = load_checkpoint2(args, model)
 
-    if args.cuda:
-        model = model.cuda()
+#     if args.cuda:
+#         model = model.cuda()
 
-    # net = DNN_two_layers()
+#     # net = DNN_two_layers()
 
-    # net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
-        # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
+#     # net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
+#         # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
 
-    # net.load_state_dict(net_state_dict, strict=False)
+#     # net.load_state_dict(net_state_dict, strict=False)
 
-    # if args.cuda:
-    #     net = net.cuda()
-    criterion = nn.CrossEntropyLoss().cuda()
-    if args.select_valid_set:
-        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='cluster', pretrained_model=model)
-    else:
-        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(args, criterion, split_method='random', pretrained_model=model)
+#     # if args.cuda:
+#     #     net = net.cuda()
+#     criterion = nn.CrossEntropyLoss().cuda()
+#     if args.select_valid_set:
+#         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(criterion, optimizer,args, criterion, split_method='cluster', pretrained_model=model)
+#     else:
+#         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(criterion, optimizer,args, criterion, split_method='random', pretrained_model=model)
 
-    # net = DNN_two_layers()
-    if not args.use_pretrained_model:
-        model = models.__dict__['ResNet18'](low_dim=args.low_dim, pool_len=args.pool_len, normlinear=args.normlinear).cuda()
-        if args.cuda:
-            model = model.cuda()
+#     # net = DNN_two_layers()
+#     if not args.use_pretrained_model:
+#         model = models.__dict__['ResNet18'](low_dim=args.low_dim, pool_len=args.pool_len, normlinear=args.normlinear).cuda()
+#         if args.cuda:
+#             model = model.cuda()
 
-    # optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
-
-    
-    optimizer = torch.optim.SGD(model.parameters(),
-                                lr=args.lr,#args.batch_size * dist.get_world_size() / 128 * args.base_learning_rate,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
-    scheduler = None#get_scheduler(optimizer, len(trainloader), args)
-
-    # meta_learning_model_rl(args, model, optimizer, criterion, trainloader, metaloader, validloader, testloader, scheduler)
-    if args.do_train:
-        logging.info("start basic training")
-        basic_train(trainloader, validloader, testloader, criterion, args, model, optimizer, scheduler)
-    else:
-        logging.info("start meta training")
-        meta_learning_model(args, model, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = None, target_id = None)
-
-
-def main(args):
-
-    set_logger(args)
-    
-    logging.info("start")
-
-    net = DNN_two_layers()
+#     # optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
 
     
-    pre_processing_mnist_main(args)
+#     optimizer = torch.optim.SGD(model.parameters(),
+#                                 lr=args.lr,#args.batch_size * dist.get_world_size() / 128 * args.base_learning_rate,
+#                                 momentum=args.momentum,
+#                                 weight_decay=args.weight_decay)
+#     scheduler = None#get_scheduler(optimizer, len(trainloader), args)
+
+#     # meta_learning_model_rl(args, model, optimizer, criterion, trainloader, metaloader, validloader, testloader, scheduler)
+#     if args.do_train:
+#         logging.info("start basic training")
+#         basic_train(trainloader, validloader, testloader, criterion, args, model, optimizer, scheduler)
+#     else:
+#         logging.info("start meta training")
+#         meta_learning_model(args, model, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = None, target_id = None)
+
+
+# def main(args):
+
+#     set_logger(args)
+    
+#     logging.info("start")
+
+#     net = DNN_two_layers()
 
     
-    if args.select_valid_set:
-        # train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations(args)
-
-        train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations2(args)
-
-        net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
-        # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
-
-        net.load_state_dict(net_state_dict, strict=False)
-
-        if args.cuda:
-            net = net.cuda()
-
-        test(test_loader, net, args, "test")
-        # test(train_loader, net, args)
-
-        # train_loader, valid_loader, meta_loader = find_boundary_samples(net, train_loader, args, args.valid_ratio)
-
-
-        # train_loader, valid_loader, meta_loader = find_boundary_and_representative_samples(net, train_loader, args, args.valid_ratio)
-        train_loader, valid_loader, meta_loader = find_representative_samples(net, train_loader, args, args.valid_ratio)
-    else:
-        train_loader, valid_loader, meta_loader, test_loader = get_mnist_data_loader2(args)
-
-    net = DNN_two_layers()
-    
-    optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
+#     pre_processing_mnist_main(args)
 
     
-    if args.do_train:
-        logging.info("start basic training")
-        basic_train(train_loader, valid_loader, test_loader, torch.nn.NLLLoss(), args, net, optimizer)
-    else:
+#     if args.select_valid_set:
+#         # train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations(args)
 
-        logging.info("start meta training")
-        # meta_learning_model(args, net, optimizer, torch.nn.NLLLoss(), train_loader, meta_loader, valid_loader, test_loader, mnist_to_device, cached_w_array = None, target_id = None)
-        meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), train_loader, meta_loader, valid_loader, test_loader)
+#         train_loader, test_loader = get_mnist_dataset_without_valid_without_perturbations2(args)
+
+#         net_state_dict = torch.load(os.path.join(args.data_dir, "model_full"), map_location=torch.device("cpu"))
+#         # net_state_dict = torch.load(os.path.join(args.data_dir, "model_logistic_regression"), map_location=torch.device("cpu"))
+
+#         net.load_state_dict(net_state_dict, strict=False)
+
+#         if args.cuda:
+#             net = net.cuda()
+
+#         test(test_loader, net, args, "test")
+#         # test(train_loader, net, args)
+
+#         # train_loader, valid_loader, meta_loader = find_boundary_samples(net, train_loader, args, args.valid_ratio)
+
+
+#         # train_loader, valid_loader, meta_loader = find_boundary_and_representative_samples(net, train_loader, args, args.valid_ratio)
+#         train_loader, valid_loader, meta_loader = find_representative_samples(net, train_loader, args, args.valid_ratio)
+#     else:
+#         train_loader, valid_loader, meta_loader, test_loader = get_mnist_data_loader2(args)
+
+#     net = DNN_two_layers()
+    
+#     optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
+
+    
+#     if args.do_train:
+#         logging.info("start basic training")
+#         basic_train(train_loader, valid_loader, test_loader, torch.nn.NLLLoss(), args, net, optimizer)
+#     else:
+
+#         logging.info("start meta training")
+#         # meta_learning_model(args, net, optimizer, torch.nn.NLLLoss(), train_loader, meta_loader, valid_loader, test_loader, mnist_to_device, cached_w_array = None, target_id = None)
+#         meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), train_loader, meta_loader, valid_loader, test_loader)
 
 if __name__ == "__main__":
     args = parse_args()
@@ -1161,10 +1170,12 @@ if __name__ == "__main__":
     
     os.makedirs(args.save_path, exist_ok=True)
     logger = setup_logger(output=args.save_path, distributed_rank=dist.get_rank(), name="valid-selec")
+    
     if dist.get_rank() == 0:
         path = os.path.join(args.save_path, "config.json")
         with open(path, 'w') as f:
             json.dump(vars(args), f, indent=2)
         logger.info("Full config saved to {}".format(path))
     args.device = torch.device("cuda", args.local_rank)
+    args.logger = logger
     main2(args, logger)

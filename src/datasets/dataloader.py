@@ -341,36 +341,49 @@ def random_partition_train_valid_dataset0(args, train_dataset, origin_labels):
 
 
 
-def obtain_representations_for_valid_set(args, valid_set, net):
+def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimizer):
     validloader = torch.utils.data.DataLoader(valid_set, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
 
     sample_representation_ls = []
 
-    with torch.no_grad():
+    if not args.all_layer_grad:
 
-        # all_sample_representations = [None]*len(train_loader.dataset)
+        with torch.no_grad():
 
-        for batch_id, (sample_ids, data, labels) in enumerate(validloader):
+            # all_sample_representations = [None]*len(train_loader.dataset)
 
-            if args.cuda:
-                data = data.cuda()
-                # labels = labels.cuda()
-            
-            sample_representation = net.feature_forward(data)
-            sample_representation_ls.append(sample_representation)
+            for batch_id, (sample_ids, data, labels) in enumerate(validloader):
 
-    return torch.cat(sample_representation_ls)
-
-
-def determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representations, valid_count, cosine_dist = False, all_layer = False, is_cuda = False):
-
-    if not cosine_dist:
-        existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+                if args.cuda:
+                    data, labels = validloader.dataset.to_cuda(data, labels)
+                    # data = data.cuda()
+                    # labels = labels.cuda()
+                
+                sample_representation = net.feature_forward(data)
+                sample_representation_ls.append(sample_representation)
+        return torch.cat(sample_representation_ls)
     else:
-        if not all_layer:
-            existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+        full_sample_representation_tensor, all_sample_ids = get_grad_by_example(args, validloader, net, criterion, optimizer)
+        return full_sample_representation_tensor
+
+    
+
+
+def determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representations, valid_count, cosine_dist = False, all_layer = False, is_cuda = False):
+
+    if not args.all_layer_grad:
+
+        if not cosine_dist:
+            existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
         else:
-            existing_new_dists = pairwise_cosine_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+            if not all_layer:
+                existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+            else:
+                existing_new_dists = pairwise_cosine_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+    
+    else:
+        existing_new_dists = pairwise_cosine2(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+
 
     nearset_new_valid_distance,_ = torch.min(existing_new_dists, dim = 0)
 
@@ -454,7 +467,7 @@ def init_sampling_valid_samples(net, train_dataset, train_transform, args, origi
 
 
 
-def find_representative_samples0(net, train_dataset,validset,  args, origin_labels, cached_sample_weights = None):
+def find_representative_samples0(criterion, optimizer, net, train_dataset,validset,  args, origin_labels, cached_sample_weights = None):
     # valid_ratio = args.valid_ratio
     prob_gap_ls = torch.zeros(len(train_dataset))
 
@@ -468,7 +481,7 @@ def find_representative_samples0(net, train_dataset,validset,  args, origin_labe
     trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
 
     if validset is not None:
-        existing_valid_representation = obtain_representations_for_valid_set(args, validset, net)
+        existing_valid_representation = obtain_representations_for_valid_set(args, validset, net, criterion, optimizer)
     else:
         existing_valid_representation = None
 
@@ -481,12 +494,12 @@ def find_representative_samples0(net, train_dataset,validset,  args, origin_labe
         else:
             valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
             if existing_valid_representation is not None:
-                valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda)
+                valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda)
     else:
 
-        valid_ids, new_valid_representations = get_representative_valid_ids2(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
+        valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
         if existing_valid_representation is not None:
-            valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda)
+            valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
 
     torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
@@ -697,7 +710,7 @@ def randomly_produce_valid_set(testset, transform_test, rate = 0.1):
 
     return validset, testset
 
-def get_dataloader_for_meta(args, split_method, pretrained_model=None, cached_sample_weights = None):
+def get_dataloader_for_meta(criterion, optimizer, args, split_method, pretrained_model=None, cached_sample_weights = None):
     validset = None
     if args.dataset == 'cifar10':
         # transform_train_list = [
@@ -842,7 +855,7 @@ def get_dataloader_for_meta(args, split_method, pretrained_model=None, cached_sa
             #     # net, train_dataset,validset, train_transform, args, origin_labels
             #     trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, validset, transform_train, args, origin_labels)
             # else:
-            trainset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, metaset, args, origin_labels, cached_sample_weights = cached_sample_weights)
+            trainset, new_metaset, remaining_origin_labels = find_representative_samples0(criterion, optimizer, pretrained_model, trainset, metaset, args, origin_labels, cached_sample_weights = cached_sample_weights)
 
             # metaset = concat_valid_set(metaset, new_metaset)
             metaset = metaset.concat_validset(metaset, new_metaset)
@@ -895,7 +908,7 @@ def get_dataloader_for_meta(args, split_method, pretrained_model=None, cached_sa
             # if args.cluster_method_three:
             #     trainset, validset, metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, transform_train, args, origin_labels)
             # else:
-            trainset, metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, None, args, origin_labels, cached_sample_weights = cached_sample_weights)
+            trainset, metaset, remaining_origin_labels = find_representative_samples0(criterion, optimizer, pretrained_model, trainset, None, args, origin_labels, cached_sample_weights = cached_sample_weights)
         
     # if args.flip_labels:
 

@@ -98,7 +98,7 @@ class custom_Bert(BertPreTrainedModel):
 
         super(custom_Bert, self).__init__(config)
         self.num_labels = config.num_labels
-
+        self.config = config
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
@@ -112,7 +112,7 @@ class custom_Bert(BertPreTrainedModel):
         self._tokenizer = BertTokenizer.from_pretrained(
             BERT_MODEL, do_lower_case=True)
         
-        self.config = config
+        
 
         self._optimizer = None
 
