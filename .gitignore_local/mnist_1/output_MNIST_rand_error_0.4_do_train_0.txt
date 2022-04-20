@@ -1,0 +1,156 @@
+[32m[04/13 00:05:12 moco+cld]: [0mFull config saved to /data3/wuyinjun/valid_set_selections/mnist_1//rand_error_0.4_valid_select_do_train/config.json
+2022-04-13 00:05:12,838 INFO     start
+==> Preparing data..
+[32m[04/13 00:05:16 moco+cld]: [0m==> Loading cached model...
+2022-04-13 00:05:16,593 INFO     Split method: random
+2022-04-13 00:05:16,602 INFO     add errors to train set
+2022-04-13 00:05:16,602 INFO     Not loading dataset
+2022-04-13 00:05:16,709 INFO     start basic training
+2022-04-13 00:05:19,538 INFO     learning rate at epoch 0: 0.010000
+2022-04-13 00:05:19,538 INFO     valid performance at epoch 0
+2022-04-13 00:05:19,905 INFO     valid performance: Avg. loss: 2.290251, Accuracy: 130/1000 (13.000000)
+
+2022-04-13 00:05:19,906 INFO     best test performance so far is in epoch 0: 2.290251, 13.000000
+2022-04-13 00:05:19,906 INFO     test performance at epoch 0
+2022-04-13 00:05:21,042 INFO     test performance: Avg. loss: 2.287872, Accuracy: 1267/9000 (14.077778)
+
+2022-04-13 00:05:21,042 INFO     best test performance so far is in epoch 0: 2.287872, 14.077778
+2022-04-13 00:05:23,827 INFO     learning rate at epoch 1: 0.010000
+2022-04-13 00:05:23,827 INFO     valid performance at epoch 1
+2022-04-13 00:05:24,214 INFO     valid performance: Avg. loss: 2.270313, Accuracy: 177/1000 (17.700000)
+
+2022-04-13 00:05:24,215 INFO     best test performance so far is in epoch 1: 2.270313, 17.700000
+2022-04-13 00:05:24,215 INFO     test performance at epoch 1
+2022-04-13 00:05:25,300 INFO     test performance: Avg. loss: 2.267956, Accuracy: 1729/9000 (19.211111)
+
+2022-04-13 00:05:25,300 INFO     best test performance so far is in epoch 1: 2.267956, 19.211111
+2022-04-13 00:05:28,340 INFO     learning rate at epoch 2: 0.010000
+2022-04-13 00:05:28,340 INFO     valid performance at epoch 2
+2022-04-13 00:05:28,705 INFO     valid performance: Avg. loss: 2.249760, Accuracy: 251/1000 (25.100000)
+
+2022-04-13 00:05:28,706 INFO     best test performance so far is in epoch 2: 2.249760, 25.100000
+2022-04-13 00:05:28,706 INFO     test performance at epoch 2
+2022-04-13 00:05:29,850 INFO     test performance: Avg. loss: 2.247327, Accuracy: 2320/9000 (25.777778)
+
+2022-04-13 00:05:29,851 INFO     best test performance so far is in epoch 2: 2.247327, 25.777778
+2022-04-13 00:05:32,793 INFO     learning rate at epoch 3: 0.010000
+2022-04-13 00:05:32,793 INFO     valid performance at epoch 3
+2022-04-13 00:05:33,199 INFO     valid performance: Avg. loss: 2.228128, Accuracy: 305/1000 (30.500000)
+
+2022-04-13 00:05:33,200 INFO     best test performance so far is in epoch 3: 2.228128, 30.500000
+2022-04-13 00:05:33,200 INFO     test performance at epoch 3
+2022-04-13 00:05:34,344 INFO     test performance: Avg. loss: 2.225478, Accuracy: 2936/9000 (32.622222)
+
+2022-04-13 00:05:34,345 INFO     best test performance so far is in epoch 3: 2.225478, 32.622222
+2022-04-13 00:05:37,517 INFO     learning rate at epoch 4: 0.010000
+2022-04-13 00:05:37,517 INFO     valid performance at epoch 4
+2022-04-13 00:05:37,909 INFO     valid performance: Avg. loss: 2.204924, Accuracy: 369/1000 (36.900000)
+
+2022-04-13 00:05:37,910 INFO     best test performance so far is in epoch 4: 2.204924, 36.900000
+2022-04-13 00:05:37,910 INFO     test performance at epoch 4
+2022-04-13 00:05:39,045 INFO     test performance: Avg. loss: 2.201911, Accuracy: 3469/9000 (38.544444)
+
+2022-04-13 00:05:39,046 INFO     best test performance so far is in epoch 4: 2.201911, 38.544444
+2022-04-13 00:05:42,059 INFO     learning rate at epoch 5: 0.010000
+2022-04-13 00:05:42,059 INFO     valid performance at epoch 5
+2022-04-13 00:05:42,446 INFO     valid performance: Avg. loss: 2.179835, Accuracy: 422/1000 (42.200000)
+
+2022-04-13 00:05:42,446 INFO     best test performance so far is in epoch 5: 2.179835, 42.200000
+2022-04-13 00:05:42,447 INFO     test performance at epoch 5
+2022-04-13 00:05:43,629 INFO     test performance: Avg. loss: 2.176212, Accuracy: 3970/9000 (44.111111)
+
+2022-04-13 00:05:43,630 INFO     best test performance so far is in epoch 5: 2.176212, 44.111111
+2022-04-13 00:05:46,922 INFO     learning rate at epoch 6: 0.010000
+2022-04-13 00:05:46,922 INFO     valid performance at epoch 6
+2022-04-13 00:05:47,323 INFO     valid performance: Avg. loss: 2.152366, Accuracy: 462/1000 (46.200000)
+
+2022-04-13 00:05:47,324 INFO     best test performance so far is in epoch 6: 2.152366, 46.200000
+2022-04-13 00:05:47,324 INFO     test performance at epoch 6
+2022-04-13 00:05:48,493 INFO     test performance: Avg. loss: 2.148026, Accuracy: 4347/9000 (48.300000)
+
+2022-04-13 00:05:48,494 INFO     best test performance so far is in epoch 6: 2.148026, 48.300000
+2022-04-13 00:05:51,355 INFO     learning rate at epoch 7: 0.010000
+2022-04-13 00:05:51,355 INFO     valid performance at epoch 7
+2022-04-13 00:05:51,735 INFO     valid performance: Avg. loss: 2.122128, Accuracy: 493/1000 (49.300000)
+
+2022-04-13 00:05:51,736 INFO     best test performance so far is in epoch 7: 2.122128, 49.300000
+2022-04-13 00:05:51,737 INFO     test performance at epoch 7
+2022-04-13 00:05:52,875 INFO     test performance: Avg. loss: 2.117042, Accuracy: 4611/9000 (51.233333)
+
+2022-04-13 00:05:52,876 INFO     best test performance so far is in epoch 7: 2.117042, 51.233333
+2022-04-13 00:05:55,765 INFO     learning rate at epoch 8: 0.010000
+2022-04-13 00:05:55,766 INFO     valid performance at epoch 8
+2022-04-13 00:05:56,163 INFO     valid performance: Avg. loss: 2.088705, Accuracy: 525/1000 (52.500000)
+
+2022-04-13 00:05:56,164 INFO     best test performance so far is in epoch 8: 2.088705, 52.500000
+2022-04-13 00:05:56,164 INFO     test performance at epoch 8
+2022-04-13 00:05:57,353 INFO     test performance: Avg. loss: 2.082918, Accuracy: 4827/9000 (53.633333)
+
+2022-04-13 00:05:57,353 INFO     best test performance so far is in epoch 8: 2.082918, 53.633333
+2022-04-13 00:06:00,214 INFO     learning rate at epoch 9: 0.010000
+2022-04-13 00:06:00,214 INFO     valid performance at epoch 9
+2022-04-13 00:06:00,612 INFO     valid performance: Avg. loss: 2.051994, Accuracy: 538/1000 (53.800000)
+
+2022-04-13 00:06:00,613 INFO     best test performance so far is in epoch 9: 2.051994, 53.800000
+2022-04-13 00:06:00,613 INFO     test performance at epoch 9
+2022-04-13 00:06:01,807 INFO     test performance: Avg. loss: 2.045441, Accuracy: 4988/9000 (55.422222)
+
+2022-04-13 00:06:01,808 INFO     best test performance so far is in epoch 9: 2.045441, 55.422222
+2022-04-13 00:06:04,813 INFO     learning rate at epoch 10: 0.010000
+2022-04-13 00:06:04,813 INFO     valid performance at epoch 10
+2022-04-13 00:06:05,178 INFO     valid performance: Avg. loss: 2.011985, Accuracy: 545/1000 (54.500000)
+
+2022-04-13 00:06:05,179 INFO     best test performance so far is in epoch 10: 2.011985, 54.500000
+2022-04-13 00:06:05,179 INFO     test performance at epoch 10
+2022-04-13 00:06:06,326 INFO     test performance: Avg. loss: 2.004561, Accuracy: 5090/9000 (56.555556)
+
+2022-04-13 00:06:06,327 INFO     best test performance so far is in epoch 10: 2.004561, 56.555556
+2022-04-13 00:06:09,149 INFO     learning rate at epoch 11: 0.010000
+2022-04-13 00:06:09,150 INFO     valid performance at epoch 11
+2022-04-13 00:06:09,548 INFO     valid performance: Avg. loss: 1.968732, Accuracy: 552/1000 (55.200000)
+
+2022-04-13 00:06:09,548 INFO     best test performance so far is in epoch 11: 1.968732, 55.200000
+2022-04-13 00:06:09,549 INFO     test performance at epoch 11
+/data6/wuyinjun/pyenv/lib/python3.6/site-packages/torch/distributed/launch.py:186: FutureWarning: The module torch.distributed.launch is deprecated
+and will be removed in future. Use torchrun.
+Note that --use_env is set by default in torchrun.
+If your script expects `--local_rank` argument to be set, please
+change it to read from `os.environ['LOCAL_RANK']` instead. See 
+https://pytorch.org/docs/stable/distributed.html#launch-utility for 
+further instructions
+
+  FutureWarning,
+ERROR:torch.distributed.elastic.multiprocessing.api:failed (exitcode: -9) local_rank: 0 (pid: 1612) of binary: /data6/wuyinjun/pyenv/bin/python
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/runpy.py", line 193, in _run_module_as_main
+    "__main__", mod_spec)
+  File "/usr/lib/python3.6/runpy.py", line 85, in _run_code
+    exec(code, run_globals)
+  File "/data6/wuyinjun/pyenv/lib/python3.6/site-packages/torch/distributed/launch.py", line 193, in <module>
+    main()
+  File "/data6/wuyinjun/pyenv/lib/python3.6/site-packages/torch/distributed/launch.py", line 189, in main
+    launch(args)
+  File "/data6/wuyinjun/pyenv/lib/python3.6/site-packages/torch/distributed/launch.py", line 174, in launch
+    run(args)
+  File "/data6/wuyinjun/pyenv/lib/python3.6/site-packages/torch/distributed/run.py", line 713, in run
+    )(*cmd_args)
+  File "/data6/wuyinjun/pyenv/lib/python3.6/site-packages/torch/distributed/launcher/api.py", line 131, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/data6/wuyinjun/pyenv/lib/python3.6/site-packages/torch/distributed/launcher/api.py", line 261, in launch_agent
+    failures=result.failures,
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+=====================================================
+main_train.py FAILED
+-----------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+-----------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2022-04-13_00:06:11
+  host      : ash08
+  rank      : 0 (local_rank: 0)
+  exitcode  : -9 (pid: 1612)
+  error_file: <N/A>
+  traceback : Signal 9 (SIGKILL) received by PID 1612
+=====================================================
