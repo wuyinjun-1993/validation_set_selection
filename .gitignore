@@ -1,1 +1,10 @@
+/data
+/*logs
+
+
+/.gitignore_local
+**/.vscode
+/.project
+/.pydevproject
+
 __pycache__/
