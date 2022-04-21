@@ -273,41 +273,62 @@ def systematically_flip_labels(err_label_ids, origin_labels, label_type_count):
 
     return full_rand_err_label_ls
 
+
+def uniform_mix_C(mixing_ratio, num_classes):
+    '''
+    returns a linear interpolation of a uniform matrix and an identity matrix
+    '''
+    return mixing_ratio * np.full((num_classes, num_classes), 1 / num_classes) + \
+        (1 - mixing_ratio) * np.eye(num_classes)
+
 def random_flip_labels_on_training2(train_dataset, ratio = 0.5):
+
+
     is_numpy = False
 
     if type(train_dataset.targets) is np.ndarray:
         is_numpy = True
         train_dataset.targets = torch.from_numpy(train_dataset.targets)
-    full_ids = torch.tensor(list(range(len(train_dataset.targets))))
-
-    full_rand_ids = torch.randperm(len(train_dataset.targets))
-
-    err_label_count = int(len(full_rand_ids)*ratio)
-
-    err_label_ids = full_rand_ids[0:err_label_count]
-
-    correct_label_ids = full_rand_ids[err_label_count:]
 
     label_type_count = len(train_dataset.targets.unique())
 
+    C = uniform_mix_C(ratio, label_type_count)
+
     origin_labels = train_dataset.targets.clone()
 
-    rand_err_labels = random_flip_labels_for_each_class(err_label_ids, origin_labels, label_type_count)
+    for i in range(len(origin_labels)):
+        train_dataset.targets[i] = np.random.choice(label_type_count, p=C[origin_labels[i]])
+
+    
+    # full_ids = torch.tensor(list(range(len(train_dataset.targets))))
+
+    # full_rand_ids = torch.randperm(len(train_dataset.targets))
+
+    # err_label_count = int(len(full_rand_ids)*ratio)
+
+    # err_label_ids = full_rand_ids[0:err_label_count]
+
+    # correct_label_ids = full_rand_ids[err_label_count:]
+
+    # label_type_count = len(train_dataset.targets.unique())
+
+    # origin_labels = train_dataset.targets.clone()
+
+    # rand_err_labels = random_flip_labels_for_each_class(err_label_ids, origin_labels, label_type_count)
 
 
-    # rand_err_labels = torch.randint(low=0,high=label_type_count-1, size=[len(err_label_ids)])
+    # # rand_err_labels = torch.randint(low=0,high=label_type_count-1, size=[len(err_label_ids)])
 
-    # origin_err_labels = origin_labels[err_label_ids]
+    # # origin_err_labels = origin_labels[err_label_ids]
 
-    # rand_err_labels[rand_err_labels == origin_err_labels] = (rand_err_labels[rand_err_labels == origin_err_labels] + 1)%label_type_count
+    # # rand_err_labels[rand_err_labels == origin_err_labels] = (rand_err_labels[rand_err_labels == origin_err_labels] + 1)%label_type_count
 
-    origin_labels[err_label_ids] = rand_err_labels
+    # origin_labels[err_label_ids] = rand_err_labels
 
     if is_numpy:
         train_dataset.targets = train_dataset.targets.numpy()
 
-    return origin_labels
+    return train_dataset.targets
 
 def random_flip_labels_on_training3(train_dataset, ratio = 0.5):
     is_numpy = False
