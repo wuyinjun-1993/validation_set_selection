@@ -239,7 +239,11 @@ def kmeans(
         print(f'running k-means on cpu..')
 
     if distance == 'euclidean':
-        pairwise_distance_function = pairwise_distance
+        if not all_layer:
+            pairwise_distance_function = pairwise_distance
+        else:
+            pairwise_distance_function = pairwise_distance_ls
+
     elif distance == 'cosine':
         if not all_layer:
             pairwise_distance_function = pairwise_cosine
@@ -784,6 +788,58 @@ def kmeans_predict(
 
     return choice_cluster.cpu()
 
+def pairwise_distance_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
+    # transfer to device
+    # data1, data2 = data1.to(device), data2.to(device)
+    B_ls = []
+    for idx in range(len(data2_ls)):
+        data2 = data2_ls[idx].unsqueeze(dim=0)
+        if is_cuda:
+            data2 = data2.cuda()
+        B_ls.append(data2)
+
+    A_ls = []
+    for idx in range(len(data1_ls)):
+        data1 = data1_ls[idx].unsqueeze(dim=1)
+        A_ls.append(data1)
+
+    # if is_cuda:
+    #     data2 = data2.cuda()
+
+    # N*1*M
+    # A = data1.unsqueeze(dim=1)
+
+    # # 1*N*M
+    # B = data2.unsqueeze(dim=0)
+
+    full_dist_ls = []
+
+    for start_id in range(0, A_ls[0].shape[0], batch_size):
+        end_id = start_id + batch_size
+        if end_id > A_ls[0].shape[0]:
+            end_id = A_ls[0].shape[0]
+        
+        cosine_dis_ls = []
+        for idx in range(len(A_ls)):
+            curr_A = A_ls[idx][start_id: end_id]
+            if is_cuda:
+                curr_A = curr_A.cuda()
+            # curr_A_normalized = curr_A / curr_A.norm(dim=-1, keepdim=True)
+            B = B_ls[idx]
+            # B_normalized = B / B.norm(dim=-1, keepdim=True)
+            # curr_cosine = curr_A_normalized * B_normalized    
+            # curr_dist = torch.sqrt(((curr_A - B) **2.0).sum(dim=-1).squeeze())
+            curr_dist = ((curr_A - B) **2.0).sum(dim=-1)
+            # curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1)).squeeze()
+            cosine_dis_ls.append(curr_dist)
+        # final_cosine_dis = torch.min(torch.stack(cosine_dis_ls, dim = 1), dim = 1)[0]
+        final_cosine_dis = torch.sum(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
+        # final_cosine_dis = 1 - max_cosine_sim
+        full_dist_ls.append(final_cosine_dis)
+
+    full_dist_tensor = torch.cat(full_dist_ls)
+
+    return full_dist_tensor
 
 def pairwise_distance(data1, data2, is_cuda=False, batch_size = 128):
     # transfer to device
@@ -807,7 +863,7 @@ def pairwise_distance(data1, data2, is_cuda=False, batch_size = 128):
         if is_cuda:
             curr_A = curr_A.cuda()
 
-        curr_dist = torch.sqrt(((curr_A - B) **2.0).sum(dim=-1).squeeze())
+        curr_dist = torch.sqrt(((curr_A - B) **2.0).sum(dim=-1))
         full_dist_ls.append(curr_dist)
         del curr_A
 
