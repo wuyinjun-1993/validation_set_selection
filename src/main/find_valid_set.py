@@ -427,9 +427,27 @@ def get_representative_valid_ids2(train_loader, args, net, valid_count, cached_s
         cached_sample_weights = None
 
     if cached_sample_weights is not None:
-        valid_ids, valid_sample_representation_tensor = cluster_per_class(full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=args.all_layer)  
+        valid_ids, valid_sample_representation_tensor = cluster_per_class(
+            full_sample_representation_tensor,
+            all_sample_ids,
+            valid_count_per_class=main_represent_count,
+            num_clusters=50,
+            sample_weights=cached_sample_weights[all_sample_ids],
+            cosin_distance=args.cosin_dist,
+            is_cuda=args.cuda,
+            all_layer=args.all_layer,
+        )  
     else:
-        valid_ids, valid_sample_representation_tensor = cluster_per_class(full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=args.all_layer)  
+        valid_ids, valid_sample_representation_tensor = cluster_per_class(
+            full_sample_representation_tensor,
+            all_sample_ids,
+            valid_count_per_class=main_represent_count,
+            num_clusters=main_represent_count,
+            sample_weights=None,
+            cosin_distance=args.cosin_dist,
+            is_cuda=args.cuda,
+            all_layer=args.all_layer,
+        )  
 
 
     # for label in sample_representation_vec_ls_by_class:

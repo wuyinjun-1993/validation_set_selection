@@ -55,7 +55,7 @@ cmd
 
 
 
-exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio 0.05 --meta_lr ${meta_lr} --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_do_train/ --cuda --lr 0.01 --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --do_train --biased_flip"
+exe_cmd="python -m torch.distributed.launch --nproc_per_node 1 --master_port ${port_num} main_train.py --nce-t 0.07 --nce-k 200 --data_dir ${data_dir} --dataset ${dataset_name} --valid_ratio 0.05 --meta_lr ${meta_lr} --flip_labels --err_label_ratio ${err_label_ratio} --save_path ${save_path_prefix}_do_train/ --cuda --lr 1 --batch_size ${batch_size} --test_batch_size ${test_batch_size} --epochs ${epochs} --do_train --biased_flip --l1_loss"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_0.txt

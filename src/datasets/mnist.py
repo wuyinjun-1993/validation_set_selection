@@ -346,6 +346,30 @@ def random_flip_labels_on_training3(train_dataset, ratio = 0.5):
     return origin_labels
 
 
+def random_flip_labels_on_training4(train_dataset, ratio = 0.5):
+    is_numpy = False
+
+    if type(train_dataset.targets) is np.ndarray:
+        is_numpy = True
+        train_dataset.targets = torch.from_numpy(train_dataset.targets)
+
+    full_rand_ids = torch.randperm(len(train_dataset.targets))
+    err_label_count = int(len(full_rand_ids)*ratio)
+    err_label_ids = full_rand_ids[0:err_label_count]
+
+    label_type_count = len(train_dataset.targets.unique())
+    origin_labels = train_dataset.targets.clone()
+
+    rand_err_labels = torch.randint(0, label_type_count, err_label_ids.shape)
+
+    origin_labels[err_label_ids] = rand_err_labels
+    assert torch.all(origin_labels[err_label_ids] == rand_err_labels)
+
+    if is_numpy:
+        train_dataset.targets = train_dataset.targets.numpy()
+
+    return origin_labels
+
 
 def adversarial_flip_labels(dataset, ratio=0.5):
     print(dataset.data.shape)

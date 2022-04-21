@@ -9,6 +9,9 @@ def parse_args(args=None):
 
     parser.add_argument('--cuda', action='store_true', help='use GPU')
     parser.add_argument('--biased_flip', action='store_true', help='use GPU')
+    parser.add_argument('--noisy_valid', action='store_true', help='use the noisy labels in the validation set')
+    parser.add_argument('--w_rectified_gaussian_init', action='store_true',
+        help='initialize the sample weights with a rectified gaussian')
 
     parser.add_argument('--all_layer', action='store_true', help='use GPU')
 
@@ -38,6 +41,7 @@ def parse_args(args=None):
     parser.add_argument('--add_under_rep_samples', action='store_true', help='add under represented samples')
 
     parser.add_argument('--do_train', action='store_true', help='do training')
+    parser.add_argument('--active_learning', action='store_true', help='perform training with active learning')
     parser.add_argument('--load_cached_weights', action='store_true', help='load_cached_weights')
     parser.add_argument('--lr_decay', action='store_true', help='load_cached_weights')
 

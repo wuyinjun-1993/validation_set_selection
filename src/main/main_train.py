@@ -220,15 +220,6 @@ def meta_learning_model(
     mile_stones_epochs=None,
 ):
     
-    # train_loader = DataLoader(train_dataset, batch_size=args['bs'], shuffle=True, num_workers=2, pin_memory=True)
-    # test_loader =  DataLoader(test_dataset, batch_size=args['bs'], shuffle=False, num_workers=2, pin_memory=True)
-    # meta_loader = DataLoader(meta_dataset, batch_size=args['bs'], shuffle=True, pin_memory=True)
-    
-    # train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    # test_loader =  DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False)
-    # meta_loader = DataLoader(meta_dataset, batch_size=args.test_batch_size, shuffle=True)
-    # train_loader, meta_loader, valid_loader, test_loader = create_data_loader(train_dataset, meta_dataset, test_dataset, args)
-    
     meta_loader = itertools.cycle(meta_loader)
     
     if args.cuda:
@@ -237,36 +228,26 @@ def meta_learning_model(
         device = torch.device("cpu")
 
     if cached_w_array is None:
-        w_array =torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
-        # w_array.data[:] = 1e-1
-        # w_array =torch.ones(len(train_loader.dataset), requires_grad=True, device = device)*1e-4
+        if args.w_rectified_gaussian_init:
+            w_array = torch.normal(
+                mean=0.0,
+                std=1.0,
+                size=(len(train_loader.dataset),),
+                device=device,
+            )
+            w_array = F.relu(w_array)
+            w_array = (w_array / torch.sum(w_array)) * w_array.shape[0]
+            w_array.requires_grad = True
+        else:
+            w_array = torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
     else:
         cached_w_array.requires_grad = False
         w_array = cached_w_array.clone()
-
-    # if args.cuda:
         w_array = w_array.to(device)
-
         w_array.requires_grad = True
     
-    # with torch.no_grad():
-    #     metrics = model.test(model, valid_loader, args)
-        
-    #     log_metrics('Valid', 0, metrics)
-            
-    #     metrics = model.test(model, test_loader, args)
-        
-    #     log_metrics('Test', 0, metrics)   
-    warm_up_steps = 200
 
     total_iter_count = 1
-
-    # warm_up_steps = args.warm_up_steps
-
-    # if warm_up_steps is None:
-    #     warm_up_steps = 10000# args.max_steps//2
-
-    curr_learning_rate = args.lr
 
     curr_ilp_learning_rate = args.meta_lr
 
@@ -533,22 +514,68 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
             if valid_loader is not None and args.local_rank == 0:
                 valid_loss, valid_acc = test(valid_loader, network, criterion, args, logger, "valid")
                 report_best_test_performance_so_far(logger, valid_loss_ls, valid_acc_ls, valid_loss, valid_acc)
+            
+            if args.local_rank == 0:
+                logger.info("test performance at epoch %d"%(epoch))
+                test_loss, test_acc = test(test_loader, network, criterion, args, logger, "test")
+                report_best_test_performance_so_far(logger, test_loss_ls, test_acc_ls, test_loss, test_acc)
+
+    if args.local_rank == 0:
+        report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=False)
+
+def uncertainty_heuristic(model, train_loader):
+    vals = torch.zeros((train_loader.data.dataset.shape[0],))
+    for _, (indices, data, _) in enumerate(train_loader):
+        output = model(data)
+        vals[indices] = F.cross_entropy(output, output).cpu()
+    return vals
+
+def active_learning(train_loader, valid_loader, test_loader, criterion,
+        gt_training_labels, heuristic, args, network, optimizer, scheduler = None):
+
+    network.train()
+    valid_loss_ls = []
+    valid_acc_ls = []
+    test_loss_ls = []
+    test_acc_ls = []
+    for epoch in range(args.epochs):
+        with torch.no_grad():
+            # Select 10 samples based on heuristic and assign correct label
+            _, indices = torch.sort(
+                heuristic(network, train_loader), descending=True
+            )
+            train_loader.data.targets[indices[:10]] = gt_training_labels[indices[:10]]
+
+        for _, (_, data, target) in enumerate(train_loader):
+            optimizer.zero_grad()
+            if args.cuda:
+                data = data.cuda()
+                target = target.cuda()
+            output = network(data)
+            if isinstance(criterion, torch.nn.L1Loss):
+                target = F.one_hot(target, num_classes=10)
+                output = F.softmax(output)
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+        if scheduler is not None:
+            scheduler.step()
+        if args.local_rank == 0:
+            torch.save(network.module.state_dict(), os.path.join(args.save_path, "model_" + str(epoch)))
+        logger.info("learning rate at epoch %d: %f"%(epoch, float(optimizer.param_groups[0]['lr'])))
+        
+        with torch.no_grad():
+            logger.info("valid performance at epoch %d"%(epoch))
+            if valid_loader is not None and args.local_rank == 0:
+                valid_loss, valid_acc = test(valid_loader, network, criterion, args, logger, "valid")
+                report_best_test_performance_so_far(logger, valid_loss_ls, valid_acc_ls, valid_loss, valid_acc)
             logger.info("test performance at epoch %d"%(epoch))
             test_loss, test_acc = test(test_loader, network, criterion, args, logger, "test")
 
             report_best_test_performance_so_far(logger, test_loss_ls, test_acc_ls, test_loss, test_acc)
 
-
     if args.local_rank == 0:
         report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=False)
-        # if (epoch+1) % 40 == 0:
-        #     curr_lr /= 10
-        #     update_lr(optimizer, curr_lr)
-                # train_losses.append(loss.item())
-                # train_counter.append(
-                # (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
-                # torch.save(network.state_dict(), '/results/model.pth')
-                # torch.save(optimizer.state_dict(), '/results/optimizer.pth')
 
 def sort_prob_gap_by_class(pred_labels, prob_gap_ls, label_ls, class_id, select_count):
     boolean_id_arrs = torch.logical_and((label_ls == class_id).view(-1), (pred_labels == label_ls).view(-1))
@@ -870,17 +897,12 @@ def main2(args, logger):
 
     if args.dataset == 'MNIST':
         pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
-    else:
-        if args.dataset.startswith('cifar'):
-            pretrained_rep_net = ResNet18().cuda()
-            criterion = torch.nn.CrossEntropyLoss()
-        else:
-            if args.dataset.startswith('sst2'):
-                pretrained_rep_net = Bert(2, args.cuda)
-                criterion = torch.nn.CrossEntropyLoss()
-        # pretrained_rep_net = ResNet18().cuda()
-    criterion = torch.nn.CrossEntropyLoss()
+    elif args.dataset.startswith('cifar'):
+        pretrained_rep_net = ResNet18().cuda()
+    elif args.dataset.startswith('sst2'):
+        pretrained_rep_net = Bert(2, args.cuda)
 
+    criterion = torch.nn.CrossEntropyLoss()
     meta_criterion = criterion
     if args.l1_meta_loss:
         meta_criterion = torch.nn.L1Loss()
@@ -898,16 +920,18 @@ def main2(args, logger):
         pretrained_rep_net = pretrained_rep_net.cuda()
     
     if args.select_valid_set:
-        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
             args,
-            split_method='cluster',
+            'cluster',
+            logger,
             pretrained_model=pretrained_rep_net,
             cached_sample_weights=cached_sample_weights,
         )
     else:
-        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
             args,
-            split_method='random',
+            'random',
+            logger,
             pretrained_model=pretrained_rep_net,
         )
 
@@ -949,12 +973,10 @@ def main2(args, logger):
     # if not args.use_pretrained_model:
     if args.dataset == 'MNIST':
         net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
-        
     else:
         net = ResNet18()
 
     if args.use_pretrained_model:
-        # net = load_pretrained_model(args, net)
         net = load_checkpoint(args, net)
 
     mile_stones_epochs = None
@@ -964,7 +986,8 @@ def main2(args, logger):
 
     if args.cuda:
         net = net.cuda()
-    net = DDP(net, device_ids=[args.local_rank])
+        net = DDP(net, device_ids=[args.local_rank])
+
     if args.dataset == 'MNIST':
         optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
         scheduler = None
@@ -973,8 +996,9 @@ def main2(args, logger):
         optimizer.param_groups[0]['initial_lr'] = args.lr
         if args.do_train:
             mile_stones_epochs = [100, 150]
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                        milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer,
+                milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
         else:
             if args.use_pretrained_model:
@@ -982,19 +1006,41 @@ def main2(args, logger):
             else:
                 mile_stones_epochs = [120,160]
             if args.lr_decay:
-                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+                scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
             else:
                 scheduler = None
     
     if args.do_train:
-        logger.info("start basic training")
-        basic_train(trainloader, validloader, testloader, criterion, args, net, optimizer, scheduler = scheduler)
+        logger.info("starting basic training")
+        basic_train(
+            trainloader,
+            validloader,
+            testloader,
+            criterion,
+            args,
+            net,
+            optimizer,
+            scheduler=scheduler,
+        )
+    elif args.active_learning:
+        logger.info("starting active learning")
+        active_learning(
+            trainloader,
+            validloader,
+            testloader,
+            criterion,
+            origin_labels,
+            uncertainty_heuristic,
+            args,
+            net,
+            optimizer,
+            scheduler=scheduler,
+        )
     else:
-        logging.info("start meta training")
-        logging.info("meta dataset size::%d"%(len(metaloader.dataset)))
-        # meta_learning_model_rl(args, net, optimizer, torch.nn.NLLLoss(), trainloader, metaloader, validloader, testloader)
-        # meta_learning_model(args, net, optimizer, criterion, trainloader, metaloader, validloader, testloader, mnist_to_device, scheduler = scheduler, cached_w_array = prev_weights, target_id = None, start_ep=start_epoch, mile_stones_epochs = mile_stones_epochs)
-        # logger.info("start meta training")
+        logger.info("starting meta training")
+        logger.info("meta dataset size::%d"%(len(metaloader.dataset)))
         meta_learning_model(
             args,
             logger,
