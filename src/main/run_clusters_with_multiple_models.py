@@ -107,11 +107,35 @@ def do_clustering_main(args):
 
     for model_state in model_state_ls:
 
-        net = update_models_with_cached_state(model_state, net)
+        curr_net = update_models_with_cached_state(model_state, net)
 
-        optimizer = get_optimizer_given_model(args, net)
+        if args.cuda:
+            curr_net = curr_net.cuda()
 
-        get_representative_valid_ids2(criterion, optimizer, train_loader, args, net, len(valid_set), cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info=True)
+        optimizer = get_optimizer_given_model(args, curr_net)
+
+        get_representative_valid_ids2(criterion, optimizer, train_loader, args, curr_net, len(valid_set), cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info=True)
+
+        del curr_net
 
 if __name__ == "__main__":
     args = parse_args()
+    set_logger(args)
+    dist.init_process_group(backend='nccl', init_method='env://')
+    args.world_size = dist.get_world_size()
+    args.local_rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(args.local_rank)
+
+    cudnn.benchmark = True
+    
+    os.makedirs(args.save_path, exist_ok=True)
+    logger = setup_logger(output=args.save_path, distributed_rank=dist.get_rank(), name="valid-selec")
+    
+    if dist.get_rank() == 0:
+        path = os.path.join(args.save_path, "config.json")
+        with open(path, 'w') as f:
+            json.dump(vars(args), f, indent=2)
+        logger.info("Full config saved to {}".format(path))
+    args.device = torch.device("cuda", args.local_rank)
+    args.logger = logger
+    do_clustering_main(args)
