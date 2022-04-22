@@ -931,6 +931,8 @@ def main2(args, logger):
             pretrained_model=pretrained_rep_net,
         )
 
+    del pretrained_rep_net
+
     if args.l1_loss:
         criterion = torch.nn.L1Loss()
     elif args.soft_bootstrapping_loss:
@@ -1010,7 +1012,7 @@ def main2(args, logger):
 
             else:
                 if args.use_pretrained_model:
-                    mile_stones_epochs = [20,60]
+                    mile_stones_epochs = [100,150]
                 else:
                     mile_stones_epochs = [120,160]
                 if args.lr_decay:
