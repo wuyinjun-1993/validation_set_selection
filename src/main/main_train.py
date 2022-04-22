@@ -933,6 +933,9 @@ def main2(args, logger):
 
     del pretrained_rep_net
 
+    if args.cuda:
+        torch.cuda.empty_cache()
+
     if args.l1_loss:
         criterion = torch.nn.L1Loss()
     elif args.soft_bootstrapping_loss:
