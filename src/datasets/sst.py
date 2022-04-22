@@ -1,6 +1,6 @@
 import os
 import texar.torch as tx
-import tensorflow as tf
+# import tensorflow as tf
 import re
 import random
 import torchtext
