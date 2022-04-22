@@ -400,16 +400,41 @@ def meta_learning_model(
 
             model_pred = torch.max(model_out, dim = 1)[1]
 
-            train_pred_correct += torch.sum(model_pred.view(-1) == inputs[2].view(-1)).detach().cpu().item()
+            train_pred_correct += torch.sum(model_pred.view(-1).detach().cpu() == inputs[2].detach().cpu().view(-1)).item()
 
 
             total_iter_count += 1
+
+
+            # del meta_inputs[2], inputs[2]
+
+            # if type(meta_inputs[1]) is not torch.Tensor:
+            #     meta_inputs[1] = list(meta_inputs[1])
+            #     lenth = len(meta_inputs[1])
+            #     for tensor_idx in range(lenth):
+            #         del meta_inputs[1][lenth - 1 - tensor_idx]
+            # else:
+            #     del meta_inputs[1]
+
+            # if type(inputs[1]) is not torch.Tensor:
+            #     inputs[1] = list(inputs[1])
+            #     lenth = len(inputs[1])
+            #     for tensor_idx in range(lenth):
+            #         del inputs[1][lenth - 1 - tensor_idx]
+
+            # else:
+            #     del inputs[1]
+
+
+            # del prev_w_array, meta_out, meta_inputs[0], inputs[0], minibatch_loss, meta_val_loss, meta_train_loss, model_out, eps_grads, model_pred, meta_train_outputs, labels, eps
+            # if args.cuda:
+            #     torch.cuda.empty_cache()
 
         # inference after epoch
         with torch.no_grad():
             if args.local_rank == 0:
                 avg_train_loss = avg_train_loss/len(train_loader.dataset)
-                train_pred_acc_rate = train_pred_correct*1.0/len(train_loader.dataset)
+                train_pred_acc_rate = train_pre*1.0/len(train_loader.dataset)
                 logger.info("average training loss at epoch %d:%f"%(ep, avg_train_loss))
 
                 logger.info("training accuracy at epoch %d:%f"%(ep, train_pred_acc_rate))
@@ -798,7 +823,7 @@ def load_checkpoint2(args, model):
             else:
                 model.load_state_dict(state.state_dict())
             logger.info('==> Loading cached model successfully')
-
+            del state
     return model
 
     # state = {
@@ -930,7 +955,7 @@ def main2(args, logger):
         cached_sample_weights = torch.load(os.path.join(args.prev_save_path, args.cached_sample_weights_name))
         logger.info("sample weights loaded successfully")
     if args.cuda:
-        pretrained_rep_net = pretrained_rep_net.cuda()
+        pretrained_rep_net.cuda()
     
     if args.select_valid_set:
         trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(
@@ -951,6 +976,11 @@ def main2(args, logger):
             logger,
             pretrained_model=pretrained_rep_net,
         )
+
+    del pretrained_rep_net
+
+    if args.cuda:
+        torch.cuda.empty_cache()
 
     if args.l1_loss:
         criterion = torch.nn.L1Loss()
@@ -1031,7 +1061,7 @@ def main2(args, logger):
 
             else:
                 if args.use_pretrained_model:
-                    mile_stones_epochs = [20,60]
+                    mile_stones_epochs = [100,150]
                 else:
                     mile_stones_epochs = [120,160]
                 if args.lr_decay:

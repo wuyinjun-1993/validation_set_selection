@@ -6,3 +6,5 @@ higher
 pytorch-pretrained-bert
 termcolor
 scikit-learn
+texar-pytorch
+tensorflow

@@ -91,7 +91,7 @@ class DNN_three_layers(nn.Module):
         
         # return F.log_softmax(x, dim=1)
 
-    def obtain_gradient_last_layer_by_sample_representation(self, sample_representation_last_layer, target, criterion):
+    def obtain_gradient_last_full_layer(self, sample_representation_last_layer, target, criterion):
         output = self.fc3(sample_representation_last_layer)
         loss = criterion(output, target)
         sample_representation_last_layer_grad = torch.autograd.grad(loss, sample_representation_last_layer)[0]

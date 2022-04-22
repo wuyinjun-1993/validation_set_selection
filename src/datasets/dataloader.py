@@ -647,6 +647,40 @@ def find_representative_samples1(net, train_dataset,validset, train_transform, a
 
     # return train_loader, valid_loader, meta_loader
 
+def get_dataloader_for_post_evaluations(args):
+    trainset, valid_set, meta_set, remaining_origin_labels = load_train_valid_set(args)
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+        trainset,
+        num_replicas=args.world_size,
+        rank=args.local_rank,
+    )
+    # meta_sampler = torch.utils.data.distributed.DistributedSampler(
+    #     metaset,
+    #     num_replicas=args.world_size,
+    #     rank=args.local_rank,
+    # )
+
+    trainloader = torch.utils.data.DataLoader(
+        trainset,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        pin_memory=True,
+        sampler=train_sampler,
+    )
+    # metaloader = torch.utils.data.DataLoader(
+    #     metaset,
+    #     batch_size=args.test_batch_size,
+    #     num_workers=args.num_workers,
+    #     pin_memory=True,
+    #     sampler=meta_sampler,
+    # )
+    # validloader = torch.utils.data.DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
+    # testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
+
+    return trainloader, valid_set
+
+
+
 def cache_train_valid_set(args, train_set, valid_set, meta_set, remaining_origin_labels):
     torch.save(train_set, os.path.join(args.save_path, "cached_train_set"))
     torch.save(valid_set, os.path.join(args.save_path, "cached_valid_set"))

@@ -103,6 +103,13 @@ class ResNet(nn.Module):
         out = self.linear(out)
         return out
 
+
+    def obtain_gradient_last_full_layer(self, sample_representation_last_layer, target, criterion):
+        output = self.linear(sample_representation_last_layer)
+        loss = criterion(output, target)
+        sample_representation_last_layer_grad = torch.autograd.grad(loss, sample_representation_last_layer)[0]
+        return sample_representation_last_layer_grad
+
     def feature_forward(self, x, all_layer=False):
         if not all_layer:
             out = F.relu(self.bn1(self.conv1(x)))
