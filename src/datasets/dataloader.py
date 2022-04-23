@@ -649,12 +649,14 @@ def get_dataloader_for_post_evaluations(args):
         trainset,
         num_replicas=args.world_size,
         rank=args.local_rank,
+        shuffle = False
     )
-    # meta_sampler = torch.utils.data.distributed.DistributedSampler(
-    #     metaset,
-    #     num_replicas=args.world_size,
-    #     rank=args.local_rank,
-    # )
+    meta_sampler = torch.utils.data.distributed.DistributedSampler(
+        meta_set,
+        num_replicas=args.world_size,
+        rank=args.local_rank,
+        shuffle = False
+    )
 
     trainloader = torch.utils.data.DataLoader(
         trainset,
@@ -663,17 +665,17 @@ def get_dataloader_for_post_evaluations(args):
         pin_memory=True,
         sampler=train_sampler,
     )
-    # metaloader = torch.utils.data.DataLoader(
-    #     metaset,
-    #     batch_size=args.test_batch_size,
-    #     num_workers=args.num_workers,
-    #     pin_memory=True,
-    #     sampler=meta_sampler,
-    # )
+    metaloader = torch.utils.data.DataLoader(
+        meta_set,
+        batch_size=args.test_batch_size,
+        num_workers=args.num_workers,
+        pin_memory=True,
+        sampler=meta_sampler,
+    )
     # validloader = torch.utils.data.DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
     # testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
 
-    return trainloader, valid_set
+    return trainloader, metaloader
 
 
 
