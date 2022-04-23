@@ -1170,9 +1170,9 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
             B = B_ls[idx]
             B_normalized = B / B.norm(dim=-1, keepdim=True)
             curr_cosine = curr_A_normalized * B_normalized    
-            curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1)).squeeze()
+            curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1))
             cosine_dis_ls.append(curr_cosine_dis)
-        max_cosine_sim = torch.max(torch.stack(cosine_dis_ls, dim = 1), dim = 1)[0]
+        max_cosine_sim = torch.sum(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
         final_cosine_dis = 1 - max_cosine_sim
         full_dist_ls.append(final_cosine_dis)
 

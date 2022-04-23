@@ -111,6 +111,8 @@ def do_clustering_main(args):
 
     all_full_sim_mat_ls = []
 
+    dist_ls = []
+
     for model_state in model_state_ls:
 
         curr_net = update_models_with_cached_state(model_state, net)
@@ -140,7 +142,7 @@ def do_clustering_main(args):
 
         choice_cluster = torch.argmin(dis, dim=1)
 
-
+        dist_ls.append(dis)
         # full_sim_mat1 = calculate_train_meta_grad_prod(args, train_loader, metaloader, net, criterion, optimizer)
         # if args.cosin_dist:
         #     full_sim_mat1 = pairwise_cosine_full(full_sample_representation_tensor, is_cuda=args.cuda)
