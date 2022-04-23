@@ -453,7 +453,7 @@ def meta_learning_model(
         with torch.no_grad():
             if args.local_rank == 0:
                 avg_train_loss = avg_train_loss/len(train_loader.dataset)
-                train_pred_acc_rate = train_pred_acc_rate*1.0/len(train_loader.dataset)
+                train_pred_acc_rate = train_pred_correct*1.0/len(train_loader.dataset)
                 logger.info("average training loss at epoch %d:%f"%(ep, avg_train_loss))
 
                 logger.info("training accuracy at epoch %d:%f"%(ep, train_pred_acc_rate))
