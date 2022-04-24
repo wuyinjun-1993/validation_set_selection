@@ -165,10 +165,16 @@ class custom_Bert(BertPreTrainedModel):
 
         return pooled_output
 
-    def obtain_gradient_last_full_layer(self, sample_representation_last_layer, target, criterion):
+    def obtain_gradient_last_full_layer(self, sample_representation_last_layer, target, criterion, is_cuda = False):
         output = self.classifier(sample_representation_last_layer)
         loss = criterion(output, target)
-        sample_representation_last_layer_grad = torch.autograd.grad(loss, sample_representation_last_layer)[0]
+        onehot_target = torch.zeros(output.shape[1])
+        onehot_target[target] = 1
+        if is_cuda:
+            onehot_target = onehot_target.cuda()
+
+        total_loss = loss + torch.sum(onehot_target.view(-1)*output.view(-1))
+        sample_representation_last_layer_grad = torch.autograd.grad(total_loss, sample_representation_last_layer)[0]
         return sample_representation_last_layer_grad
     #     self._weights = None
     #     self._w_decay = None

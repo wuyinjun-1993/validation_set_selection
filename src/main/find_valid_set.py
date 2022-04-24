@@ -594,11 +594,11 @@ def get_approx_grad_prod(args, train_loader, net, criterion, optimizer):
 
 
 
-def obtain_sample_representation_grad_last_layer(net, sample_representation, labels, criterion, optimizer):
+def obtain_sample_representation_grad_last_layer(net, sample_representation, labels, criterion, optimizer, is_cuda = False):
     sample_representation_grad_ls = []
     for k in range(sample_representation.shape[0]):
         optimizer.zero_grad()
-        sample_representation_grad = net.obtain_gradient_last_full_layer(sample_representation[k:k+1], labels[k:k+1], criterion).view(-1).cpu()
+        sample_representation_grad = net.obtain_gradient_last_full_layer(sample_representation[k:k+1], labels[k:k+1], criterion, is_cuda = is_cuda).view(-1).cpu()
         sample_representation_grad_ls.append(sample_representation_grad)
     return torch.stack(sample_representation_grad_ls)
 
@@ -617,7 +617,7 @@ def calculate_train_meta_grad_prod(args, train_loader, meta_loader, net, criteri
     #     full_sim_mat1 = pairwise_distance_ls_full(full_train_sample_representation_tensor, full_meta_sample_representation_tensor, is_cuda=args.cuda,  batch_size = 256)
 
 
-    return full_sim_mat1
+    return full_sim_mat1, full_train_sample_representation_tensor, full_meta_sample_representation_tensor
 
 def get_representations_last_layer(args, train_loader, criterion, optimizer, net):
     sample_representation_vec_ls = []
@@ -637,7 +637,7 @@ def get_representations_last_layer(args, train_loader, criterion, optimizer, net
         sample_representation = net.feature_forward(data, all_layer=False)
         if args.all_layer:
             # sample_representation_grad = net.obtain_gradient_last_full_layer(sample_representation, labels, criterion)
-            sample_representation_grad = obtain_sample_representation_grad_last_layer(net, sample_representation, labels, criterion, optimizer)
+            sample_representation_grad = obtain_sample_representation_grad_last_layer(net, sample_representation, labels, criterion, optimizer, is_cuda=args.cuda)
 
 
         if not args.all_layer:

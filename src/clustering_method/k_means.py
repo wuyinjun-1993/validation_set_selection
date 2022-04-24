@@ -1003,7 +1003,7 @@ def pairwise_cosine_full(data1, is_cuda=False,  batch_size = 2048, data2 = None)
 
     full_dist_ls = []
 
-    full_cosin_mat = torch.zeros([data1.shape[0], data1.shape[0]])
+    full_cosin_mat = torch.zeros([data1.shape[0], data2.shape[0]])
 
     for start_id in range(0, A.shape[0], batch_size):
         end_id = start_id + batch_size
