@@ -57,7 +57,6 @@ exe_cmd="python -m torch.distributed.launch \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
   --valid_ratio 0 \
-  --noisy_valid \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
@@ -103,9 +102,9 @@ exe_cmd="python -m torch.distributed.launch \
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_all_rand.txt
 
-# echo "${exe_cmd} > ${output_file_name}"
-# 
-# ${exe_cmd} > ${output_file_name} 2>&1
+echo "${exe_cmd} > ${output_file_name}"
+
+${exe_cmd} > ${output_file_name} 2>&1
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
@@ -149,9 +148,9 @@ do
 
 	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_$k.txt
 
-	# echo "${exe_cmd} > ${output_file_name}"
-	# 
-	# ${exe_cmd} > ${output_file_name} 2>&1
+	echo "${exe_cmd} > ${output_file_name}"
+	
+	${exe_cmd} > ${output_file_name} 2>&1
 	
 done
 

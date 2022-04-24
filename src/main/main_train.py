@@ -240,7 +240,8 @@ def meta_learning_model(
             w_array = (w_array / torch.sum(w_array)) * w_array.shape[0]
             w_array.requires_grad = True
         else:
-            w_array = torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
+            # w_array = torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
+            w_array = torch.ones(len(train_loader.dataset), requires_grad=True, device=device)
     else:
         cached_w_array.requires_grad = False
         w_array = cached_w_array.clone()
@@ -248,6 +249,8 @@ def meta_learning_model(
         w_array.requires_grad = True
     
 
+    aug_targets = F.one_hot(torch.tensor(train_loader.dataset.targets),
+            num_classes=10).float()
     total_iter_count = 1
 
     curr_ilp_learning_rate = args.meta_lr
@@ -307,7 +310,7 @@ def meta_learning_model(
 
                 labels = inputs[2]
                 if isinstance(criterion, torch.nn.L1Loss):
-                    labels = torch.nn.functional.one_hot(inputs[2],
+                    labels = F.one_hot(inputs[2],
                             num_classes=10)
                     meta_train_outputs = F.softmax(meta_train_outputs)
                 meta_train_loss = torch.mean(criterion(meta_train_outputs, labels)*eps)
@@ -334,7 +337,7 @@ def meta_learning_model(
                 meta_out = meta_inputs[2]
                 model_out = meta_model(meta_inputs[1])
                 if isinstance(meta_criterion, torch.nn.L1Loss):
-                    meta_out = torch.nn.functional.one_hot(meta_inputs[2],
+                    meta_out = F.one_hot(meta_inputs[2],
                             num_classes=10)
                     model_out = F.softmax(model_out)
                 meta_val_loss = meta_criterion(model_out, meta_out)
@@ -387,7 +390,7 @@ def meta_learning_model(
             model_out = model(inputs[1])
             labels = inputs[2]
             if isinstance(criterion, torch.nn.L1Loss):
-                labels = torch.nn.functional.one_hot(inputs[2],
+                labels = F.one_hot(inputs[2],
                         num_classes=10)
                 model_out = F.softmax(meta_train_outputs)
             minibatch_loss = torch.mean(criterion(model_out, labels)*w_array[train_ids])
@@ -434,7 +437,7 @@ def meta_learning_model(
         with torch.no_grad():
             if args.local_rank == 0:
                 avg_train_loss = avg_train_loss/len(train_loader.dataset)
-                train_pred_acc_rate = train_pre*1.0/len(train_loader.dataset)
+                train_pred_acc_rate = train_pred_correct*1.0/len(train_loader.dataset)
                 logger.info("average training loss at epoch %d:%f"%(ep, avg_train_loss))
 
                 logger.info("training accuracy at epoch %d:%f"%(ep, train_pred_acc_rate))
@@ -958,7 +961,7 @@ def main2(args, logger):
         pretrained_rep_net.cuda()
     
     if args.select_valid_set:
-        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
             criterion,
             optimizer,
             args,
@@ -968,7 +971,7 @@ def main2(args, logger):
             cached_sample_weights=cached_sample_weights,
         )
     else:
-        trainloader, validloader, metaloader, testloader = get_dataloader_for_meta(
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
             criterion,
             optimizer,
             args,

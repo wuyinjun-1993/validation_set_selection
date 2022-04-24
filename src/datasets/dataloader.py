@@ -301,7 +301,7 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
 def split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids):
 
     if args.noisy_valid:
-        clean_labels = train_dataset.targets.clone()
+        clean_labels = train_dataset.targets.copy()
     else:
         clean_labels = origin_labels
     meta_set = train_dataset.get_subset_dataset(train_dataset, valid_ids, clean_labels)
@@ -883,7 +883,7 @@ def get_dataloader_for_meta(
                             flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
                         else:
                             logger.info("Adding uniform noise")
-                            flipped_labels = random_flip_labels_on_training4(trainset, ratio=args.err_label_ratio)
+                            flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
                     torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
                 else:
                     logger.info("Loading dataset")
@@ -899,7 +899,7 @@ def get_dataloader_for_meta(
                         torch.save(flipped_labels, flipped_label_dir)
                     flipped_labels = torch.load(flipped_label_dir)
 
-                logger.info(torch.sum(torch.tensor(trainset.targets) == flipped_labels) / trainset.targets.shape[0])
+                # logger.info(torch.sum(torch.tensor(trainset.targets) == torch.tensor(flipped_labels)) / trainset.targets.shape[0])
                 trainset.targets = flipped_labels
 
             trainset, metaset, remaining_origin_labels = random_partition_train_valid_dataset0(

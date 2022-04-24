@@ -66,15 +66,13 @@ exe_cmd="python -m torch.distributed.launch \
   --valid_ratio 0.05 \
   --meta_lr ${meta_lr} \
   --flip_labels \
-  --biased_flip \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr 100 \
+  --lr 0.01 \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  --l1_loss \
   --do_train"
 
 
@@ -106,7 +104,6 @@ exe_cmd="python -m torch.distributed.launch \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
   --cluster_method_two \
-  --l1_meta_loss \
   --cosin_dist"
 
 
@@ -150,7 +147,6 @@ do
     --test_batch_size ${test_batch_size} \
     --epochs ${epochs} \
     --cluster_method_two \
-    --l1_meta_loss \
     --cosin_dist"
 
 	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_${k}_2.txt

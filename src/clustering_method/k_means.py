@@ -310,8 +310,10 @@ def kmeans(
             # selected = torch.index_select(X, 0, selected)
             if not all_layer:
                 selected = X[selected]
-                # if is_cuda:
-                #     selected = selected.cuda()
+                if is_cuda:
+                    selected = selected.cuda()
+                    if selected_sample_weights is not None:
+                        selected_sample_weights = selected_sample_weights.cuda()
 
                 if sample_weights is None:
                     selected_state = selected.mean(dim=0)
