@@ -161,10 +161,15 @@ class custom_Bert(BertPreTrainedModel):
         input_ids, attention_mask, token_type_ids = x
         outputs = self.bert(input_ids, position_ids=None, token_type_ids=token_type_ids,
                             attention_mask=attention_mask, head_mask=None)
-        pooled_output = outputs[1]
+        pooled_output = self.dropout(outputs[1])
 
         return pooled_output
 
+    def obtain_gradient_last_full_layer(self, sample_representation_last_layer, target, criterion):
+        output = self.classifier(sample_representation_last_layer)
+        loss = criterion(output, target)
+        sample_representation_last_layer_grad = torch.autograd.grad(loss, sample_representation_last_layer)[0]
+        return sample_representation_last_layer_grad
     #     self._weights = None
     #     self._w_decay = None
 
