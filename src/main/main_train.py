@@ -248,9 +248,6 @@ def meta_learning_model(
         w_array = w_array.to(device)
         w_array.requires_grad = True
     
-
-    aug_targets = F.one_hot(torch.tensor(train_loader.dataset.targets),
-            num_classes=10).float()
     total_iter_count = 1
 
     curr_ilp_learning_rate = args.meta_lr
