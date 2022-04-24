@@ -790,6 +790,29 @@ def kmeans_predict(
 
     return choice_cluster.cpu()
 
+
+def pairwise_distance_ls_full(data1_ls, data2_ls, is_cuda = False, batch_size = 128):
+    
+    curr_dist_ls = []
+
+    for start_id in range(0, data2_ls[0].shape[0], batch_size):
+        end_id = start_id + batch_size
+        if end_id > data2_ls[0].shape[0]:
+            end_id = data2_ls[0].shape[0]
+        curr_B_ls = []
+
+        for idx in range(len(data2_ls)):
+            data2 = data2_ls[idx][start_id:end_id]
+            # if is_cuda:
+            #     data2 = data2.cuda()
+            curr_B_ls.append(data2)
+
+        curr_dist = pairwise_distance_ls(data1_ls, curr_B_ls, is_cuda=is_cuda,  batch_size = batch_size)    
+
+        curr_dist_ls.append(curr_dist)
+
+    return torch.cat(curr_dist_ls, dim = 1)
+
 def pairwise_distance_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
@@ -834,12 +857,31 @@ def pairwise_distance_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
             curr_dist = ((curr_A - B) **2.0).sum(dim=-1)
             # curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1)).squeeze()
             cosine_dis_ls.append(curr_dist)
+
+
+            del curr_A, B
         # final_cosine_dis = torch.min(torch.stack(cosine_dis_ls, dim = 1), dim = 1)[0]
         final_cosine_dis = torch.sum(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
+        for item in cosine_dis_ls:
+            del item
+
+        del cosine_dis_ls
         # final_cosine_dis = 1 - max_cosine_sim
-        full_dist_ls.append(final_cosine_dis)
+        full_dist_ls.append(final_cosine_dis.cpu())
+
+        del final_cosine_dis
 
     full_dist_tensor = torch.cat(full_dist_ls)
+
+    for idx in range(len(B_ls)):
+        data2 = B_ls[idx]
+        del data2
+
+    if is_cuda:
+        torch.cuda.empty_cache()
+        # if is_cuda:
+        #     data2 = data2.cuda()
+        # B_ls.append(data2)
 
     return full_dist_tensor
 
@@ -946,7 +988,7 @@ def pairwise_cosine2(data1, data2, is_cuda=False,  batch_size = 128):
 
 
 
-def pairwise_cosine_full(data1, is_cuda=False,  batch_size = 2048):
+def pairwise_cosine_full(data1, is_cuda=False,  batch_size = 2048, data2 = None):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     # if is_cuda:
@@ -956,7 +998,10 @@ def pairwise_cosine_full(data1, is_cuda=False,  batch_size = 2048):
     A = data1#.unsqueeze(dim=1)
 
     # 1*N*M
-    B = data1.clone()#.unsqueeze(dim=0)
+    if data2 is None:
+        B = data1.clone()#.unsqueeze(dim=0)
+    else:
+        B = data2
 
     full_dist_ls = []
 
@@ -1127,9 +1172,9 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
             B = B_ls[idx]
             B_normalized = B / B.norm(dim=-1, keepdim=True)
             curr_cosine = curr_A_normalized * B_normalized    
-            curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1)).squeeze()
+            curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1))
             cosine_dis_ls.append(curr_cosine_dis)
-        max_cosine_sim = torch.max(torch.stack(cosine_dis_ls, dim = 1), dim = 1)[0]
+        max_cosine_sim = torch.sum(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
         final_cosine_dis = 1 - max_cosine_sim
         full_dist_ls.append(final_cosine_dis)
 

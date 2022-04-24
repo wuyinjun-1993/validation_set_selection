@@ -98,20 +98,86 @@ def do_clustering_main(args):
         # pretrained_rep_net = ResNet18().cuda()
     criterion = torch.nn.CrossEntropyLoss()
 
-    train_loader, valid_set = get_dataloader_for_post_evaluations(args)
+    train_loader, metaloader = get_dataloader_for_post_evaluations(args)
 
     
-    model_file_ls = ["refined_model_1", "refined_model_100"]
+    model_file_ls = ["cached_model", "refined_model_1", "refined_model_100"]
 
     model_state_ls = load_models_from_cache(model_file_ls)
 
+    all_cluster_ids_ls = []
+
+    all_cluster_center_ls = []
+
+    all_full_sim_mat_ls = []
+
+    dist_ls = []
+
     for model_state in model_state_ls:
 
-        net = update_models_with_cached_state(model_state, net)
+        curr_net = update_models_with_cached_state(model_state, net)
 
-        optimizer = get_optimizer_given_model(args, net)
+        if args.cuda:
+            curr_net = curr_net.cuda()
 
-        get_representative_valid_ids2(criterion, optimizer, train_loader, args, net, len(valid_set), cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info=True)
+        optimizer = get_optimizer_given_model(args, curr_net)
+
+        full_sample_representation_tensor = get_representative_valid_ids2(criterion, optimizer, train_loader, args, curr_net, len(metaloader.dataset), cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info=True, only_sample_representation=True)
+
+        meta_sample_representation_tensor = get_representative_valid_ids2(criterion, optimizer, metaloader, args, curr_net, len(metaloader.dataset), cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info=True, only_sample_representation=True)
+
+        if not args.cosin_dist:
+            if not args.all_layer:
+                pairwise_distance_function = pairwise_distance
+            else:
+                pairwise_distance_function = pairwise_distance_ls
+
+        else:
+            if not args.all_layer:
+                pairwise_distance_function = pairwise_cosine
+            else:
+                pairwise_distance_function = pairwise_cosine_ls
+        
+        dis = pairwise_distance_function(full_sample_representation_tensor, meta_sample_representation_tensor,args.cuda)
+
+        choice_cluster = torch.argmin(dis, dim=1)
+
+        dist_ls.append(dis)
+        # full_sim_mat1 = calculate_train_meta_grad_prod(args, train_loader, metaloader, net, criterion, optimizer)
+        # if args.cosin_dist:
+        #     full_sim_mat1 = pairwise_cosine_full(full_sample_representation_tensor, is_cuda=args.cuda)
+        # else:
+        #     # full_sim_mat1 = pairwise_l2_full(full_sample_representation_tensor, is_cuda=args.cuda)
+        #     full_sim_mat1 = pairwise_distance_ls_full(full_sample_representation_tensor, full_sample_representation_tensor, is_cuda=args.cuda,  batch_size = 256)
+
+        # all_full_sim_mat_ls.append(full_sim_mat1)
+
+        all_cluster_ids_ls.append(choice_cluster)
+
+        # all_cluster_center_ls.append(cluster_centers)
+
+        del curr_net
+
+    print()
 
 if __name__ == "__main__":
     args = parse_args()
+    set_logger(args)
+    dist.init_process_group(backend='nccl', init_method='env://')
+    args.world_size = dist.get_world_size()
+    args.local_rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(args.local_rank)
+
+    cudnn.benchmark = True
+    
+    os.makedirs(args.save_path, exist_ok=True)
+    logger = setup_logger(output=args.save_path, distributed_rank=dist.get_rank(), name="valid-selec")
+    
+    if dist.get_rank() == 0:
+        path = os.path.join(args.save_path, "config.json")
+        with open(path, 'w') as f:
+            json.dump(vars(args), f, indent=2)
+        logger.info("Full config saved to {}".format(path))
+    args.device = torch.device("cuda", args.local_rank)
+    args.logger = logger
+    do_clustering_main(args)

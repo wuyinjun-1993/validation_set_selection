@@ -352,20 +352,22 @@ def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimi
 
     if not args.all_layer_grad:
 
-        with torch.no_grad():
+        full_sample_representation_tensor, all_sample_ids = get_representations_last_layer(args, validloader, criterion, optimizer, net)
+        return full_sample_representation_tensor
+        # with torch.no_grad():
 
-            # all_sample_representations = [None]*len(train_loader.dataset)
+        #     # all_sample_representations = [None]*len(train_loader.dataset)
 
-            for batch_id, (sample_ids, data, labels) in enumerate(validloader):
+        #     for batch_id, (sample_ids, data, labels) in enumerate(validloader):
 
-                if args.cuda:
-                    data, labels = validloader.dataset.to_cuda(data, labels)
-                    # data = data.cuda()
-                    # labels = labels.cuda()
+        #         if args.cuda:
+        #             data, labels = validloader.dataset.to_cuda(data, labels)
+        #             # data = data.cuda()
+        #             # labels = labels.cuda()
                 
-                sample_representation = net.feature_forward(data)
-                sample_representation_ls.append(sample_representation)
-        return torch.cat(sample_representation_ls)
+        #         sample_representation = net.feature_forward(data)
+        #         sample_representation_ls.append(sample_representation)
+        # return torch.cat(sample_representation_ls)
     else:
         full_sample_representation_tensor, all_sample_ids = get_grad_by_example(args, validloader, net, criterion, optimizer)
         return full_sample_representation_tensor
@@ -374,11 +376,18 @@ def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimi
 
 
 def determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representations, valid_count, cosine_dist = False, all_layer = False, is_cuda = False):
-
+    existing_valid_count = 0
+    if all_layer:
+        existing_valid_count = existing_valid_representations[0].shape[0]
+    else:
+        existing_valid_count = existing_valid_representations.shape[0]
     if not args.all_layer_grad:
 
         if not cosine_dist:
-            existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+            if not all_layer:
+                existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+            else:
+                existing_new_dists = pairwise_distance_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
         else:
             if not all_layer:
                 existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
@@ -393,7 +402,7 @@ def determine_new_valid_ids(args, valid_ids, new_valid_representations, existing
 
     sorted_min_distance, sorted_min_sample_ids = torch.sort(nearset_new_valid_distance, descending=True)
 
-    remaining_valid_ids = valid_ids[sorted_min_sample_ids[0:valid_count - existing_valid_representations.shape[0]]]
+    remaining_valid_ids = valid_ids[sorted_min_sample_ids[0:valid_count - existing_valid_count]]
     
 
     
@@ -503,7 +512,7 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
 
         valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
         if existing_valid_representation is not None:
-            valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda)
+            valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer = args.all_layer)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
 
     torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
@@ -653,12 +662,14 @@ def get_dataloader_for_post_evaluations(args):
         trainset,
         num_replicas=args.world_size,
         rank=args.local_rank,
+        shuffle = False
     )
-    # meta_sampler = torch.utils.data.distributed.DistributedSampler(
-    #     metaset,
-    #     num_replicas=args.world_size,
-    #     rank=args.local_rank,
-    # )
+    meta_sampler = torch.utils.data.distributed.DistributedSampler(
+        meta_set,
+        num_replicas=args.world_size,
+        rank=args.local_rank,
+        shuffle = False
+    )
 
     trainloader = torch.utils.data.DataLoader(
         trainset,
@@ -667,17 +678,17 @@ def get_dataloader_for_post_evaluations(args):
         pin_memory=True,
         sampler=train_sampler,
     )
-    # metaloader = torch.utils.data.DataLoader(
-    #     metaset,
-    #     batch_size=args.test_batch_size,
-    #     num_workers=args.num_workers,
-    #     pin_memory=True,
-    #     sampler=meta_sampler,
-    # )
+    metaloader = torch.utils.data.DataLoader(
+        meta_set,
+        batch_size=args.test_batch_size,
+        num_workers=args.num_workers,
+        pin_memory=True,
+        sampler=meta_sampler,
+    )
     # validloader = torch.utils.data.DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
     # testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
 
-    return trainloader, valid_set
+    return trainloader, metaloader
 
 
 
