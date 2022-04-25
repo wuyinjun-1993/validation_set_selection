@@ -23,6 +23,8 @@ def parse_args(args=None):
     parser.add_argument('--l1_meta_loss', action='store_true', help='Use the L1 loss for meta learning step')
     parser.add_argument('--load_dataset', action='store_true', help='load dataset')
     parser.add_argument('--continue_label', action='store_true', help='load dataset')
+    parser.add_argument('--use_model_prov', action='store_true', help='capture model_prov')
+    parser.add_argument('--model_prov_period', default=20, type=int, help='capture model_prov')
 
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
     parser.add_argument('--select_valid_set', action='store_true', help='select valid set')

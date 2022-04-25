@@ -1026,31 +1026,7 @@ def main2(args, logger):
     if args.cuda:
         net = net.cuda()
     net = DDP(net, device_ids=[args.local_rank])
-    if args.dataset == 'MNIST':
-        optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
-        scheduler = None
-    else:
-        if args.dataset.startswith('cifar'):
-            optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
-            optimizer.param_groups[0]['initial_lr'] = args.lr
-            if args.do_train:
-                mile_stones_epochs = [100, 150]
-                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                            milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-
-            else:
-                if args.use_pretrained_model:
-                    mile_stones_epochs = [100,150]
-                else:
-                    mile_stones_epochs = [120,160]
-                if args.lr_decay:
-                    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-                else:
-                    scheduler = None
-        else:
-            if args.dataset.startswith('sst'):
-                optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-                scheduler = None
+    optimizer, scheduler = obtain_optimizer_scheduler(args, net, start_epoch = start_epoch)
     
     if args.do_train:
         logger.info("start basic training")

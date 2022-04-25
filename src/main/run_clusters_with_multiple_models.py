@@ -101,7 +101,7 @@ def do_clustering_main(args):
     train_loader, metaloader = get_dataloader_for_post_evaluations(args)
 
     
-    model_file_ls = ["cached_pretrain_model", "refined_model_400"]
+    model_file_ls = ["cached_pretrain_model", "refined_model_1", "refined_model_400"]
 
     model_state_ls = load_models_from_cache(model_file_ls)
 

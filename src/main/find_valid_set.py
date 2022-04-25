@@ -11,6 +11,7 @@ from main.helper_func import *
 from clustering_method.k_means import *
 from sklearn import metrics
 
+import collections
 
 
 def test_s_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, num_clusters, distance = 'euclidean', is_cuda=False):
@@ -619,7 +620,32 @@ def calculate_train_meta_grad_prod(args, train_loader, meta_loader, net, criteri
 
     return full_sim_mat1, full_train_sample_representation_tensor, full_meta_sample_representation_tensor
 
-def get_representations_last_layer(args, train_loader, criterion, optimizer, net):
+
+def load_checkpoint_by_epoch(args, model, epoch):
+    args.logger.info('==> Loading cached model at epoch %d'%(epoch))
+    cached_model_name = "refined_model_" + str(epoch)
+    if args.prev_save_path is not None:
+        cached_model_file_name = os.path.join(args.prev_save_path, cached_model_name)
+
+        if not os.path.exists(cached_model_file_name):
+            cached_model_name = "model_" + str(epoch)
+            cached_model_file_name = os.path.join(args.prev_save_path, cached_model_name)
+
+            
+        state = torch.load(cached_model_file_name, map_location=torch.device("cpu"))
+
+        if type(state) is collections.OrderedDict:
+            model.load_state_dict(state)
+        else:
+            model.load_state_dict(state.state_dict())
+        args.logger.info('==> Loading cached model successfully')
+        del state
+            
+        
+    return model
+
+
+def obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer):
     sample_representation_vec_ls = []
 
     sample_id_ls = []
@@ -652,6 +678,57 @@ def get_representations_last_layer(args, train_loader, criterion, optimizer, net
                 #     sample_representation_vec_ls[arr_idx] = torch.cat([sample_representation_vec_ls[arr_idx].detach().cpu(), sample_representation[arr_idx].detach().cpu()])
 
         sample_id_ls.append(sample_ids)
+
+    return sample_representation_vec_ls, sample_id_ls
+
+
+def get_extra_representations_last_layer(args, train_loader, criterion, net, full_sample_representation_vec_ls):
+    for ep in range(0, args.epochs, args.model_prov_period):
+        net = load_checkpoint_by_epoch(args, net, ep)
+        optimizer, _=obtain_optimizer_scheduler(args, net, start_epoch = 0)
+        sample_representation_vec_ls, _ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
+
+        full_sample_representation_vec_ls.extend(sample_representation_vec_ls)
+
+
+
+def get_representations_last_layer(args, train_loader, criterion, optimizer, net):
+
+    sample_representation_vec_ls, sample_id_ls = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
+    if args.use_model_prov:
+        get_extra_representations_last_layer(args, train_loader, criterion, net, sample_representation_vec_ls)
+    # sample_representation_vec_ls = []
+
+    # sample_id_ls = []
+    # # with torch.no_grad():
+
+    #     # all_sample_representations = [None]*len(train_loader.dataset)
+
+
+    # for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
+
+    #     if args.cuda:
+    #         data, labels = train_loader.dataset.to_cuda(data, labels)
+    #         # labels = labels.cuda()
+        
+    #     sample_representation = net.feature_forward(data, all_layer=False)
+    #     if args.all_layer:
+    #         # sample_representation_grad = net.obtain_gradient_last_full_layer(sample_representation, labels, criterion)
+    #         sample_representation_grad = obtain_sample_representation_grad_last_layer(net, sample_representation, labels, criterion, optimizer, is_cuda=args.cuda)
+
+
+    #     if not args.all_layer:
+    #         sample_representation_vec_ls.append(sample_representation.detach().cpu())
+    #     else:
+    #         if batch_id == 0:
+    #             sample_representation_vec_ls.extend([sample_representation.detach().cpu(), sample_representation_grad.detach().cpu()])
+    #         else:
+    #             sample_representation_vec_ls[0] = torch.cat([sample_representation_vec_ls[0].detach().cpu(), sample_representation.detach().cpu()])
+    #             sample_representation_vec_ls[1] = torch.cat([sample_representation_vec_ls[1].detach().cpu(), sample_representation_grad.detach().cpu()])
+    #             # for arr_idx in range(len(sample_representation_vec_ls)):
+    #             #     sample_representation_vec_ls[arr_idx] = torch.cat([sample_representation_vec_ls[arr_idx].detach().cpu(), sample_representation[arr_idx].detach().cpu()])
+
+    #     sample_id_ls.append(sample_ids)
             # for idx in range(len(labels)):
             #     curr_label = labels[idx].item()
             #     sample_id = sample_ids[idx]
