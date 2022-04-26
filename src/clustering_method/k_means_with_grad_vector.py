@@ -15,7 +15,7 @@ def compute_norm_for_grad_ls(full_grad_ls):
         curr_norm = torch.sqrt(curr_norm)
 
         grad_norm_ls.append(curr_norm)
-    return grad_norm_ls
+    return torch.cat(grad_norm_ls)
 
 def average_grad_vec(full_vec_ls, weight_ls = None, is_cuda = False):
     average_vec_ls = []
