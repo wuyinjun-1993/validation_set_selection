@@ -913,6 +913,7 @@ def get_dataloader_for_meta(
                 # logger.info(torch.sum(torch.tensor(trainset.targets) == torch.tensor(flipped_labels)) / trainset.targets.shape[0])
                 trainset.targets = flipped_labels
 
+            logger.info(f"Size of training dataset is: {trainset.data.shape[0]}")
             trainset, metaset, remaining_origin_labels = random_partition_train_valid_dataset0(
                 args,
                 trainset,
