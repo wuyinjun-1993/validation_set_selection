@@ -522,6 +522,8 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
     update_train_ids = update_train_ids.nonzero().view(-1)
     
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
+    unique_labels_count = len(set(meta_set.targets.tolist()))
+    args.logger.info("unique label count in meta set::%d"%(unique_labels_count))
 
     remaining_origin_labels = origin_labels[update_train_ids]
 

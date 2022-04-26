@@ -69,35 +69,40 @@ def report_best_test_performance_so_far(logger, test_loss_ls, test_acc_ls, test_
 def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=True):
     valid_acc_arr = numpy.array(valid_acc_ls)
 
-    best_valid_acc = numpy.max(valid_acc_arr)
+    best_valid_acc_idx = numpy.argmax(valid_acc_arr)
+
+    # best_valid_acc = numpy.max(valid_acc_arr)
 
     # for k in range(len(valid_acc_ls)):
     #     if valid_acc_ls[k] == best_valid_acc:
 
 
-    best_valid_acc_epochs = numpy.reshape(numpy.nonzero(valid_acc_arr == best_valid_acc), (-1))
+    # best_valid_acc_epochs = numpy.reshape(numpy.nonzero(valid_acc_arr == best_valid_acc), (-1))
 
-    for epoch in best_valid_acc_epochs:
-        all_best = True
-        for k in range(1, tol+1):
-            if epoch + k <= len(valid_acc_ls) - 1:
-                if not valid_acc_ls[epoch + k] <= best_valid_acc:
-                    all_best = False
-                    break
+    # for epoch in best_valid_acc_epochs:
+    #     all_best = True
+    #     for k in range(1, tol+1):
+    #         if epoch + k <= len(valid_acc_ls) - 1:
+    #             if not valid_acc_ls[epoch + k] <= best_valid_acc:
+    #                 all_best = False
+    #                 break
 
-        if all_best:
-            break
+    #     if all_best:
+    #         break
 
-    final_epoch = min(epoch, args.epochs-1)
-    final_test_loss = test_loss_ls[final_epoch]
+    # final_epoch = min(epoch, args.epochs-1)
+    final_test_loss = test_loss_ls[best_valid_acc_idx]
 
-    final_test_acc = test_acc_ls[final_epoch]
+    final_test_acc = test_acc_ls[best_valid_acc_idx]
 
-    logging.info("final test performance is in epoch %d: %f, %f"%(final_epoch, final_test_loss, final_test_acc))
+    logging.info("final test performance is in epoch %d: %f, %f"%(best_valid_acc_idx, final_test_loss, final_test_acc))
+
+    torch.save(best_valid_acc_idx, os.path.join(args.save_path, "early_stopping_epoch"))
+
     if is_meta:
-        cache_sample_weights_given_epoch(final_epoch)
+        cache_sample_weights_given_epoch(best_valid_acc_idx)
     else:
-        cache_sample_weights_given_epoch_basic_train(final_epoch)
+        cache_sample_weights_given_epoch_basic_train(best_valid_acc_idx)
 
 
 def report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5, is_meta=True):
@@ -135,6 +140,8 @@ def report_final_performance_by_early_stopping2(valid_loss_ls, valid_acc_ls, tes
     final_test_acc = test_acc_ls[final_epoch]
 
     logging.info("final test performance is in epoch %d: %f, %f"%(final_epoch, final_test_loss, final_test_acc))
+
+    torch.save(final_epoch, os.path.join(args.save_path, "early_stopping_epoch"))
     if is_meta:
         cache_sample_weights_given_epoch(final_epoch)
     else:
@@ -488,11 +495,11 @@ def meta_learning_model(
 
     if args.local_rank == 0:
         report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls, test_loss_ls, test_acc_ls, args, tol = 5)
-    w_array_delta_ls_tensor = torch.stack(w_array_delta_ls, dim = 0)
+    # w_array_delta_ls_tensor = torch.stack(w_array_delta_ls, dim = 0)
 
-    if args.local_rank == 0:
-        torch.save(w_array_delta_ls_tensor, os.path.join(args.save_path, "cached_w_array_delta_ls"))
-        torch.save(torch.sum(w_array_delta_ls_tensor, dim = 1), os.path.join(args.save_path, "cached_w_array_total_delta"))
+    # if args.local_rank == 0:
+    #     torch.save(w_array_delta_ls_tensor, os.path.join(args.save_path, "cached_w_array_delta_ls"))
+    #     torch.save(torch.sum(w_array_delta_ls_tensor, dim = 1), os.path.join(args.save_path, "cached_w_array_total_delta"))
 
 def update_lr(optimizer, lr):    
     for param_group in optimizer.param_groups:
@@ -1045,33 +1052,8 @@ def main2(args, logger):
 
     if args.cuda:
         net = net.cuda()
-        net = DDP(net, device_ids=[args.local_rank])
-
-    if args.dataset == 'MNIST':
-        optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
-        scheduler = None
-    else:
-        if args.dataset.startswith('cifar'):
-            optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
-            optimizer.param_groups[0]['initial_lr'] = args.lr
-            if args.do_train:
-                mile_stones_epochs = [100, 150]
-                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                            milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-
-            else:
-                if args.use_pretrained_model:
-                    mile_stones_epochs = [100,150]
-                else:
-                    mile_stones_epochs = [120,160]
-                if args.lr_decay:
-                    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-                else:
-                    scheduler = None
-        else:
-            if args.dataset.startswith('sst'):
-                optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-                scheduler = None
+    net = DDP(net, device_ids=[args.local_rank])
+    optimizer, scheduler = obtain_optimizer_scheduler(args, net, start_epoch = start_epoch)
     
     if args.do_train:
         logger.info("starting basic training")

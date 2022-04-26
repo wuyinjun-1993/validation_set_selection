@@ -261,14 +261,16 @@ class sst_dataset(Dataset):
 
 class SST5Processor(DatasetProcessor):
     """Processor for the SST-5 data set."""
-
-    def __init__(self):
-        TEXT = torchtext.data.Field()
-        LABEL = torchtext.data.Field(sequential=False)
-
+    # def __init__(self, data_path):
+    #     self.data_path = data_path
+    #     prepare_data(data_path)
+    def __init__(self, data_path):
+        TEXT = torchtext.legacy.data.Field()
+        LABEL = torchtext.legacy.data.Field(sequential=False)
+        self.data_path = data_path
         self._train_set, self._dev_set, self._test_set = \
-            torchtext.datasets.SST.splits(
-                TEXT, LABEL, fine_grained=True)
+            torchtext.legacy.datasets.SST.splits(
+                TEXT, LABEL, fine_grained=True, root=data_path)
 
     def get_train_examples(self, num_per_class=None, noise_rate=0.):
         """See base class."""

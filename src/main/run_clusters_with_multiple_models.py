@@ -101,7 +101,7 @@ def do_clustering_main(args):
     train_loader, metaloader = get_dataloader_for_post_evaluations(args)
 
     
-    model_file_ls = ["cached_model", "refined_model_1", "refined_model_100"]
+    model_file_ls = ["cached_pretrain_model", "refined_model_1", "refined_model_400"]
 
     model_state_ls = load_models_from_cache(model_file_ls)
 
@@ -112,6 +112,10 @@ def do_clustering_main(args):
     all_full_sim_mat_ls = []
 
     dist_ls = []
+
+    full_train_sample_representation_tensor_ls = []
+
+    full_meta_sample_representation_tensor_ls = []
 
     for model_state in model_state_ls:
 
@@ -143,14 +147,18 @@ def do_clustering_main(args):
         choice_cluster = torch.argmin(dis, dim=1)
 
         dist_ls.append(dis)
-        # full_sim_mat1 = calculate_train_meta_grad_prod(args, train_loader, metaloader, net, criterion, optimizer)
+        full_sim_mat1,full_train_sample_representation_tensor, full_meta_sample_representation_tensor  = calculate_train_meta_grad_prod(args, train_loader, metaloader, net, criterion, optimizer)
+
+        full_train_sample_representation_tensor_ls.append(full_train_sample_representation_tensor)
+
+        full_meta_sample_representation_tensor_ls.append(full_meta_sample_representation_tensor)
         # if args.cosin_dist:
         #     full_sim_mat1 = pairwise_cosine_full(full_sample_representation_tensor, is_cuda=args.cuda)
         # else:
         #     # full_sim_mat1 = pairwise_l2_full(full_sample_representation_tensor, is_cuda=args.cuda)
         #     full_sim_mat1 = pairwise_distance_ls_full(full_sample_representation_tensor, full_sample_representation_tensor, is_cuda=args.cuda,  batch_size = 256)
 
-        # all_full_sim_mat_ls.append(full_sim_mat1)
+        all_full_sim_mat_ls.append(full_sim_mat1)
 
         all_cluster_ids_ls.append(choice_cluster)
 
