@@ -15,7 +15,7 @@ def compute_norm_for_grad_ls(full_grad_ls):
         curr_norm = torch.sqrt(curr_norm)
 
         grad_norm_ls.append(curr_norm)
-    return torch.cat(grad_norm_ls)
+    return torch.tensor(grad_norm_ls)
 
 def average_grad_vec(full_vec_ls, weight_ls = None, is_cuda = False):
     average_vec_ls = []
@@ -83,9 +83,9 @@ def obtain_loss_per_example(args, train_loader, net, criterion):
             if args.cuda:
                 data, labels = train_loader.dataset.to_cuda(data, labels)
             output = net.forward(data)
-            loss = criterion(output, labels).cpu()
+            loss = criterion(output, labels)
             loss = obtain_full_loss_batch(output, labels, args.cuda, loss)
-            loss_ls[sample_ids] = loss
+            loss_ls[sample_ids] = loss.cpu()
 
     return loss_ls
 
@@ -102,6 +102,40 @@ def perturb_net_by_grad(net, eps, grad_ls = None):
 def pairwise_cosine_full_for_grad_vec(args, train_loader, net, criterion, grad_norm_ls, data2, data2_norm_ls, is_cuda=False,  batch_size = 2048):
     
     B = data2
+
+    baseloss_ls = obtain_loss_per_example(args, train_loader, net, criterion)
+
+    full_sim_mat = torch.zeros([len(train_loader.dataset), len(data2)])
+
+    eps = 1e-6
+
+    for idx in range(len(data2)):
+
+        perturb_net_by_grad(net, eps, grad_ls = data2[idx])
+
+        loss_ls_with_update_net = obtain_loss_per_example(args, train_loader, net, criterion)
+
+        full_sim_mat[:, idx] = 1 - torch.abs((loss_ls_with_update_net - baseloss_ls)/eps)/(grad_norm_ls*data2_norm_ls[idx])
+
+    return full_sim_mat
+
+def obtain_vectorized_grad(net):
+    gradient_ls = []
+    for param in net.parameters():
+        curr_gradient = param.grad.detach().cpu().clone().view(-1)
+        gradient_ls.append(curr_gradient)
+
+    return torch.cat(gradient_ls)
+
+def pairwise_cosine_full_for_grad_vec2(args, train_loader, net, criterion, grad_ls, grad_norm_ls, data2, data2_norm_ls, is_cuda=False,  batch_size = 2048):
+    
+
+    B_ls = []
+
+    for data2_item in data2:
+        B_ls.append(obtain_vectorized_grad(data2_item).view(-1))
+
+    B = torch.stack(B_ls)
 
     baseloss_ls = obtain_loss_per_example(args, train_loader, net, criterion)
 

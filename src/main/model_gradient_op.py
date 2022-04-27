@@ -7,7 +7,7 @@ from common.utils import *
 def obtain_net_grad(net):
     grad_ls = []
     for param in net.parameters():
-        grad_ls.append(param.grad.clone())
+        grad_ls.append(param.grad.detach().cpu().clone())
 
     return grad_ls
 

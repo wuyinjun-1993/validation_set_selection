@@ -551,22 +551,16 @@ def reduce_dimension_for_feature_representations(sample_representation_vec_ls, r
         sample_representation_vec = sample_representation_vec_ls[idx]
         s,v,d = torch.svd(sample_representation_vec)
 
-def obtain_vectorized_grad(net):
-    gradient_ls = []
-    for param in net.parameters():
-        curr_gradient = param.grad.detach().cpu().clone().view(-1)
-        gradient_ls.append(curr_gradient)
-
-    return torch.cat(gradient_ls)
 
 
-def obtain_net_grad(net):
-    gradient_ls = []
-    for param in net.parameters():
-        curr_gradient = param.grad.detach().cpu().clone().view(-1)
-        gradient_ls.append(curr_gradient)
 
-    return gradient_ls
+# def obtain_net_grad(net):
+#     gradient_ls = []
+#     for param in net.parameters():
+#         curr_gradient = param.grad.detach().cpu().clone().view(-1)
+#         gradient_ls.append(curr_gradient)
+
+#     return gradient_ls
 
 
 
@@ -587,11 +581,11 @@ def get_all_grad_by_example(args, train_loader, net, criterion, optimizer):
 
 
 
-def get_grad_by_example(args, train_loader, net, criterion, optimizer):
+def get_grad_by_example(args, train_loader, net, criterion, optimizer, vectorize_grad = False):
     vec_grad_by_example_ls = []
     sample_id_ls = []
 
-    for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
+    for batch_id, (sample_ids, data, labels) in tqdm(enumerate(train_loader)):
         args.logger.info("sample batch ids::%d"%(batch_id))
         if args.cuda:
             data, labels = train_loader.dataset.to_cuda(data, labels)
@@ -599,12 +593,19 @@ def get_grad_by_example(args, train_loader, net, criterion, optimizer):
         for idx in range(labels.shape[0]):
             optimizer.zero_grad()
             loss = criterion(output[idx:idx+1], labels[idx:idx+1])
-            loss = obtain_full_loss(output[idx:idx+1], labels[idx:idx+1], args.cuda, loss)
+            if not args.all_layer_grad_no_full_loss:
+                loss = obtain_full_loss(output[idx:idx+1], labels[idx:idx+1], args.cuda, loss)
             loss.backward(retain_graph = True)
-            vec_grad_by_example_ls.append(obtain_net_grad(net))
+            if not vectorize_grad:
+                vec_grad_by_example_ls.append(obtain_net_grad(net))
+            else:
+                vec_grad_by_example_ls.append(obtain_vectorized_grad(net).view(-1))
         sample_id_ls.append(sample_ids)
             # optimizer.step()
-    return vec_grad_by_example_ls, torch.cat(sample_id_ls)
+    if not vectorize_grad:
+        return vec_grad_by_example_ls, torch.cat(sample_id_ls)
+    else:
+        return torch.stack(vec_grad_by_example_ls), torch.cat(sample_id_ls)
 
 
 
@@ -736,6 +737,20 @@ def full_approx_grad_prod(args, train_loader, net, criterion, optimizer):
         return full_sim_mat, sample_id_ls
 
 
+def full_approx_grad_prod2(args, train_loader, net, criterion, optimizer):
+
+    full_sim_mat, sample_id_ls = get_approx_grad_prod(args, train_loader, net, criterion, optimizer)
+
+    full_sim_mat_ls = []
+    if args.use_model_prov:
+        full_sim_mat_ls.append(full_sim_mat)
+        full_sim_mat_ls = get_extra_approx_grad_prod(args, train_loader, criterion, net, optimizer, full_sim_mat_ls)    
+        return torch.sum(torch.stack(torch.abs(full_sim_mat_ls)),dim=0), sample_id_ls
+
+    else:
+        return full_sim_mat, sample_id_ls
+
+
 def get_extra_approx_grad_prod(args, train_loader, criterion, net, optimizer, full_sim_mat_ls):
     start_epoch_id = 0
     if args.use_pretrained_model:
@@ -784,6 +799,68 @@ def get_approx_grad_prod(args, train_loader, net, criterion, optimizer):
         sample_id_ls.append(sample_ids)
 
     return full_sim_mat, sample_id_ls
+
+
+def get_grad_prod(args, grad_ls):
+
+    full_sim_mat = torch.zeros([len(grad_ls), len(grad_ls)])
+
+    for start_id1 in tqdm(range(0, len(grad_ls), args.batch_size)):
+        end_id1 = start_id1 + args.batch_size
+        if end_id1 >= len(grad_ls):
+            end_id1 = len(grad_ls)
+
+        selected_grad_mat1 = grad_ls[start_id1: end_id1]
+        if args.cuda:
+            selected_grad_mat1 = selected_grad_mat1.cuda()
+
+        for start_id2 in range(0, len(grad_ls), args.batch_size):
+            end_id2 = start_id2 + args.batch_size
+            if end_id2 >= len(grad_ls):
+                end_id2 = len(grad_ls)
+
+            selected_grad_mat2 = grad_ls[start_id2: end_id2]
+            if args.cuda:
+                selected_grad_mat2 = selected_grad_mat2.cuda()
+
+
+            curr_sim = torch.mm(selected_grad_mat1, torch.t(selected_grad_mat2))
+            full_sim_mat[start_id1:end_id1, start_id2:end_id2] = curr_sim
+
+    return full_sim_mat
+            
+
+    # sample_id_ls = []
+    # eps = 1e-6
+
+    # # baseloss_ls = obtain_loss_per_example(args, train_loader, net, criterion)
+
+    # full_sim_mat = torch.zeros([len(train_loader.dataset), len(train_loader.dataset)])
+
+    # for batch_id, (sample_ids, data, labels) in enumerate(train_loader):
+    #     args.logger.info("sample batch ids::%d"%(batch_id))
+    #     if args.cuda:
+    #         data, labels = train_loader.dataset.to_cuda(data, labels)
+    #     output = net.forward(data)
+    #     for idx in range(labels.shape[0]):
+    #         optimizer.zero_grad()
+    #         loss = criterion(output[idx:idx+1], labels[idx:idx+1])
+    #         loss = obtain_full_loss(output[idx:idx+1], labels[idx:idx+1], args.cuda, loss)
+
+    #         loss.backward(retain_graph = True)
+
+    #         # grad_ls = obtain_net_grad(net)          
+    #         perturb_net_by_grad(net, eps)
+
+    #         loss_ls_with_update_net = obtain_loss_per_example(args, train_loader, net, criterion)
+
+    #         full_sim_mat[sample_ids[idx]] = (loss_ls_with_update_net - baseloss_ls)/eps
+
+    #         # vec_grad_by_example_ls.append(obtain_vectorized_grad(net))
+    #     sample_id_ls.append(sample_ids)
+
+    # return full_sim_mat, sample_id_ls
+
             # optimizer.step()
     # return torch.stack(vec_grad_by_example_ls), torch.cat(sample_id_ls)
 
@@ -1013,8 +1090,10 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
         full_sample_representation_tensor, all_sample_ids = get_representations_last_layer(args, train_loader, criterion, optimizer, net)
     else:
 
-        # full_sample_representation_tensor, all_sample_ids = get_grad_by_example(args, train_loader, net, criterion, optimizer)
-        full_sim_mat1, sample_id_ls = full_approx_grad_prod(args, train_loader, net, criterion, optimizer)
+        full_sample_representation_tensor, all_sample_ids = get_grad_by_example(args, train_loader, net, criterion, optimizer, vectorize_grad=True)
+
+        
+        # full_sim_mat1, sample_id_ls = full_approx_grad_prod(args, train_loader, net, criterion, optimizer)
         # sim_mat_file_name = os.path.join(args.save_path, "full_similarity_mat")
         # if not os.path.exists(sim_mat_file_name):
         #     full_sim_mat1 = pairwise_cosine_full(full_sample_representation_tensor, is_cuda=args.cuda)
@@ -1032,7 +1111,8 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
 
     # sample_representation_vec_ls = sample_representation_vec_ls_by_class[label]
 
-    if args.all_layer_grad:
+    if args.all_layer_grad_greedy:
+        full_sim_mat1 = get_grad_prod(args, full_sample_representation_tensor)
         valid_ids = select_samples_with_greedy_algorithm(full_sim_mat1, main_represent_count)
         valid_sample_representation_tensor = None
         return valid_ids, valid_sample_representation_tensor
