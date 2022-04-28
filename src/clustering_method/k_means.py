@@ -362,20 +362,20 @@ def select_samples_with_greedy_algorithm(full_x_cosin_sim, num_clusters):
 
     selected_sample_boolean_arrays = torch.ones(len(full_x_cosin_sim))
 
-    first_select_sample_id = torch.argmax(torch.min(torch.abs(full_x_cosin_sim), dim=1)[0])
+    first_select_sample_id = torch.argmax(torch.mean(torch.abs(full_x_cosin_sim), dim=1)[0])
     curr_cosin_sim_sum = full_x_cosin_sim[first_select_sample_id]
-    print("curr min cosin sim sum::", torch.min(torch.abs(curr_cosin_sim_sum)))
+    print("curr mean cosin sim sum::", torch.mean(torch.abs(curr_cosin_sim_sum)))
     selected_sample_boolean_arrays[first_select_sample_id] = 0
 
     for k in range(num_clusters-1):
         remaining_x_cosin_sim = full_x_cosin_sim[selected_sample_boolean_arrays.nonzero().view(-1)]
-        curr_select_sample_id = torch.argmax(torch.min(torch.abs(curr_cosin_sim_sum.view(1,-1) + remaining_x_cosin_sim), dim = 1)[0])
+        curr_select_sample_id = torch.argmax(torch.mean(torch.abs(curr_cosin_sim_sum.view(1,-1) + remaining_x_cosin_sim), dim = 1)[0])
 
         curr_select_sample_real_id = selected_sample_boolean_arrays.nonzero().view(-1)[curr_select_sample_id]
 
         curr_cosin_sim_sum = curr_cosin_sim_sum + full_x_cosin_sim[curr_select_sample_real_id]
         selected_sample_boolean_arrays[curr_select_sample_real_id] = 0
-        print("curr min cosin sim sum::", str(k+1), torch.min(torch.abs(curr_cosin_sim_sum)).item())
+        print("curr mean cosin sim sum::", str(k+1), torch.mean(torch.abs(curr_cosin_sim_sum)).item())
 
     return torch.nonzero(selected_sample_boolean_arrays == 0).view(-1)
 
