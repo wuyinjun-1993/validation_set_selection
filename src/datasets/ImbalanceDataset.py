@@ -33,16 +33,16 @@ class ImbalanceDataset(Dataset):
             self.mask[idx] = True
             num_select *= 0.5
 
-        self.dataset.targets = self.dataset.targets[self.mask]
-        if orig_numpy:
-            self.dataset.targets = self.dataset.targets.numpy()
-        self.dataset.data = self.dataset.data[self.mask]
+        # self.dataset.targets = self.dataset.targets[self.mask]
+        # if orig_numpy:
+        #     self.dataset.targets = self.dataset.targets.numpy()
+        # self.dataset.data = self.dataset.data[self.mask]
 
-        self.data = self.dataset.data
-        self.targets = self.dataset.targets
+        # self.data = self.dataset.data
+        # self.targets = self.dataset.targets
 
-    def __getitem__(self, index):
-        return self.dataset[index]
+    # def __getitem__(self, index):
+    #     return self.dataset[index]
 
-    def __len__(self):
-        return len(self.dataset)
+    # def __len__(self):
+    #     return len(self.dataset)

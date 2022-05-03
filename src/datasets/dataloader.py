@@ -758,6 +758,21 @@ def randomly_produce_valid_set(testset, transform_test, rate = 0.1):
 
     return validset, testset
 
+def generate_class_biased_dataset(trainset, args, testset, origin_labels):
+    if not args.load_dataset:
+        imb_trainset = datasets.ImbalanceDataset(trainset)
+        trainset = trainset.get_subset_dataset(trainset, torch.nonzero(imb_trainset.mask).view(-1))
+        origin_labels = origin_labels[imb_trainset.mask]
+        logging.info(f"Total number of training samples: {trainset.data.shape[0]}")
+        logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
+        torch.save(trainset, os.path.join(args.data_dir, args.dataset + "_bias_class_dataset"))
+        torch.save(origin_labels, os.path.join(args.data_dir, args.dataset + "_bias_class_origin_labels"))
+    else:
+        trainset = torch.load(os.path.join(args.data_dir, args.dataset + "_bias_class_dataset"))
+        origin_labels = torch.load(os.path.join(args.data_dir, args.dataset + "_bias_class_origin_labels"))
+    return trainset, origin_labels
+
+
 def get_dataloader_for_meta(criterion, optimizer, args, split_method, pretrained_model=None, cached_sample_weights = None):
     validset = None
     if args.dataset == 'cifar10':
@@ -856,10 +871,12 @@ def get_dataloader_for_meta(criterion, optimizer, args, split_method, pretrained
             flipped_labels = None
 
             if args.bias_classes:
-                trainset = datasets.ImbalanceDataset(trainset)
-                origin_labels = origin_labels[trainset.mask]
-                logging.info(f"Total number of training samples: {trainset.data.shape[0]}")
-                logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
+                trainset, origin_labels = generate_class_biased_dataset(trainset, args, testset, origin_labels)
+                # imb_trainset = datasets.ImbalanceDataset(trainset)
+                # trainset = trainset.get_subset_dataset(trainset, torch.nonzero(imb_trainset.mask).view(-1))
+                # origin_labels = origin_labels[imb_trainset.mask]
+                # logging.info(f"Total number of training samples: {trainset.data.shape[0]}")
+                # logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
             
             if args.flip_labels:
                 logging.info("add errors to train set")
@@ -918,10 +935,7 @@ def get_dataloader_for_meta(criterion, optimizer, args, split_method, pretrained
             flipped_labels = None
 
             if args.bias_classes:
-                trainset = datasets.ImbalanceDataset(trainset)
-                origin_labels = origin_labels[trainset.mask]
-                logging.info(f"Total number of training samples: {trainset.data.shape[0]}")
-                logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
+                trainset, origin_labels = generate_class_biased_dataset(trainset, args, testset, origin_labels)
             
             if args.flip_labels:
 

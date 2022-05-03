@@ -1,15 +1,252 @@
 import torch
-
+import collections
 import os,sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from common.utils import *
-
+import numpy as np
 def obtain_net_grad(net):
     grad_ls = []
     for param in net.parameters():
         grad_ls.append(param.grad.detach().cpu().clone())
 
     return grad_ls
+
+
+def obtain_net_grad_norm(net):
+    grad_norm = 0
+    for param in net.parameters():
+        grad_norm += (torch.norm(param.grad)**2).detach().cpu()
+        # grad_ls.append(param.grad.detach().cpu().clone())
+
+    return torch.sqrt(grad_norm)
+
+def merge_grad_by_layer(grad_ls, vec_grad_ls):
+    if len(vec_grad_ls) <= 0:
+        for grad in grad_ls:
+            vec_grad_ls.append([grad.view(1,-1)])
+    else:
+        idx = 0
+        for grad in grad_ls:
+            # vec_grad_ls[idx] = torch.cat([vec_grad_ls[idx], grad.view(1,-1)])
+            vec_grad_ls[idx].append(grad.view(1,-1))
+            idx += 1
+
+    return vec_grad_ls
+
+def rand_sample_parameter(net, sampled_layer_count = 5, sampled_param_count = 1000, include_last_layer = True):
+    module_ls = list(net._modules)
+
+    selected_param_layer_ls = []
+
+    if include_last_layer:
+
+        last_layer_param = list(getattr(net, module_ls[-1]).parameters())
+
+        # last_layer_param = [last_layer_param[k].view(-1) for k in range(len(last_layer_param))]
+
+        curr_sampled_param_count = sum([last_layer_param[k].numel() for k in range(len(last_layer_param))])
+
+        selected_param_layer_ls.extend(last_layer_param)
+
+        if sampled_param_count - curr_sampled_param_count <= 0:
+            return selected_param_layer_ls, None
+    else:
+
+        last_layer_param = []
+        curr_sampled_param_count = 0
+
+    sampled_param_count = sampled_param_count - curr_sampled_param_count
+    full_param_ls = list(net.parameters())
+
+    remaining_param_ls = [full_param_ls[k] for k in range(len(full_param_ls)) if k < len(full_param_ls) - len(last_layer_param)]
+
+    remaining_param_count_ls = [remaining_param_ls[k].numel() for k in range(len(remaining_param_ls))]
+
+    if sampled_layer_count >= len(remaining_param_ls):
+        selected_layer_id_ls = list(range(len(remaining_param_ls)))
+        selected_param_count_ls = remaining_param_count_ls
+
+    else:    
+        selected_layer_id_ls = np.random.choice(list(range(len(remaining_param_ls))), size = sampled_layer_count, p = np.array(remaining_param_count_ls)/sum(remaining_param_count_ls), replace = False)
+        selected_param_count_ls = [remaining_param_count_ls[k] for k in selected_layer_id_ls]
+
+    selected_param_num_by_layer_ls = np.array(selected_param_count_ls)
+    selected_sampled_param_id_by_layer_ls = []
+    if len(selected_param_layer_ls) > 0:
+        selected_sampled_param_id_by_layer_ls.extend([None]*len(selected_param_layer_ls))
+    selected_param_layer_ls.extend([remaining_param_ls[k] for k in selected_layer_id_ls])
+    if sampled_param_count > sum(selected_param_num_by_layer_ls):
+        return selected_param_layer_ls, None
+
+
+    
+    selected_sampling_param_num_by_layer_ls = selected_param_num_by_layer_ls/sum(selected_param_num_by_layer_ls)*sampled_param_count
+    selected_sampling_param_num_by_layer_ls = selected_sampling_param_num_by_layer_ls.astype(int)
+
+    
+    for idx in range(len(selected_sampling_param_num_by_layer_ls)):
+        sampling_param_count = selected_sampling_param_num_by_layer_ls[idx]
+        param_count_curr_layer = selected_param_num_by_layer_ls[idx]
+        if sampling_param_count >= param_count_curr_layer:
+            selected_sampled_param_id_by_layer_ls.append(None)
+        else:
+            rand_sampled_param_ids_curr_layer = np.random.choice(list(range(param_count_curr_layer)), size = sampling_param_count, replace=False)
+            selected_sampled_param_id_by_layer_ls.append(rand_sampled_param_ids_curr_layer)
+
+    return selected_param_layer_ls, selected_sampled_param_id_by_layer_ls
+
+
+def biased_rand_sample_parameter(net, sampled_layer_count = 5, sampled_param_count = 1000, include_last_layer = True):
+    module_ls = list(net._modules)
+
+    selected_param_layer_ls = []
+
+    if include_last_layer:
+
+        last_layer_param = list(getattr(net, module_ls[-1]).parameters())
+
+        # last_layer_param = [last_layer_param[k].view(-1) for k in range(len(last_layer_param))]
+
+        curr_sampled_param_count = sum([last_layer_param[k].numel() for k in range(len(last_layer_param))])
+
+        selected_param_layer_ls.extend(last_layer_param)
+
+        if sampled_param_count - curr_sampled_param_count <= 0:
+            return selected_param_layer_ls, None
+    else:
+
+        last_layer_param = []
+        curr_sampled_param_count = 0
+
+    sampled_param_count = sampled_param_count - curr_sampled_param_count
+    full_param_ls = list(net.parameters())
+
+    remaining_param_ls = [full_param_ls[k] for k in range(len(full_param_ls)) if k < len(full_param_ls) - len(last_layer_param) and k >= len(full_param_ls) - sampled_layer_count - len(last_layer_param)]
+
+    remaining_param_count_ls = [remaining_param_ls[k].numel() for k in range(len(remaining_param_ls))]
+
+    if sampled_layer_count >= len(remaining_param_ls):
+        selected_layer_id_ls = list(range(len(remaining_param_ls)))
+        selected_param_count_ls = remaining_param_count_ls
+
+    else:    
+        selected_layer_id_ls = np.random.choice(list(range(len(remaining_param_ls))), size = sampled_layer_count, p = np.array(remaining_param_count_ls)/sum(remaining_param_count_ls), replace = False)
+        selected_param_count_ls = [remaining_param_count_ls[k] for k in selected_layer_id_ls]
+
+    selected_param_num_by_layer_ls = np.array(selected_param_count_ls)
+    selected_sampled_param_id_by_layer_ls = []
+    if len(selected_param_layer_ls) > 0:
+        selected_sampled_param_id_by_layer_ls.extend([None]*len(selected_param_layer_ls))
+    selected_param_layer_ls.extend([remaining_param_ls[k] for k in selected_layer_id_ls])
+    if sampled_param_count > sum(selected_param_num_by_layer_ls):
+        return selected_param_layer_ls, None
+
+
+    
+    selected_sampling_param_num_by_layer_ls = selected_param_num_by_layer_ls/sum(selected_param_num_by_layer_ls)*sampled_param_count
+    selected_sampling_param_num_by_layer_ls = selected_sampling_param_num_by_layer_ls.astype(int)
+
+    
+    for idx in range(len(selected_sampling_param_num_by_layer_ls)):
+        sampling_param_count = selected_sampling_param_num_by_layer_ls[idx]
+        param_count_curr_layer = selected_param_num_by_layer_ls[idx]
+        if sampling_param_count >= param_count_curr_layer:
+            selected_sampled_param_id_by_layer_ls.append(None)
+        else:
+            rand_sampled_param_ids_curr_layer = np.random.choice(list(range(param_count_curr_layer)), size = sampling_param_count, replace=False)
+            selected_sampled_param_id_by_layer_ls.append(rand_sampled_param_ids_curr_layer)
+
+    return selected_param_layer_ls, selected_sampled_param_id_by_layer_ls
+    # remaining_param_cum_count_ls = []
+    # cum_count = 0
+    # for count in remaining_param_count_ls:
+    #     remaining_param_cum_count_ls.append(cum_count)
+    #     cum_count += count
+
+    # total_remaining_param_count = sum(remaining_param_count_ls)
+
+    # sampled_param_id_ls = torch.randperm(total_remaining_param_count)[0:sampled_param_count - curr_sampled_param_count]
+
+    # sampled_param_id_ls = torch.sort(sampled_param_id_ls, descending=False)[0]
+
+    # param_layer_id = 0
+
+
+
+    # for param_id in sampled_param_id_ls:
+    #     if param_layer_id < len(remaining_param_cum_count_ls) - 1:
+    #         while param_id >= remaining_param_cum_count_ls[param_layer_id + 1]:
+    #             param_layer_id += 1
+            
+    #     parameter_ls.append([remaining_param_ls[param_layer_id].view(-1)[remaining_param_cum_count_ls[param_layer_id] - param_id]])
+
+    # return parameter_ls
+
+
+
+def obtain_net_grad2(net, loss, depth=1):
+    grad_ls = []
+    module_ls = list(net._modules)
+
+    last_layer_param_count = len(list(getattr(net, module_ls[-1]).parameters()))
+
+    total_parameter_layer_count = len(list(net.parameters()))
+
+    curr_depth = 0
+
+    param_ls_to_grad = []
+
+    for idx in range(total_parameter_layer_count - last_layer_param_count):
+        curr_model_param = list(net.parameters())[total_parameter_layer_count - last_layer_param_count - idx]
+        param_ls_to_grad.append(curr_model_param)
+        if len(curr_model_param.shape) > 1:
+            curr_depth += 1
+            if curr_depth >= depth:
+                break
+
+    res_grad_ls = list(torch.autograd.grad(loss, param_ls_to_grad, retain_graph=True))
+
+    for grad in res_grad_ls:
+        grad_ls.append(grad.detach().cpu())
+
+    # for idx in range(total_parameter_layer_count - last_layer_param_count):
+    #     if idx >= depth:
+    #         break
+    #     curr_param_ls = list(net.parameters())[total_parameter_layer_count - last_layer_param_count - idx]
+
+    #     curr_grad = torch.autograd.grad(loss, curr_param_ls, retain_graph=True)[0]
+
+    #     grad_ls.append(curr_grad)
+    # for idx in range(len(module_ls)-1):
+    #     if idx >= depth:
+    #         break
+
+    #     module = module_ls[len(module_ls) - idx - 2]
+    #     curr_param_ls = list(getattr(net, module).parameters())
+
+    #     for param in curr_param_ls:
+    #         grad_ls.append(param.grad.detach().cpu().clone())
+
+    return grad_ls
+
+def obtain_net_grad3(loss, sampled_net_param_layer_ls, sampled_net_param_ids_per_layer):
+    grad_ls = []
+
+    res_grad_ls = list(torch.autograd.grad(loss, sampled_net_param_layer_ls, retain_graph=True))
+
+    for idx in range(len(res_grad_ls)):
+        grad = res_grad_ls[idx]
+        if sampled_net_param_ids_per_layer is None:
+            grad_ls.append(grad.detach().cpu())
+            continue
+        param_ids_curr_layer = sampled_net_param_ids_per_layer[idx]
+        if param_ids_curr_layer is None:
+            grad_ls.append(grad.detach().cpu())
+        else:
+            grad_ls.append(grad.view(-1).detach().cpu()[param_ids_curr_layer])
+
+    return grad_ls
+
 
 
 def obtain_full_loss(output, target, is_cuda, loss):
@@ -54,6 +291,8 @@ def load_checkpoint_by_epoch(args, model, epoch):
             cached_model_name = "model_" + str(epoch)
             cached_model_file_name = os.path.join(args.prev_save_path, cached_model_name)
 
+        if not os.path.exists(cached_model_file_name):
+            return None
             
         state = torch.load(cached_model_file_name, map_location=torch.device("cpu"))
 

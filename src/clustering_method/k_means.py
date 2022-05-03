@@ -212,6 +212,29 @@ def compute_center_shift_by_ls(initial_state, initial_state_pre):
                 ))
     return center_shift
 
+
+def print_cluster_dist_info(dist):
+    min_dist_values, min_dist_ids = torch.min(dist, dim=1)
+
+    print("max dist sample to assigned cluster mean::", torch.max(min_dist_values).item())
+
+    second_min_cluster_dist, second_min_cluster_ids = torch.topk(dist, k = 2, largest=False)
+
+    print("min dist sample to other cluster mean::", torch.min(second_min_cluster_dist[:,1]).item())
+
+
+def rescale_dist_by_cluster_mean_norm(dist, cluster_mean_ls, all_layer = False):
+    if not all_layer:
+        cluster_mean_norm_ls = torch.norm(cluster_mean_ls, dim = 1)
+    else:
+        cluster_mean_norm_ls = torch.sqrt(torch.sum(torch.stack([torch.norm(cluster_mean_ls[k], dim = 1)**2 for k in range(len(cluster_mean_ls))],dim=1),dim=1))
+
+    cluster_mean_norm_ls = torch.max(cluster_mean_norm_ls)/cluster_mean_norm_ls
+
+    dist = dist*cluster_mean_norm_ls.view(1,-1)
+
+    return dist
+
 def kmeans(
         # args,
         X,
@@ -222,7 +245,9 @@ def kmeans(
         sample_weights = None,
         existing_cluster_mean_ls = None,
         total_iter_count=1000,
-        all_layer = False
+        all_layer = False,
+        agg_sim_array = 'mean',
+        weight_by_norm = False
 ):
     """
     perform kmeans
@@ -249,6 +274,11 @@ def kmeans(
             pairwise_distance_function = pairwise_cosine
         else:
             pairwise_distance_function = pairwise_cosine_ls
+    # elif distance == 'cross':
+    #     if not all_layer:
+    #         pairwise_distance_function = pairwise_cross_prod
+    #     else:
+    #         pairwise_distance_function = pairwise_cross_prod_ls
     else:
         raise NotImplementedError
 
@@ -259,6 +289,23 @@ def kmeans(
         for idx in range(len(X)):
             X[idx] = X[idx].float()
 
+    if weight_by_norm:
+        if not all_layer:
+            sample_norm_ls = torch.norm(X,dim=1)
+        else:
+            sample_norm_ls = torch.sqrt(torch.sum(torch.stack([torch.norm(X[k],dim=1)**2 for k in range(len(X))],dim=1),dim=1))
+
+    else:
+        sample_norm_ls = None
+    curr_sample_weights = None
+    if sample_weights is not None:
+        curr_sample_weights = sample_weights.clone()
+
+    if weight_by_norm:
+        if curr_sample_weights is None:
+            curr_sample_weights = sample_norm_ls.clone()
+        else:
+            curr_sample_weights = (sample_norm_ls*sample_weights).clone()
     # transfer to device
     # if args.cuda:
     #     X = X.cuda()
@@ -284,7 +331,13 @@ def kmeans(
         if existing_cluster_mean_ls is not None:
             full_centroid_state = torch.cat([existing_cluster_mean_ls, full_centroid_state], dim = 0)
 
-        dis = pairwise_distance_function(X, full_centroid_state,is_cuda)
+        if all_layer:
+            dis = pairwise_distance_function(X, full_centroid_state,is_cuda, agg = agg_sim_array)
+        else:
+            dis = pairwise_distance_function(X, full_centroid_state,is_cuda)
+
+        if weight_by_norm:
+            dis = rescale_dist_by_cluster_mean_norm(dis, full_centroid_state, all_layer)
 
         choice_cluster = torch.argmin(dis, dim=1)
 
@@ -292,6 +345,8 @@ def kmeans(
             initial_state_pre = initial_state.clone()
         else:
             initial_state_pre = [initial_state[k].clone() for k in range(len(initial_state))]
+
+        
 
         for index in range(num_clusters):
             selected = torch.nonzero(choice_cluster == index).squeeze()
@@ -302,18 +357,20 @@ def kmeans(
             # if args.cuda:
             #     selected = selected.cuda()
             selected_sample_weights = None
-            if sample_weights is not None:
+            if curr_sample_weights is not None:
                 # selected_sample_weights = torch.index_select(sample_weights, 0, selected)
-                selected_sample_weights = sample_weights[selected.cpu()]
-                # if is_cuda:
-                #     selected_sample_weights = selected_sample_weights.cuda()
+                selected_sample_weights = curr_sample_weights[selected.cpu()]
+
+
+                if is_cuda:
+                    selected_sample_weights = selected_sample_weights.cuda()
             # selected = torch.index_select(X, 0, selected)
             if not all_layer:
                 selected = X[selected]
-                # if is_cuda:
-                #     selected = selected.cuda()
+                if is_cuda:
+                    selected = selected.cuda()
 
-                if sample_weights is None:
+                if selected_sample_weights is None:
                     selected_state = selected.mean(dim=0)
                 else:
                     selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
@@ -348,6 +405,8 @@ def kmeans(
         tqdm_meter.update()
         if center_shift ** 2 < tol:
             break
+    
+    print_cluster_dist_info(dis)
     if not all_layer:
         return choice_cluster.cpu(), initial_state.cpu()
     else:
@@ -811,7 +870,7 @@ def pairwise_distance_ls_full(data1_ls, data2_ls, is_cuda = False, batch_size = 
 
     return torch.cat(curr_dist_ls, dim = 1)
 
-def pairwise_distance_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
+def pairwise_distance_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg = 'mean'):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     B_ls = []
@@ -859,7 +918,13 @@ def pairwise_distance_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
 
             del curr_A, B
         # final_cosine_dis = torch.min(torch.stack(cosine_dis_ls, dim = 1), dim = 1)[0]
-        final_cosine_dis = torch.sum(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
+        if agg == 'mean':
+            final_cosine_dis = torch.mean(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
+        else:
+            if agg == 'min':
+                final_cosine_dis = torch.max(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
+            else:
+                raise NotImplementedError
         for item in cosine_dis_ls:
             del item
 
@@ -943,6 +1008,44 @@ def pairwise_cosine(data1, data2, is_cuda=False,  batch_size = 128):
         B_normalized = B / B.norm(dim=-1, keepdim=True)
         curr_cosine = curr_A_normalized * B_normalized    
         curr_cosine_dis = 1 - torch.abs(curr_cosine.sum(dim=-1)).squeeze(1)
+        full_dist_ls.append(curr_cosine_dis)
+
+    full_dist_tensor = torch.cat(full_dist_ls)
+
+    return full_dist_tensor
+
+
+def pairwise_cross_prod(data1, data2, is_cuda=False,  batch_size = 128):
+    # transfer to device
+    # data1, data2 = data1.to(device), data2.to(device)
+    if is_cuda:
+        data2 = data2.cuda()
+
+    # N*1*M
+    A = data1#.unsqueeze(dim=1)
+
+    # 1*N*M
+    B = data2#.unsqueeze(dim=0)
+
+    full_dist_ls = []
+
+    for start_id in range(0, A.shape[0], batch_size):
+        end_id = start_id + batch_size
+        if end_id > A.shape[0]:
+            end_id = A.shape[0]
+
+        curr_A = A[start_id: end_id]
+        if is_cuda:
+            curr_A = curr_A.cuda()
+        curr_A_normalized = torch.abs(curr_A / curr_A.norm(dim=-1, keepdim=True))
+        B_normalized = torch.abs(B / B.norm(dim=-1, keepdim=True))
+        curr_A_normalized = curr_A_normalized.unsqueeze(-1).unsqueeze(1)
+        B_normalized = B_normalized.unsqueeze(-2).unsqueeze(0)
+        curr_cosine = torch.sum(curr_A_normalized*B_normalized, dim = (-1,-2))/(A.shape[1]*A.shape[1])
+
+
+        # curr_cosine = torch.sum(torch.mm(torch.abs(curr_A_normalized).view(-1,1), torch.abs(B_normalized).view(1,-1)))
+        curr_cosine_dis = 1 - curr_cosine#torch.abs(curr_cosine.sum(dim=-1)).squeeze(1)
         full_dist_ls.append(curr_cosine_dis)
 
     full_dist_tensor = torch.cat(full_dist_ls)
@@ -1130,7 +1233,7 @@ def pairwise_cosine_full_by_sample_ids(full_cosin_sim, sample_ids_ls, is_cuda=Fa
 
 
 
-def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
+def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg = 'mean'):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     B_ls = []
@@ -1161,18 +1264,99 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
         if end_id > A_ls[0].shape[0]:
             end_id = A_ls[0].shape[0]
         
+        inner_prod_ls = []
+        vec_norm_ls1 = []
+        vec_norm_ls2 = []
+        # cosine_dis_ls = []
+        for idx in range(len(A_ls)):
+            curr_A = A_ls[idx][start_id: end_id]
+            if is_cuda:
+                curr_A = curr_A.cuda()
+
+            B = B_ls[idx]
+            curr_inner_prod = (curr_A*B).sum(dim=-1)
+            inner_prod_ls.append(curr_inner_prod)
+            vec_norm_ls1.append(curr_A.norm(dim=-1)**2)
+            vec_norm_ls2.append(B.norm(dim=-1)**2)
+
+
+            # curr_A_normalized = curr_A / curr_A.norm(dim=-1, keepdim=True)
+            
+            # B_normalized = B / B.norm(dim=-1, keepdim=True)
+            # curr_cosine = curr_A_normalized * B_normalized    
+            # curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1))
+            # cosine_dis_ls.append(curr_cosine_dis)
+        total_cosin_ls = torch.sum(torch.stack(inner_prod_ls, dim = 1), dim=1)
+        total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
+        max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
+        # if agg == 'mean':
+        # max_cosine_sim = torch.mean(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
+        # else:
+        #     if agg == 'min':
+        #         max_cosine_sim = torch.min(torch.stack(cosine_dis_ls, dim = 1), dim = 1)[0]
+        #     else:
+        #         raise NotImplementedError
+        final_cosine_dis = 1 - max_cosine_sim
+        full_dist_ls.append(final_cosine_dis)
+
+    full_dist_tensor = torch.cat(full_dist_ls)
+
+    return full_dist_tensor
+
+
+
+def pairwise_cross_prod_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128):
+    # transfer to device
+    # data1, data2 = data1.to(device), data2.to(device)
+    B_ls = []
+    for idx in range(len(data2_ls)):
+        data2 = data2_ls[idx]
+        if is_cuda:
+            data2 = data2.cuda()
+        B_ls.append(data2)
+
+    A_ls = []
+    for idx in range(len(data1_ls)):
+        data1 = data1_ls[idx]
+        A_ls.append(data1)
+
+    # if is_cuda:
+    #     data2 = data2.cuda()
+
+    # N*1*M
+    # A = data1.unsqueeze(dim=1)
+
+    # # 1*N*M
+    # B = data2.unsqueeze(dim=0)
+
+    full_dist_ls = []
+
+    for start_id in range(0, A_ls[0].shape[0], batch_size):
+        end_id = start_id + batch_size
+        if end_id > A_ls[0].shape[0]:
+            end_id = A_ls[0].shape[0]
+        
         cosine_dis_ls = []
         for idx in range(len(A_ls)):
             curr_A = A_ls[idx][start_id: end_id]
             if is_cuda:
                 curr_A = curr_A.cuda()
-            curr_A_normalized = curr_A / curr_A.norm(dim=-1, keepdim=True)
+            curr_A_normalized = torch.abs(curr_A / curr_A.norm(dim=-1, keepdim=True))
             B = B_ls[idx]
-            B_normalized = B / B.norm(dim=-1, keepdim=True)
-            curr_cosine = curr_A_normalized * B_normalized    
-            curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1))
-            cosine_dis_ls.append(curr_cosine_dis)
-        max_cosine_sim = torch.sum(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
+            B_normalized = torch.abs(B / B.norm(dim=-1, keepdim=True))
+
+            # curr_sim = torch.sum(torch.bmm(curr_A_normalized.view(curr_A_normalized.shape[0], -1,1), B_normalized.view(B_normalized.shape[0], 1,-1)), dim = (-2,-1)).view(-1)
+
+            curr_A_normalized = curr_A_normalized.unsqueeze(-1).unsqueeze(1)
+            B_normalized = B_normalized.unsqueeze(-2).unsqueeze(0)
+            curr_cosine = torch.sum(curr_A_normalized*B_normalized, dim = (-1,-2))
+
+            # curr_sim = torch.sum(torch.mm(torch.abs(curr_A_normalized).view(-1,1), torch.abs(B_normalized).view(1,-1)))
+
+            # curr_cosine = curr_A_normalized * B_normalized    
+            # curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1))
+            cosine_dis_ls.append(curr_cosine)
+        max_cosine_sim = torch.mean(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
         final_cosine_dis = 1 - max_cosine_sim
         full_dist_ls.append(final_cosine_dis)
 
