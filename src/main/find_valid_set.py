@@ -629,10 +629,10 @@ def get_grad_by_example_per_batch(args, labels, output, net, criterion, optimize
 
     return res_grad_by_example_ls
 
-def get_grad_by_example_per_batch2(args, labels, output, net, criterion, optimizer, vec_grad_by_example_ls, sampled_net_param_layer_ls, sampled_net_param_ids_per_layer, merge_grad = False):
+def get_grad_by_example_per_batch2(args, labels, output, net, criterion, optimizer, vec_grad_by_example_ls, sampled_net_param_layer_ls, sampled_layer_sqrt_prob_ls, merge_grad = False):
     for idx in range(labels.shape[0]):
         # args, output, net, optimizer, target, criterion
-        obtain_class_wise_grad_ratio_wrt_full_grad(args, output[idx:idx+1], net, optimizer, labels[idx:idx+1], criterion)
+        # obtain_class_wise_grad_ratio_wrt_full_grad(args, output[idx:idx+1], net, optimizer, labels[idx:idx+1], criterion)
         optimizer.zero_grad()
         loss = criterion(output[idx:idx+1], labels[idx:idx+1])
         if not args.all_layer_grad_no_full_loss:
@@ -640,9 +640,9 @@ def get_grad_by_example_per_batch2(args, labels, output, net, criterion, optimiz
         # loss.backward(retain_graph = True)
         # if not vectorize_grad:
         if not merge_grad:
-            vec_grad_by_example_ls.append(obtain_net_grad3(loss, sampled_net_param_layer_ls, sampled_net_param_ids_per_layer))
+            vec_grad_by_example_ls.append(obtain_net_grad4(loss, sampled_net_param_layer_ls, sampled_layer_sqrt_prob_ls))
         else:
-            curr_sample_grad = obtain_net_grad3(loss, sampled_net_param_layer_ls, sampled_net_param_ids_per_layer)
+            curr_sample_grad = obtain_net_grad4(loss, sampled_net_param_layer_ls, sampled_layer_sqrt_prob_ls)
 
             vec_grad_by_example_ls = merge_grad_by_layer(curr_sample_grad, vec_grad_by_example_ls)
 
@@ -1113,15 +1113,38 @@ def obtain_class_wise_grad_ratio_wrt_full_grad(args, output, net, optimizer, tar
         print()
         
 
+def obtain_norms_for_each_layer(args, train_dataset, net, criterion, optimizer):
+    # train_loader = 
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
-def obtain_representations_last_layer_given_model2(args, train_loader, net, criterion, optimizer):
+    for batch_id, (sample_ids, data, labels) in tqdm(enumerate(train_loader)):
+
+        if args.cuda:
+            data, labels = train_loader.dataset.to_cuda(data, labels)
+
+        output = net.forward(data)
+
+        loss = criterion(output, labels)
+        if not args.all_layer_grad_no_full_loss:
+            loss = obtain_full_loss(output, labels, args.cuda, loss)
+        loss.backward()
+        net_grad_ls = obtain_net_grad(net)
+        net_grad_norm_ls = compute_net_grad_norm_ls(net_grad_ls)
+        net_param_count_ls = obtain_net_param_count_ls(net)
+        return net_grad_norm_ls, net_param_count_ls
+        
+
+
+def obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer):
     sample_representation_vec_ls = []
 
     sample_id_ls = []
     # with torch.no_grad():
 
         # all_sample_representations = [None]*len(train_loader.dataset)
-    sampled_net_param_layer_ls, sampled_net_param_ids_per_layer = biased_rand_sample_parameter(net, sampled_param_count = args.sampled_param_count, include_last_layer = True)
+    grad_norm_by_layer_ls, net_param_count_ls = obtain_norms_for_each_layer(args, train_dataset, net, criterion, optimizer)
+    avg_grad_norm_by_layer = torch.tensor(grad_norm_by_layer_ls)/torch.tensor(net_param_count_ls)
+    sampled_net_param_layer_ls,sampled_layer_sqrt_prob_ls = biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_param_count = args.sampled_param_count, include_last_layer = True)
 
     for batch_id, (sample_ids, data, labels) in tqdm(enumerate(train_loader)):
 
@@ -1136,7 +1159,7 @@ def obtain_representations_last_layer_given_model2(args, train_loader, net, crit
         # if not args.all_layer and not args.all_layer2:
         #     sample_representation_vec_ls.append(sample_representation.detach().cpu())
         vec_grad_by_example_ls = []
-        vec_grad_by_example_ls = get_grad_by_example_per_batch2(args, labels, output, net, criterion, optimizer, vec_grad_by_example_ls, sampled_net_param_layer_ls, sampled_net_param_ids_per_layer, merge_grad = True)
+        vec_grad_by_example_ls = get_grad_by_example_per_batch2(args, labels, output, net, criterion, optimizer, vec_grad_by_example_ls, sampled_net_param_layer_ls, sampled_layer_sqrt_prob_ls, merge_grad = True)
 
         if batch_id == 0:
             # sample_representation_vec_ls.append(sample_representation.detach().cpu())
@@ -1217,7 +1240,7 @@ def get_extra_representations_last_layer(args, train_loader, criterion, net, ful
 
     return full_sample_representation_vec_ls
 
-def get_extra_representations_last_layer2(args, train_loader, criterion, net, full_sample_representation_vec_ls):
+def get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, full_sample_representation_vec_ls):
     
     start_epoch_id = 0
     if args.use_pretrained_model:
@@ -1233,7 +1256,7 @@ def get_extra_representations_last_layer2(args, train_loader, criterion, net, fu
         if net is None:
             continue
         optimizer, _=obtain_optimizer_scheduler(args, net, start_epoch = 0)
-        sample_representation_vec_ls, _ = obtain_representations_last_layer_given_model2(args, train_loader, net, criterion, optimizer)
+        sample_representation_vec_ls, _ = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer)
 
         if args.all_layer or args.all_layer2:
             full_sample_representation_vec_ls.extend(sample_representation_vec_ls)
@@ -1333,12 +1356,12 @@ def get_representations_last_layer(args, train_loader, criterion, optimizer, net
 
     return full_sample_representation_tensor, all_sample_ids
 
-def get_representations_last_layer2(args, train_loader, criterion, optimizer, net):
+def get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net):
 
-    sample_representation_vec_ls, sample_id_ls = obtain_representations_last_layer_given_model2(args, train_loader, net, criterion, optimizer)
+    sample_representation_vec_ls, sample_id_ls = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer)
     if args.use_model_prov:
         args.all_layer = True
-        sample_representation_vec_ls = get_extra_representations_last_layer2(args, train_loader, criterion, net, sample_representation_vec_ls)
+        sample_representation_vec_ls = get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, sample_representation_vec_ls)
 
 
     full_sample_representation_tensor = sample_representation_vec_ls
@@ -1444,7 +1467,7 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
             return valid_ids, valid_sample_representation_tensor, full_sample_representation_tensor
 
 
-def get_representative_valid_ids2_3(criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False):
+def get_representative_valid_ids2_3(train_dataset, criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False):
 
     if args.add_under_rep_samples:
         under_represent_count = int(valid_count/2)
@@ -1458,7 +1481,7 @@ def get_representative_valid_ids2_3(criterion, optimizer, train_loader, args, ne
     # sample_id_ls_by_class = dict()
     full_sim_mat1 = None
 
-    full_sample_representation_tensor, all_sample_ids = get_representations_last_layer2(args, train_loader, criterion, optimizer, net)
+    full_sample_representation_tensor, all_sample_ids = get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net)
 
     
     if only_sample_representation:
