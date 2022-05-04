@@ -8,3 +8,5 @@ termcolor
 scikit-learn
 texar-pytorch
 tensorflow
+pytorch_transformers
+torchtext
