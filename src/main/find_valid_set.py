@@ -1147,7 +1147,7 @@ def obtain_representations_last_layer_given_model2(train_dataset, args, train_lo
         # all_sample_representations = [None]*len(train_loader.dataset)
     grad_norm_by_layer_ls, net_param_count_ls = obtain_norms_for_each_layer(args, train_dataset, net, criterion, optimizer)
     avg_grad_norm_by_layer = grad_norm_by_layer_ls/torch.tensor(net_param_count_ls)
-    sampled_net_param_layer_ls,sampled_layer_sqrt_prob_ls = biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_param_count = args.sampled_param_count, include_last_layer = True)
+    sampled_net_param_layer_ls,sampled_layer_sqrt_prob_ls = biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_param_count = args.sampled_param_count, include_last_layer = True, replace=args.replace)
 
     for batch_id, (sample_ids, data, labels) in tqdm(enumerate(train_loader)):
 
