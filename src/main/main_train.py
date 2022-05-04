@@ -936,7 +936,13 @@ def main2(args, logger):
                         criterion = torch.nn.CrossEntropyLoss()
                         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
                     else:
-                        raise NotImplementedError
+                        if args.dataset.startswith('trec'):
+                            pretrained_rep_net = custom_Bert(6)
+                            # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+                            criterion = torch.nn.CrossEntropyLoss()
+                            optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+                        else:
+                            raise NotImplementedError
         # pretrained_rep_net = ResNet18().cuda()
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -1034,7 +1040,10 @@ def main2(args, logger):
                     if args.dataset.startswith('imdb'):
                         net = custom_Bert(2)
                     else:
-                        raise NotImplementedError
+                        if args.dataset.startswith('trec'):
+                            net = custom_Bert(6)
+                        else:
+                            raise NotImplementedError
 
     if args.use_pretrained_model:
         # net = load_pretrained_model(args, net)

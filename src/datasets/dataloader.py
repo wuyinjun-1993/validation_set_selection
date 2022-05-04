@@ -19,6 +19,7 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from datasets.sst import *
 from datasets.imdb import *
+from datasets.trec import *
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
 # process.
@@ -960,6 +961,13 @@ def get_dataloader_for_meta(criterion, optimizer, args, split_method, pretrained
             trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
             origin_labels = trainset.targets.clone()
 
+        elif args.dataset.startswith("trec"):
+            label_list = None
+            
+            sstprocess = trec_Processor(args.data_dir)
+            label_list = sstprocess.get_labels()
+            trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
+            origin_labels = trainset.targets.clone()
         
         cache_train_valid_set(args, trainset, validset, None, origin_labels)
         cache_test_set(args, testset)
