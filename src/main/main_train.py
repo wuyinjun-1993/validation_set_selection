@@ -934,6 +934,8 @@ def main2(args, logger):
 
     if args.dataset == 'MNIST':
         pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
+        optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+        optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('cifar'):
         pretrained_rep_net = ResNet18().cuda()
         optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)

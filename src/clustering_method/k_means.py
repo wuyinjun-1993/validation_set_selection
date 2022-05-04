@@ -243,7 +243,6 @@ def kmeans(
             pairwise_distance_function = pairwise_distance
         else:
             pairwise_distance_function = pairwise_distance_ls
-
     elif distance == 'cosine':
         if not all_layer:
             pairwise_distance_function = pairwise_cosine
