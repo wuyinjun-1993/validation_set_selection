@@ -16,7 +16,7 @@ def compute_net_grad_norm_ls(grad_ls):
     for grad in grad_ls:
         grad_norm_ls.append(torch.sum(grad*grad))
 
-    return grad_norm_ls
+    return torch.tensor(grad_norm_ls)
 
 def obtain_net_param_count_ls(net):
     param_count_ls = []
@@ -115,7 +115,7 @@ def biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_layer_coun
 
     all_layer_id_ls = np.array(list(range(len(net_param_ls))))
 
-    selected_layer_id_ls = np.random.choice(all_layer_id_ls, size = sampled_layer_count, replace = True, p = prob_ls.numpy())
+    selected_layer_id_ls = np.random.choice(all_layer_id_ls, size = sampled_layer_count, replace = False, p = prob_ls.numpy())
     print(selected_layer_id_ls)
 
     selected_layer_param_ls = [net_param_ls[k] for k in selected_layer_id_ls]
