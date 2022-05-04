@@ -18,6 +18,7 @@ import numpy
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from datasets.sst import *
+from datasets.imdb import *
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
 # process.
@@ -692,16 +693,51 @@ def get_dataloader_for_post_evaluations(args):
 
 
 def cache_train_valid_set(args, train_set, valid_set, meta_set, remaining_origin_labels):
-    torch.save(train_set, os.path.join(args.save_path, "cached_train_set"))
-    torch.save(valid_set, os.path.join(args.save_path, "cached_valid_set"))
-    torch.save(meta_set, os.path.join(args.save_path, "cached_meta_set"))
-    torch.save(remaining_origin_labels, os.path.join(args.save_path, "cached_train_origin_labels"))
+    if train_set is not None:
+        torch.save(train_set, os.path.join(args.save_path, "cached_train_set"))
+    if valid_set is not None:
+        torch.save(valid_set, os.path.join(args.save_path, "cached_valid_set"))
+    if meta_set is not None:
+        torch.save(meta_set, os.path.join(args.save_path, "cached_meta_set"))
+    if remaining_origin_labels is not None:
+        torch.save(remaining_origin_labels, os.path.join(args.save_path, "cached_train_origin_labels"))
 
+def cache_test_set(args, test_set):
+    test_set_path = os.path.join(args.save_path, "cached_train_set")
+    if test_set is not None:
+        torch.save(test_set, test_set_path)
+
+def load_test_set(args):
+    test_set_path = os.path.join(args.prev_save_path, "cached_test_set")
+    test_set = None
+    if os.path.exists(test_set_path):
+        test_set = torch.load(test_set_path)
+    return test_set
+    
 def load_train_valid_set(args):
-    train_set = torch.load(os.path.join(args.prev_save_path, "cached_train_set"))
-    valid_set = torch.load(os.path.join(args.prev_save_path, "cached_valid_set"))
-    meta_set = torch.load(os.path.join(args.prev_save_path, "cached_meta_set"))
-    remaining_origin_labels = torch.load(os.path.join(args.prev_save_path, "cached_train_origin_labels"))
+    train_set_path = os.path.join(args.prev_save_path, "cached_train_set")
+    valid_set_path = os.path.join(args.prev_save_path, "cached_valid_set")
+    meta_set_path = os.path.join(args.prev_save_path, "cached_meta_set")
+    origin_label_path = os.path.join(args.prev_save_path, "cached_train_origin_labels")
+    if os.path.exists(train_set_path):
+        train_set = torch.load(train_set_path)
+    else:
+        train_set = None
+    
+    if os.path.exists(valid_set_path):
+        valid_set = torch.load(valid_set_path)
+    else:
+        valid_set = None
+    
+    if os.path.exists(meta_set_path):
+        meta_set = torch.load(meta_set_path)
+    else:
+        meta_set = None
+
+    if os.path.exists(origin_label_path):
+        remaining_origin_labels = torch.load(origin_label_path)
+    else:
+        remaining_origin_labels = None
     return train_set, valid_set, meta_set, remaining_origin_labels
 
 def evaluate_dataset_with_basic_models(args, dataset, model, criterion):
@@ -773,205 +809,256 @@ def generate_class_biased_dataset(trainset, args, testset, origin_labels):
     return trainset, origin_labels
 
 
+def generate_noisy_dataset(args, trainset):
+    flipped_labels = None
+    logging.info("add errors to train set")
+
+    # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+    # flipped_labels = obtain_flipped_labels(train_dataset, args)
+    if not args.load_dataset:
+        logging.info("Not loading dataset")
+        if args.adversarial_flip:
+            flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
+        else:
+            if args.biased_flip:
+                flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
+            else:
+                flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+        torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
+    else:
+        logging.info("Loading dataset")
+        flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
+        if not os.path.exists(flipped_label_dir):
+            if args.adversarial_flip:
+                flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
+            else:
+                if args.biased_flip:
+                    flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
+                else:
+                    flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+            torch.save(flipped_labels, flipped_label_dir)
+        flipped_labels = torch.load(flipped_label_dir)
+    trainset.targets = flipped_labels
+    return trainset
+
+
 def get_dataloader_for_meta(criterion, optimizer, args, split_method, pretrained_model=None, cached_sample_weights = None):
     validset = None
-    if args.dataset == 'cifar10':
-        # transform_train_list = [
-        #         transforms.RandomResizedCrop(size=32, scale=(0.2,1.)),
-        #         transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
-        #         transforms.RandomGrayscale(p=0.2),
-        #         transforms.RandomHorizontalFlip(),
-        #         transforms.ToTensor(),
-        #         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        #     ]
-        transform_train_list = [
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ]
-        transform_train = transforms.Compose(transform_train_list)
-        transform_test = transforms.Compose([
+    if args.load_dataset:
+        trainset, validset, _, origin_labels = load_train_valid_set(args)
+        testset = load_test_set(args)
+    else:
+
+
+        if args.dataset == 'cifar10':
+            # transform_train_list = [
+            #         transforms.RandomResizedCrop(size=32, scale=(0.2,1.)),
+            #         transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
+            #         transforms.RandomGrayscale(p=0.2),
+            #         transforms.RandomHorizontalFlip(),
+            #         transforms.ToTensor(),
+            #         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            #     ]
+            transform_train_list = [
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-            ])
-        trainset = torchvision.datasets.CIFAR10(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train)
+            ]
+            transform_train = transforms.Compose(transform_train_list)
+            transform_test = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                ])
+            trainset = torchvision.datasets.CIFAR10(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train)
 
-        testset = torchvision.datasets.CIFAR10(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
-        args.pool_len = 4
-        if type(trainset.data) is numpy.ndarray:
-            trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
-            testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
+            testset = torchvision.datasets.CIFAR10(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
+            args.pool_len = 4
+            if type(trainset.data) is numpy.ndarray:
+                trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
+                testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
 
-            origin_labels = numpy.copy(trainset.targets)
-        else:
-            trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
-            testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+                origin_labels = numpy.copy(trainset.targets)
+            else:
+                trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
+                testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
 
-            origin_labels = trainset.targets.clone()
+                origin_labels = trainset.targets.clone()
+        elif args.dataset == 'cifar100':
 
-    elif args.dataset == 'MNIST':
+            transform_train_list = [
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            ]
+            transform_train = transforms.Compose(transform_train_list)
+            transform_test = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                ])
+            trainset = torchvision.datasets.CIFAR100(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train)
 
-        transform_train = torchvision.transforms.Compose([
-                                    torchvision.transforms.ToTensor(),
-                                    torchvision.transforms.Normalize(
-                                        (0.1307,), (0.3081,))
-                                    ])
-        trainset = torchvision.datasets.MNIST(args.data_dir, train=True, download=True,
-                                    transform=transform_train)
+            testset = torchvision.datasets.CIFAR100(root=os.path.join(args.data_dir, 'CIFAR-100'), train=False, download=True, transform=transform_test)
+            args.pool_len = 4
+            if type(trainset.data) is numpy.ndarray:
+                trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
+                testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
 
-        transform_test = torchvision.transforms.Compose([
+                origin_labels = numpy.copy(trainset.targets)
+            else:
+                trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
+                testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+
+                origin_labels = trainset.targets.clone()
+        elif args.dataset == 'MNIST':
+
+            transform_train = torchvision.transforms.Compose([
                                         torchvision.transforms.ToTensor(),
                                         torchvision.transforms.Normalize(
                                             (0.1307,), (0.3081,))
                                         ])
+            trainset = torchvision.datasets.MNIST(args.data_dir, train=True, download=True,
+                                        transform=transform_train)
 
-        testset = torchvision.datasets.MNIST(args.data_dir, train=False, download=True,
-                                        transform=transform_test)
-        args.pool_len = 4
+            transform_test = torchvision.transforms.Compose([
+                                            torchvision.transforms.ToTensor(),
+                                            torchvision.transforms.Normalize(
+                                                (0.1307,), (0.3081,))
+                                            ])
 
-        if type(trainset.data) is numpy.ndarray:
-            trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
-            testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
-            origin_labels = numpy.copy(trainset.targets)
-        else:
-            trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
-            testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+            testset = torchvision.datasets.MNIST(args.data_dir, train=False, download=True,
+                                            transform=transform_test)
+            args.pool_len = 4
+
+            if type(trainset.data) is numpy.ndarray:
+                trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
+                testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
+                origin_labels = numpy.copy(trainset.targets)
+            else:
+                trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
+                testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+                origin_labels = trainset.targets.clone()
+
+        
+        elif args.dataset.startswith('sst'):
+            label_list = None
+            if args.dataset.startswith('sst2'):
+                sstprocess = SST2Processor(args.data_dir)
+                label_list = sstprocess.get_labels()
+            elif args.dataset.startswith('sst5'):
+                sstprocess = SST5Processor(args.data_dir)
+                label_list = sstprocess.get_labels()
+            trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
             origin_labels = trainset.targets.clone()
 
-    
-    elif args.dataset.startswith('sst'):
-        label_list = None
-        if args.dataset.startswith('sst2'):
-            sstprocess = SST2Processor(args.data_dir)
+        elif args.dataset.startswith('imdb'):
+            label_list = None
+            
+            sstprocess = imdb_Processor(args.data_dir)
             label_list = sstprocess.get_labels()
-        elif args.dataset.startswith('sst5'):
-            sstprocess = SST5Processor(args.data_dir)
-            label_list = sstprocess.get_labels()
-        trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
-        origin_labels = trainset.targets.clone()
+            trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
+            origin_labels = trainset.targets.clone()
+
+        
+        cache_train_valid_set(args, trainset, validset, None, origin_labels)
+        cache_test_set(args, testset)
+
+    metaset = None
+        
 
     valid_ratio = args.valid_ratio
     valid_count = int(len(trainset)*valid_ratio)
     args.valid_count = valid_count
 
-    remaining_origin_labels = []
-    if split_method == 'random':
-        logging.info("Split method: random")
-        if args.continue_label:
-            trainset, validset, metaset, origin_labels = load_train_valid_set(args)
-            trainset, new_metaset, remaining_origin_labels = random_partition_train_valid_dataset0(args, trainset, origin_labels)
-            # validset = concat_valid_set(validset, new_validset)
-            metaset =metaset.concat_validset(metaset, new_metaset)
-            # metaset = concat_valid_set(metaset, new_metaset)
-        else:
-            
-            
+    remaining_origin_labels = origin_labels
 
-            flipped_labels = None
-
-            if args.bias_classes:
-                trainset, origin_labels = generate_class_biased_dataset(trainset, args, testset, origin_labels)
-                # imb_trainset = datasets.ImbalanceDataset(trainset)
-                # trainset = trainset.get_subset_dataset(trainset, torch.nonzero(imb_trainset.mask).view(-1))
-                # origin_labels = origin_labels[imb_trainset.mask]
-                # logging.info(f"Total number of training samples: {trainset.data.shape[0]}")
-                # logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
-            
-            if args.flip_labels:
-                logging.info("add errors to train set")
-
-                # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
-                # flipped_labels = obtain_flipped_labels(train_dataset, args)
-                if not args.load_dataset:
-                    logging.info("Not loading dataset")
-                    if args.adversarial_flip:
-                        flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
-                    else:
-                        if args.biased_flip:
-                            flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
-                        else:
-                            flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
-                    torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
-                else:
-                    logging.info("Loading dataset")
-                    flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
-                    if not os.path.exists(flipped_label_dir):
-                        if args.adversarial_flip:
-                            flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
-                        else:
-                            if args.biased_flip:
-                                flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
-                            else:
-                                flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
-                        torch.save(flipped_labels, flipped_label_dir)
-                    flipped_labels = torch.load(flipped_label_dir)
-                trainset.targets = flipped_labels
-            trainset, metaset, remaining_origin_labels = random_partition_train_valid_dataset0(args, trainset, origin_labels)
-    elif split_method == 'cluster':
-        if args.continue_label:
-            trainset, validset, metaset, origin_labels = load_train_valid_set(args)
-            # evaluate_dataset_with_basic_models(args, trainset, pretrained_model, criterion)
-            # args.flip_labels = False
-            # trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
-
-
-            # if args.cluster_method_three:
-            #     # net, train_dataset,validset, train_transform, args, origin_labels
-            #     trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, validset, transform_train, args, origin_labels)
-            # else:
-            trainset, new_metaset, remaining_origin_labels = find_representative_samples0(criterion, optimizer, pretrained_model, trainset, metaset, args, origin_labels, cached_sample_weights = cached_sample_weights)
-
-            # metaset = concat_valid_set(metaset, new_metaset)
-            metaset = metaset.concat_validset(metaset, new_metaset)
-        else:
-            # if type(trainset.data) is numpy.ndarray:
-            #     trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
-            #     origin_labels = numpy.copy(trainset.targets)
-            # else:
-            #     trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
-            #     origin_labels = trainset.targets.clone()
-
-            flipped_labels = None
-
-            if args.bias_classes:
-                trainset, origin_labels = generate_class_biased_dataset(trainset, args, testset, origin_labels)
-            
-            if args.flip_labels:
-
-                logging.info("add errors to train set")
-
-                # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
-                # flipped_labels = obtain_flipped_labels(train_dataset, args)
-                if not args.load_dataset:
-                    # flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
-                    if args.biased_flip:
-                        flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
-                    else:
-                        flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
-                    torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
-                else:
-                    flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
-                    if not os.path.exists(flipped_label_dir):
-                        if args.biased_flip:
-                            flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
-                        else:
-                            flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
-
-
-                        # flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
-                        torch.save(flipped_labels, flipped_label_dir)
-                    flipped_labels = torch.load(flipped_label_dir)
-                trainset.targets = flipped_labels
-            # 
-            # if args.init_cluster_by_confident:
-            #     trainset, validset, metaset, remaining_origin_labels = init_sampling_valid_samples(pretrained_model, trainset, transform_train, args, origin_labels)
-            # else:
-            # if args.cluster_method_three:
-            #     trainset, validset, metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, transform_train, args, origin_labels)
-            # else:
-            trainset, metaset, remaining_origin_labels = find_representative_samples0(criterion, optimizer, pretrained_model, trainset, None, args, origin_labels, cached_sample_weights = cached_sample_weights)
+    if args.do_train:
+        if args.bias_classes:
+            trainset, origin_labels = generate_class_biased_dataset(trainset, args, testset, origin_labels)
+            # imb_trainset = datasets.ImbalanceDataset(trainset)
+            # trainset = trainset.get_subset_dataset(trainset, torch.nonzero(imb_trainset.mask).view(-1))
+            # origin_labels = origin_labels[imb_trainset.mask]
+            # logging.info(f"Total number of training samples: {trainset.data.shape[0]}")
+            # logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
         
+        if args.flip_labels:
+            trainset = generate_noisy_dataset(args, trainset)
+    if not args.do_train:
+        if split_method == 'random':
+            logging.info("Split method: random")
+            if args.continue_label:
+                trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+                trainset, new_metaset, remaining_origin_labels = random_partition_train_valid_dataset0(args, trainset, origin_labels)
+                # validset = concat_valid_set(validset, new_validset)
+                metaset =metaset.concat_validset(metaset, new_metaset)
+                # metaset = concat_valid_set(metaset, new_metaset)
+            else:                
+                trainset, metaset, remaining_origin_labels = random_partition_train_valid_dataset0(args, trainset, origin_labels)
+        elif split_method == 'cluster':
+            if args.continue_label:
+                trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+                # evaluate_dataset_with_basic_models(args, trainset, pretrained_model, criterion)
+                # args.flip_labels = False
+                # trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples0(pretrained_model, trainset, validset, transform_train, args, origin_labels, cached_sample_weights = cached_sample_weights)
+
+
+                # if args.cluster_method_three:
+                #     # net, train_dataset,validset, train_transform, args, origin_labels
+                #     trainset, new_validset, new_metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, validset, transform_train, args, origin_labels)
+                # else:
+                trainset, new_metaset, remaining_origin_labels = find_representative_samples0(criterion, optimizer, pretrained_model, trainset, metaset, args, origin_labels, cached_sample_weights = cached_sample_weights)
+
+                # metaset = concat_valid_set(metaset, new_metaset)
+                metaset = metaset.concat_validset(metaset, new_metaset)
+            else:
+                # if type(trainset.data) is numpy.ndarray:
+                #     trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
+                #     origin_labels = numpy.copy(trainset.targets)
+                # else:
+                #     trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
+                #     origin_labels = trainset.targets.clone()
+
+                flipped_labels = None
+
+                # if args.bias_classes:
+                #     trainset, origin_labels = generate_class_biased_dataset(trainset, args, testset, origin_labels)
+                
+                # if args.flip_labels:
+
+                #     logging.info("add errors to train set")
+
+                #     # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+                #     # flipped_labels = obtain_flipped_labels(train_dataset, args)
+                #     if not args.load_dataset:
+                #         # flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
+                #         if args.biased_flip:
+                #             flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
+                #         else:
+                #             flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+                #         torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
+                #     else:
+                #         flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
+                #         if not os.path.exists(flipped_label_dir):
+                #             if args.biased_flip:
+                #                 flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
+                #             else:
+                #                 flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+
+
+                #             # flipped_labels = random_flip_labels_on_training2(trainset, ratio = args.err_label_ratio)
+                #             torch.save(flipped_labels, flipped_label_dir)
+                #         flipped_labels = torch.load(flipped_label_dir)
+                #     trainset.targets = flipped_labels
+                # 
+                # if args.init_cluster_by_confident:
+                #     trainset, validset, metaset, remaining_origin_labels = init_sampling_valid_samples(pretrained_model, trainset, transform_train, args, origin_labels)
+                # else:
+                # if args.cluster_method_three:
+                #     trainset, validset, metaset, remaining_origin_labels = find_representative_samples1(pretrained_model, trainset, transform_train, args, origin_labels)
+                # else:
+                trainset, metaset, remaining_origin_labels = find_representative_samples0(criterion, optimizer, pretrained_model, trainset, None, args, origin_labels, cached_sample_weights = cached_sample_weights)
+            
     # if args.flip_labels:
 
     #     # train_dataset, _ = random_flip_labels_on_training(train_dataset, ratio = args.err_label_ratio)
@@ -983,17 +1070,27 @@ def get_dataloader_for_meta(criterion, optimizer, args, split_method, pretrained
     if validset is None:
         validset, testset = randomly_produce_valid_set(testset, transform_test, rate = 0.1)
     cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
+    cache_test_set(args, testset)
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         trainset,
         num_replicas=args.world_size,
         rank=args.local_rank,
     )
-    meta_sampler = torch.utils.data.distributed.DistributedSampler(
-        metaset,
-        num_replicas=args.world_size,
-        rank=args.local_rank,
-    )
+    metaloader = None
+    if metaset is not None:
+        meta_sampler = torch.utils.data.distributed.DistributedSampler(
+            metaset,
+            num_replicas=args.world_size,
+            rank=args.local_rank,
+        )
+        metaloader = torch.utils.data.DataLoader(
+            metaset,
+            batch_size=args.test_batch_size,
+            num_workers=args.num_workers,
+            pin_memory=True,
+            sampler=meta_sampler,
+        )
 
     trainloader = torch.utils.data.DataLoader(
         trainset,
@@ -1002,13 +1099,7 @@ def get_dataloader_for_meta(criterion, optimizer, args, split_method, pretrained
         pin_memory=True,
         sampler=train_sampler,
     )
-    metaloader = torch.utils.data.DataLoader(
-        metaset,
-        batch_size=args.test_batch_size,
-        num_workers=args.num_workers,
-        pin_memory=True,
-        sampler=meta_sampler,
-    )
+    
     validloader = torch.utils.data.DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
 

@@ -910,7 +910,10 @@ def main2(args, logger):
         optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr)
     else:
         if args.dataset.startswith('cifar'):
-            pretrained_rep_net = ResNet18().cuda()
+            if args.dataset == 'cifar10':
+                pretrained_rep_net = ResNet18().cuda()
+            else:
+                pretrained_rep_net = ResNet18(num_classes=100).cuda()
             criterion = torch.nn.CrossEntropyLoss()
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
             optimizer.param_groups[0]['initial_lr'] = args.lr
@@ -927,7 +930,13 @@ def main2(args, logger):
                     criterion = torch.nn.CrossEntropyLoss()
                     optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
                 else:
-                    raise NotImplementedError
+                    if args.dataset.startswith('imdb'):
+                        pretrained_rep_net = custom_Bert(2)
+                        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+                        criterion = torch.nn.CrossEntropyLoss()
+                        optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+                    else:
+                        raise NotImplementedError
         # pretrained_rep_net = ResNet18().cuda()
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -977,7 +986,7 @@ def main2(args, logger):
 
     if args.bias_classes:
         num_train = len(trainloader.dataset.targets)
-        num_val = len(metaloader.dataset.targets)
+        num_val = len(validloader.dataset.targets)
         num_test = len(testloader.dataset.targets)
         if type(trainloader.dataset.targets) is numpy.ndarray:
             vsum = np.sum
@@ -995,7 +1004,7 @@ def main2(args, logger):
                 {vsum(trainloader.dataset.targets == c) / num_train}")
         for c in range(10):
             logger.info(f"Validation set class {c} percentage: \
-                {vsum(metaloader.dataset.targets == c) / num_val}")
+                {vsum(validloader.dataset.targets == c) / num_val}")
         for c in range(10):
             logger.info(f"Test set class {c} percentage: \
                 {vsum(testloader.dataset.targets == c) / num_test}")
@@ -1009,7 +1018,10 @@ def main2(args, logger):
         
     else:
         if args.dataset.startswith('cifar'):
-            net = ResNet18()
+            if args.dataset == 'cifar10':
+                net = ResNet18()
+            elif args.dataset == 'cifar100':
+                net = ResNet18(num_classes=100)
         else:
             if args.dataset.startswith('sst2'):
                 net = custom_Bert(2)
@@ -1019,7 +1031,10 @@ def main2(args, logger):
                     net = custom_Bert(5)
                     # net = init_model_with_pretrained_model_weights(net)
                 else:
-                    raise NotImplementedError
+                    if args.dataset.startswith('imdb'):
+                        net = custom_Bert(2)
+                    else:
+                        raise NotImplementedError
 
     if args.use_pretrained_model:
         # net = load_pretrained_model(args, net)

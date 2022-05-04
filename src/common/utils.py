@@ -53,5 +53,12 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
             if args.dataset.startswith('sst'):
                 optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
                 scheduler = None
+            else:
+                if args.dataset.startswith('imdb'):
+                    # pretrained_rep_net = custom_Bert(2)
+                    # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+                    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+                    scheduler = None
+
 
     return optimizer, scheduler
