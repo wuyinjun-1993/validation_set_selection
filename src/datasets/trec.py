@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from datasets.sst import *
 
 class trec_Processor(DatasetProcessor):
-    """Processor for the imdb data set."""
+    """Processor for the trec data set."""
     # def __init__(self, data_path):
     #     self.data_path = data_path
     #     prepare_data(data_path)
