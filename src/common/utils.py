@@ -32,7 +32,7 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
         optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
         scheduler = None
     else:
-        if args.dataset.startswith('cifar'):
+        if args.dataset == 'cifar10':
             optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
             optimizer.param_groups[0]['initial_lr'] = args.lr
             if args.do_train:
@@ -50,15 +50,33 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
                 else:
                     scheduler = None
         else:
-            if args.dataset.startswith('sst'):
-                optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-                scheduler = None
+            if args.dataset == 'cifar100':
+                optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+                optimizer.param_groups[0]['initial_lr'] = args.lr
+                if args.do_train:
+                    mile_stones_epochs = [60, 120, 160]
+                    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
+                                                                milestones=mile_stones_epochs, last_epoch=start_epoch-1, gamma = 0.2)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+
+                else:
+                    if args.use_pretrained_model:
+                        mile_stones_epochs = [50, 100, 160]
+                    else:
+                        mile_stones_epochs = [60, 120, 160]
+                    if args.lr_decay:
+                        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1, gamma = 0.2)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+                    else:
+                        scheduler = None
             else:
-                if args.dataset.startswith('imdb'):
-                    # pretrained_rep_net = custom_Bert(2)
-                    # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+                if args.dataset.startswith('sst'):
                     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
                     scheduler = None
+                else:
+                    if args.dataset.startswith('imdb'):
+                        # pretrained_rep_net = custom_Bert(2)
+                        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+                        optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+                        scheduler = None
 
 
     return optimizer, scheduler
