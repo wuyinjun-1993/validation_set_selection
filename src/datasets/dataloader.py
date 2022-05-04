@@ -703,7 +703,7 @@ def cache_train_valid_set(args, train_set, valid_set, meta_set, remaining_origin
         torch.save(remaining_origin_labels, os.path.join(args.save_path, "cached_train_origin_labels"))
 
 def cache_test_set(args, test_set):
-    test_set_path = os.path.join(args.save_path, "cached_train_set")
+    test_set_path = os.path.join(args.save_path, "cached_test_set")
     if test_set is not None:
         torch.save(test_set, test_set_path)
 
