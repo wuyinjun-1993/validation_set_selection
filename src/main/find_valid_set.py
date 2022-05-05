@@ -167,10 +167,10 @@ def cluster_per_class(args, sample_representation_vec_ls, sample_id_ls, full_sim
             if is_cuda:
                 curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
             
-            cluster_dist_ls_tensor = pairwise_distance_function(curr_cluster_sample_representation, cluster_centers[cluster_id].view(1,-1), is_cuda = is_cuda)
+            cluster_dist_ls_tensor = pairwise_distance_function(curr_cluster_sample_representation, cluster_centers[cluster_id].view(1,-1), is_cuda = is_cuda, weight_by_norm=args.weight_by_norm)
             
-            if args.weight_by_norm:
-                cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, cluster_centers[cluster_id].view(1,-1), all_layer)
+            # if args.weight_by_norm:
+            #     cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, cluster_centers[cluster_id].view(1,-1), all_layer)
             cluster_dist_ls_tensor = cluster_dist_ls_tensor.view(-1)
 
             sorted_dist_tensor, sorted_sample_idx_tensor = torch.sort(cluster_dist_ls_tensor, descending=False)
@@ -191,10 +191,10 @@ def cluster_per_class(args, sample_representation_vec_ls, sample_id_ls, full_sim
                 if is_cuda:
                     curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
                 curr_cluster_sample_representation_ls.append(curr_cluster_sample_representation)
-            cluster_dist_ls_tensor = pairwise_distance_function(curr_cluster_sample_representation_ls, curr_cluster_center_ls, is_cuda = is_cuda)
+            cluster_dist_ls_tensor = pairwise_distance_function(curr_cluster_sample_representation_ls, curr_cluster_center_ls, is_cuda = is_cuda, weight_by_norm=args.weight_by_norm)
 
-            if args.weight_by_norm:
-                cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, curr_cluster_center_ls,all_layer)
+            # if args.weight_by_norm:
+            #     cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, curr_cluster_center_ls,all_layer)
 
             cluster_dist_ls_tensor = cluster_dist_ls_tensor.view(-1)
 
