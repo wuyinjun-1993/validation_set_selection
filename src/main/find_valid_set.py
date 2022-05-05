@@ -1254,7 +1254,7 @@ def get_extra_representations_last_layer2(train_dataset, args, train_loader, cri
     if not args.all_layer and not args.all_layer2:
         full_sample_representation_vec_ls = [full_sample_representation_vec_ls]
 
-    for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+    for ep in range(start_epoch_id, 50, args.model_prov_period):
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:
             continue

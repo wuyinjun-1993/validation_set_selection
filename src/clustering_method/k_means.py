@@ -332,12 +332,12 @@ def kmeans(
             full_centroid_state = torch.cat([existing_cluster_mean_ls, full_centroid_state], dim = 0)
 
         if all_layer:
-            dis = pairwise_distance_function(X, full_centroid_state,is_cuda, agg = agg_sim_array)
+            dis = pairwise_distance_function(X, full_centroid_state,is_cuda, agg = agg_sim_array, weight_by_norm=weight_by_norm)
         else:
-            dis = pairwise_distance_function(X, full_centroid_state,is_cuda)
+            dis = pairwise_distance_function(X, full_centroid_state,is_cuda, weight_by_norm=weight_by_norm)
 
-        if weight_by_norm:
-            dis = rescale_dist_by_cluster_mean_norm(dis, full_centroid_state, all_layer)
+        # if weight_by_norm:
+        #     dis = rescale_dist_by_cluster_mean_norm(dis, full_centroid_state, all_layer)
 
         choice_cluster = torch.argmin(dis, dim=1)
 
@@ -982,7 +982,7 @@ def pairwise_distance(data1, data2, is_cuda=False, batch_size = 128):
     return dis
 
 
-def pairwise_cosine(data1, data2, is_cuda=False,  batch_size = 128):
+def pairwise_cosine(data1, data2, is_cuda=False,  batch_size = 128, weight_by_norm = False):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     if is_cuda:
@@ -1005,8 +1005,11 @@ def pairwise_cosine(data1, data2, is_cuda=False,  batch_size = 128):
         if is_cuda:
             curr_A = curr_A.cuda()
         curr_A_normalized = curr_A / curr_A.norm(dim=-1, keepdim=True)
-        B_normalized = B / B.norm(dim=-1, keepdim=True)
-        curr_cosine = curr_A_normalized * B_normalized    
+        if not weight_by_norm:
+            B_normalized = B / B.norm(dim=-1, keepdim=True)
+            curr_cosine = curr_A_normalized * B_normalized    
+        else:
+            curr_cosine = curr_A_normalized * B
         curr_cosine_dis = 1 - torch.abs(curr_cosine.sum(dim=-1)).squeeze(1)
         full_dist_ls.append(curr_cosine_dis)
 
@@ -1233,7 +1236,7 @@ def pairwise_cosine_full_by_sample_ids(full_cosin_sim, sample_ids_ls, is_cuda=Fa
 
 
 
-def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg = 'mean'):
+def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg = 'mean', weight_by_norm=False):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     B_ls = []
@@ -1287,8 +1290,13 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg
             # curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1))
             # cosine_dis_ls.append(curr_cosine_dis)
         total_cosin_ls = torch.sum(torch.stack(inner_prod_ls, dim = 1), dim=1)
-        total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
-        max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
+
+        if not weight_by_norm:
+            total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
+            max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
+        else:
+            total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.ones_like(torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1)).unsqueeze(0))
+            max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
         # if agg == 'mean':
         # max_cosine_sim = torch.mean(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
         # else:
