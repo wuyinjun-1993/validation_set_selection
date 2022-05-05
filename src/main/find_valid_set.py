@@ -1254,8 +1254,9 @@ def get_extra_representations_last_layer2(train_dataset, args, train_loader, cri
     if not args.all_layer and not args.all_layer2:
         full_sample_representation_vec_ls = [full_sample_representation_vec_ls]
 
+    epoch_count = 0 
     for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
-        if len(full_sample_representation_vec_ls) > 10:
+        if epoch_count > 20:
             break
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:
@@ -1267,6 +1268,8 @@ def get_extra_representations_last_layer2(train_dataset, args, train_loader, cri
             full_sample_representation_vec_ls.extend(sample_representation_vec_ls)
         else:
             full_sample_representation_vec_ls.append(sample_representation_vec_ls)
+
+        epoch_count += 1
 
     return full_sample_representation_vec_ls
 
