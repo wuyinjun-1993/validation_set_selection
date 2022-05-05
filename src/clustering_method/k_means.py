@@ -289,14 +289,14 @@ def kmeans(
         for idx in range(len(X)):
             X[idx] = X[idx].float()
 
-    # if weight_by_norm:
-    #     if not all_layer:
-    #         sample_norm_ls = torch.norm(X,dim=1)
-    #     else:
-    #         sample_norm_ls = torch.sqrt(torch.sum(torch.stack([torch.norm(X[k],dim=1)**2 for k in range(len(X))],dim=1),dim=1))
+    if weight_by_norm:
+        if not all_layer:
+            sample_norm_ls = torch.norm(X,dim=1)
+        else:
+            sample_norm_ls = torch.sqrt(torch.sum(torch.stack([torch.norm(X[k],dim=1)**2 for k in range(len(X))],dim=1),dim=1))
 
-    # else:
-    #     sample_norm_ls = None
+    else:
+        sample_norm_ls = None
     curr_sample_weights = None
     if sample_weights is not None:
         curr_sample_weights = sample_weights.clone()
@@ -349,7 +349,10 @@ def kmeans(
         
 
         for index in range(num_clusters):
-            selected = torch.nonzero(choice_cluster == index).squeeze()
+            selected = torch.nonzero(choice_cluster == index).view(-1)
+            selected_sample_norm = None
+            if sample_norm_ls is not None:
+                selected_sample_norm = sample_norm_ls[selected]
             if torch.sum(choice_cluster == index) <= 0:
                 continue
 
@@ -371,9 +374,15 @@ def kmeans(
                     selected = selected.cuda()
 
                 if selected_sample_weights is None:
-                    selected_state = selected.mean(dim=0)
+                    if selected_sample_norm is None:
+                        selected_state = selected.mean(dim=0)
+                    else:
+                        selected_state = selected.sum(dim=0)/torch.sum(selected_sample_norm)
                 else:
-                    selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
+                    if selected_sample_norm is None:
+                        selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
+                    else:
+                        selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights.view(-1)*selected_sample_norm.view(-1))
                 if is_cuda:
                     selected_state = selected_state.cuda()
 
