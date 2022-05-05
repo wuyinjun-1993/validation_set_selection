@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from tqdm import tqdm
+import sys
 
 
 def initialize(X, num_clusters, all_layer = False):
@@ -241,6 +242,62 @@ def rescale_dist_by_cluster_mean_norm(dist, cluster_mean_ls, all_layer = False):
 
     return dist
 
+
+def kmeans_init(data, num_clusters, distance, all_layer,is_cuda, weight_by_norm = False):
+    centroids = []
+    
+    if not all_layer:
+        num_samples = data.shape[0]
+        rand_sampled_id = np.random.randint(
+            data.shape[0])
+        centroids.append(data[rand_sampled_id, :])
+    else:
+        num_samples = data[0].shape[0]
+        rand_sampled_id = np.random.randint(
+            data[0].shape[0])
+        centroids.extend([data[k][rand_sampled_id:rand_sampled_id+1, :] for k in range(len(data))])
+    # plot(data, np.array(centroids))
+  
+    ## compute remaining k - 1 centroids
+    for c_id in range(num_clusters - 1):
+         
+        ## initialize a list to store distances of data
+        ## points from nearest centroid
+        # dist = []
+
+        full_dist = distance(data, centroids, is_cuda, weight_by_norm = weight_by_norm)
+        dist = torch.min(full_dist, dim = 1)[0]
+        # for i in range(num_samples):
+        #     if not all_layer:
+        #         point = data[i, :]
+        #     else:
+        #         point =[data[s_id][i, :] for s_id in range(len(data))]
+        #     d = sys.maxsize
+
+            
+        #     ## compute distance of 'point' from each of the previously
+        #     ## selected centroid and store the minimum distance
+        #     for j in range(len(centroids)):
+        #         temp_dist = distance(point, centroids[j])
+        #         d = min(d, temp_dist)
+        #     dist.append(d)
+             
+        # ## select data point with maximum distance as our next centroid
+        # dist = np.array(dist)
+        max_dis_sample_id = torch.argmax(dist)
+        if not all_layer:
+            next_centroid = data[max_dis_sample_id, :]
+            centroids.append(next_centroid)
+        else:
+            next_centroid = [data[k][max_dis_sample_id:max_dis_sample_id+1, :] for k in range(len(data))]
+            centroids = [torch.cat([centroids[k],next_centroid[k]]) for k in range(len(next_centroid))]
+
+
+        dist = []
+        # plot(data, np.array(centroids))
+    return centroids
+
+
 def kmeans(
         # args,
         X,
@@ -319,7 +376,8 @@ def kmeans(
     #     X = X.cuda()
 
     # initialize
-    initial_state = initialize(X, num_clusters, all_layer = all_layer)
+    # initial_state = initialize(X, num_clusters, all_layer = all_layer)
+    initial_state = kmeans_init(X, num_clusters, pairwise_distance_function, all_layer, is_cuda, weight_by_norm=weight_by_norm)
     if is_cuda:
         if not all_layer:
             initial_state = initial_state.cuda()
