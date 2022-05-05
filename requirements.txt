@@ -10,3 +10,5 @@ texar-pytorch
 tensorflow
 pytorch_transformers
 torchtext
+spacy
+nltk
