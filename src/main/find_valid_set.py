@@ -1255,7 +1255,7 @@ def get_extra_representations_last_layer2(train_dataset, args, train_loader, cri
         full_sample_representation_vec_ls = [full_sample_representation_vec_ls]
 
     for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
-        if len(full_sample_representation_vec_ls) > 1:
+        if len(full_sample_representation_vec_ls) > 10:
             break
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:
