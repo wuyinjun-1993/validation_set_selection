@@ -4,6 +4,7 @@
 
 /.gitignore_local
 **/.vscode
+**/.pyc
 /.project
 /.pydevproject
 
