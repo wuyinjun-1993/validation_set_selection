@@ -289,23 +289,23 @@ def kmeans(
         for idx in range(len(X)):
             X[idx] = X[idx].float()
 
-    if weight_by_norm:
-        if not all_layer:
-            sample_norm_ls = torch.norm(X,dim=1)
-        else:
-            sample_norm_ls = torch.sqrt(torch.sum(torch.stack([torch.norm(X[k],dim=1)**2 for k in range(len(X))],dim=1),dim=1))
+    # if weight_by_norm:
+    #     if not all_layer:
+    #         sample_norm_ls = torch.norm(X,dim=1)
+    #     else:
+    #         sample_norm_ls = torch.sqrt(torch.sum(torch.stack([torch.norm(X[k],dim=1)**2 for k in range(len(X))],dim=1),dim=1))
 
-    else:
-        sample_norm_ls = None
+    # else:
+    #     sample_norm_ls = None
     curr_sample_weights = None
     if sample_weights is not None:
         curr_sample_weights = sample_weights.clone()
 
-    if weight_by_norm:
-        if curr_sample_weights is None:
-            curr_sample_weights = sample_norm_ls.clone()
-        else:
-            curr_sample_weights = (sample_norm_ls*sample_weights).clone()
+    # if weight_by_norm:
+    #     if curr_sample_weights is None:
+    #         curr_sample_weights = sample_norm_ls.clone()
+    #     else:
+    #         curr_sample_weights = (sample_norm_ls*sample_weights).clone()
     # transfer to device
     # if args.cuda:
     #     X = X.cuda()
