@@ -307,7 +307,7 @@ def kmeans(
         is_cuda=False,
         sample_weights = None,
         existing_cluster_mean_ls = None,
-        total_iter_count=1000,
+        total_iter_count=500,
         all_layer = False,
         agg_sim_array = 'mean',
         weight_by_norm = False

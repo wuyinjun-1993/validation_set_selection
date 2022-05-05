@@ -51,26 +51,59 @@ def find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance
 
     print(s_score_ls)
 
-def cluster_per_class(args, sample_representation_vec_ls, sample_id_ls, full_sim_mat = None, valid_count_per_class = 10, num_clusters = 4, sample_weights = None, existing_cluster_centroids = None, cosin_distance = False, is_cuda = False, all_layer = False, return_cluster_info = False):
-    
-    if num_clusters > 0:
-
-        if args.full_model_out:
+def do_cluster(args, num_clusters, sample_representation_vec_ls, is_cuda, cosin_distance, sample_weights, existing_cluster_centroids = None, all_layer = False):
+    if args.full_model_out:
             cluster_ids_x, cluster_centers = kmeans(
                 X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cross', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
 
+    else:
+        if not cosin_distance:
+            cluster_ids_x, cluster_centers = kmeans(
+                X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
+
+
+            # distance = 'euclidean'
+            # test_s_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, num_clusters, distance = 'euclidean')
         else:
-            if not cosin_distance:
-                cluster_ids_x, cluster_centers = kmeans(
-                    X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
+            # if not args.all_layer_grad:
+            cluster_ids_x, cluster_centers = kmeans(
+                X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
+
+    return cluster_ids_x, cluster_centers
 
 
-                # distance = 'euclidean'
-                # test_s_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, num_clusters, distance = 'euclidean')
-            else:
-                # if not args.all_layer_grad:
-                cluster_ids_x, cluster_centers = kmeans(
-                    X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
+def cluster_per_class(args, sample_representation_vec_ls, sample_id_ls, full_sim_mat = None, valid_count_per_class = 10, num_clusters = 4, sample_weights = None, existing_cluster_centroids = None, cosin_distance = False, is_cuda = False, all_layer = False, return_cluster_info = False):
+    
+    if num_clusters > 0:
+        cluster_ids_x, cluster_centers = do_cluster(args, num_clusters, sample_representation_vec_ls, is_cuda, cosin_distance, sample_weights, existing_cluster_centroids = existing_cluster_centroids, all_layer = all_layer)
+
+        unique_cluster_count = len(cluster_ids_x.unique())
+        args.logger.info("cluster count before and after:(%d,%d)"%(num_clusters, unique_cluster_count))
+        while(True):
+            cluster_ids_x, cluster_centers = do_cluster(args, unique_cluster_count, sample_representation_vec_ls, is_cuda, cosin_distance, sample_weights, existing_cluster_centroids = existing_cluster_centroids, all_layer = all_layer)
+
+            new_unique_cluster_count = len(cluster_ids_x.unique())
+            args.logger.info("cluster count before and after:(%d,%d)"%(unique_cluster_count, new_unique_cluster_count))
+
+            if new_unique_cluster_count >= unique_cluster_count:
+                break
+            unique_cluster_count = new_unique_cluster_count
+        # if args.full_model_out:
+        #     cluster_ids_x, cluster_centers = kmeans(
+        #         X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cross', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
+
+        # else:
+        #     if not cosin_distance:
+        #         cluster_ids_x, cluster_centers = kmeans(
+        #             X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
+
+
+        #         # distance = 'euclidean'
+        #         # test_s_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, num_clusters, distance = 'euclidean')
+        #     else:
+        #         # if not args.all_layer_grad:
+        #         cluster_ids_x, cluster_centers = kmeans(
+        #             X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
             # else:
             #     cluster_assignment_file_name = os.path.join(args.save_path, "cluster_assignments")
 
