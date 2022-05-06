@@ -474,7 +474,7 @@ def meta_learning_model(
                 curr_ilp_learning_rate = args.meta_lr*(0.1**(ms_idx))
                 logger.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
             else:
-                if ep > 100:
+                if ep > 120:
                     curr_ilp_learning_rate = args.meta_lr*0.1
                     logger.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
             # min_valid_loss_epoch = numpy.argmin(numpy.array(valid_loss_ls))

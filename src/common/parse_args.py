@@ -14,9 +14,19 @@ def parse_args(args=None):
         help='initialize the sample weights with a rectified gaussian')
 
     parser.add_argument('--all_layer', action='store_true', help='use GPU')
+    parser.add_argument('--all_layer2', action='store_true', help='use GPU')
     parser.add_argument('--all_layer_grad', action='store_true', help='use GPU')
     parser.add_argument('--all_layer_grad_greedy', action='store_true', help='use GPU')
     parser.add_argument('--all_layer_grad_no_full_loss', action='store_true', help='use GPU')
+    parser.add_argument('--weight_by_norm', action='store_true', help='use GPU')
+    
+    parser.add_argument('--grad_layer_depth', default=1, type=int, help='capture model_prov')
+    # sampled_param_count
+
+    parser.add_argument('--sampled_param_count', default=0, type=int, help='capture model_prov')
+    parser.add_argument('--all_layer_sim_agg', default="mean", type=str, help='capture model_prov')
+
+    parser.add_argument('--full_model_out', action='store_true', help='use GPU')
 
     parser.add_argument('--cluster_no_reweighting', action='store_true', help='use GPU')
     parser.add_argument('--flip_labels', action='store_true', help='flip labels')
