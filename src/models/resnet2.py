@@ -134,22 +134,22 @@ class ResNet(nn.Module):
 
         return output
 
-def ResNet18(num_classes = 10):
+def resnet18(num_classes = 10):
     """ return a ResNet 18 object
     """
     return ResNet(BasicBlock, [2, 2, 2, 2],num_classes=num_classes)
 
-def ResNet34(num_classes = 10):
+def resnet34(num_classes = 10):
     """ return a ResNet 34 object
     """
     return ResNet(BasicBlock, [3, 4, 6, 3],num_classes=num_classes)
 
-def ResNet50(num_classes = 10):
+def resnet50(num_classes = 10):
     """ return a ResNet 50 object
     """
     return ResNet(BottleNeck, [3, 4, 6, 3],num_classes=num_classes)
 
-def ResNet101(num_classes = 10):
+def resnet101(num_classes = 10):
     """ return a ResNet 101 object
     """
     return ResNet(BottleNeck, [3, 4, 23, 3],num_classes=num_classes)

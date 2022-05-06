@@ -1612,7 +1612,10 @@ def determine_new_valid_ids(args, valid_ids, new_valid_representations, existing
 
     sorted_min_distance, sorted_min_sample_ids = torch.sort(nearset_new_valid_distance, descending=True)
 
-    selected_sample_ids = sorted_min_sample_ids[0:valid_count - existing_valid_count]
+    if args.total_valid_sample_count > 0 and args.total_valid_sample_count < valid_count:
+        selected_sample_ids = sorted_min_sample_ids[0:args.total_valid_sample_count - existing_valid_count]
+    else:
+        selected_sample_ids = sorted_min_sample_ids[0:valid_count - existing_valid_count]
 
     remaining_valid_ids = valid_ids[selected_sample_ids]
 
