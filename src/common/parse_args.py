@@ -32,6 +32,7 @@ def parse_args(args=None):
     parser.add_argument('--flip_labels', action='store_true', help='flip labels')
     parser.add_argument('--adversarial_flip', action='store_true', help='flip labels')
     parser.add_argument('--bias_classes', action='store_true', help='Create class bias')
+    parser.add_argument('--imb_factor', default=1.0, type=float, help='Create class bias')
     parser.add_argument('--l1_loss', action='store_true', help='Use the L1 loss for the basic learning step')
     parser.add_argument('--soft_bootstrapping_loss', action='store_true', help='Use the Bootstrapping loss for the basic learning step')
     parser.add_argument('--hard_bootstrapping_loss', action='store_true', help='Use the Bootstrapping loss for the basic learning step')
@@ -57,6 +58,7 @@ def parse_args(args=None):
 
     parser.add_argument('--do_train', action='store_true', help='do training')
     parser.add_argument('--active_learning', action='store_true', help='perform training with active learning')
+    parser.add_argument('--active_select', action='store_true', help='perform training with active learning')
     parser.add_argument('--load_cached_weights', action='store_true', help='load_cached_weights')
     parser.add_argument('--lr_decay', action='store_true', help='load_cached_weights')
 
