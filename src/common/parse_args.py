@@ -17,7 +17,8 @@ def parse_args(args=None):
     parser.add_argument('--all_layer_grad_greedy', action='store_true', help='use GPU')
     parser.add_argument('--all_layer_grad_no_full_loss', action='store_true', help='use GPU')
     parser.add_argument('--weight_by_norm', action='store_true', help='use GPU')
-    
+    parser.add_argument('--warm', type=int, default=1, help='warm up training phase')
+
     parser.add_argument('--grad_layer_depth', default=1, type=int, help='capture model_prov')
     # sampled_param_count
 

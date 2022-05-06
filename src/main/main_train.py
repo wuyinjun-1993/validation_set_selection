@@ -20,7 +20,7 @@ import models
 from lib.NCECriterion import NCESoftmaxLoss
 from lib.lr_scheduler import get_scheduler
 from lib.BootstrappingLoss import SoftBootstrappingLoss, HardBootstrappingLoss
-from models.resnet import *
+from models.resnet2 import *
 from models.bert import *
 import collections
 
@@ -524,7 +524,7 @@ def update_lr(optimizer, lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
-def basic_train(train_loader, valid_loader, test_loader, criterion, args, network, optimizer, scheduler = None):
+def basic_train(train_loader, valid_loader, test_loader, criterion, args, network, optimizer, scheduler = None, warmup_scheduler = None):
 
     network.train()
     curr_lr = args.lr
@@ -547,6 +547,8 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args, networ
             loss = criterion(output, target)
             loss.backward()
             optimizer.step()
+            # if epoch < args.warm and warmup_scheduler is not None:
+            #     warmup_scheduler.step()
         if scheduler is not None:
             scheduler.step()
             # if batch_idx % log_interval == 0:
@@ -1059,9 +1061,15 @@ def main2(args, logger):
     net = DDP(net, device_ids=[args.local_rank])
     optimizer, scheduler = obtain_optimizer_scheduler(args, net, start_epoch = start_epoch)
     
+    warmup_scheduler = None
+
+    # if args.dataset == 'cifar100':
+    #     iter_per_epoch = len(trainloader)
+    #     warmup_scheduler = WarmUpLR(optimizer, iter_per_epoch * args.warm)
+
     if args.do_train:
         logger.info("start basic training")
-        basic_train(trainloader, validloader, testloader, criterion, args, net, optimizer, scheduler = scheduler)
+        basic_train(trainloader, validloader, testloader, criterion, args, net, optimizer, scheduler = scheduler, warmup_scheduler=warmup_scheduler)
     else:
         logger.info("start meta training")
         logger.info("meta dataset size::%d"%(len(metaloader.dataset)))
