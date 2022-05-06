@@ -1671,7 +1671,7 @@ def get_representative_valid_ids2_3(train_dataset, criterion, optimizer, train_l
     print()
     
     if existing_valid_representation is not None:
-        uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, existing_valid_representation, valid_sample_representation_tensor, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, existing_valid_representation, valid_sample_representation_tensor, cluster_max_radius,  cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
         valid_ids = uncovered_valid_sample_ids
         valid_sample_representation_tensor = [valid_sample_representation_tensor[k][uncovered_valid_ids] for k in range(len(valid_sample_representation_tensor))]
 
