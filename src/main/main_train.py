@@ -20,7 +20,7 @@ import models
 from lib.NCECriterion import NCESoftmaxLoss
 from lib.lr_scheduler import get_scheduler
 from lib.BootstrappingLoss import SoftBootstrappingLoss, HardBootstrappingLoss
-from models.resnet2 import *
+from models.resnet import *
 from models.bert import *
 import collections
 
