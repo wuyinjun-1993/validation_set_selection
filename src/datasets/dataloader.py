@@ -372,64 +372,6 @@ def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimi
 
 
 
-def determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representations, valid_count, cosine_dist = False, all_layer = False, is_cuda = False):
-    existing_valid_count = 0
-    if all_layer:
-        existing_valid_count = existing_valid_representations[0].shape[0]
-    else:
-        existing_valid_count = existing_valid_representations.shape[0]
-    if not args.all_layer_grad:
-
-        if not cosine_dist:
-            if not all_layer:
-                existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
-            else:
-                existing_new_dists = pairwise_distance_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
-        else:
-            if not all_layer:
-                existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
-            else:
-                existing_new_dists = pairwise_cosine_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
-    
-    else:
-        existing_new_dists = pairwise_cosine2(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
-
-
-    nearset_new_valid_distance,_ = torch.min(existing_new_dists, dim = 0)
-
-    sorted_min_distance, sorted_min_sample_ids = torch.sort(nearset_new_valid_distance, descending=True)
-
-    remaining_valid_ids = valid_ids[sorted_min_sample_ids[0:valid_count - existing_valid_count]]
-    
-
-    
-
-
-
-    # nearset_new_valid_ids = torch.argmin(existing_new_dists, dim = 1)
-
-
-    # unique_nearest_new_valid_ids = torch.unique(nearset_new_valid_ids)
-
-    # remaining_new_valid_id_tensor =  torch.ones(new_valid_representations.shape[0])
-
-    # remaining_new_valid_id_tensor[unique_nearest_new_valid_ids] = 0
-
-    # remaining_valid_ids = valid_ids[remaining_new_valid_id_tensor.nonzero().view(-1)]
-
-    # if len(remaining_valid_ids) > valid_count - existing_valid_representations.shape[0]:
-    #     existing_new_dists = existing_new_dists[:, remaining_new_valid_id_tensor.nonzero().view(-1)]
-    #     nearset_new_valid_distances, nearset_new_valid_ids = torch.min(existing_new_dists, dim = 0)
-
-    #     sorted_nearset_new_valid_distances, sorted_nearset_new_valid_ids = torch.sort(nearset_new_valid_distances.view(-1), descending=False)
-
-    #     remaining_valid_ids = remaining_valid_ids[nearset_new_valid_ids[sorted_nearset_new_valid_ids[len(remaining_valid_ids) -(valid_count - existing_valid_representations.shape[0]):]]]
-
-        # nearset_new_valid_ids[sorted_nearset_new_valid_ids]
-
-
-    return remaining_valid_ids
-
 def init_sampling_valid_samples(net, train_dataset, train_transform, args, origin_labels):
     trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
 
