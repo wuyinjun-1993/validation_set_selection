@@ -423,6 +423,10 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
     # valid_ratio = args.valid_ratio
     prob_gap_ls = torch.zeros(len(train_dataset))
 
+    if args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
+        args.logger.info("already collect enough samples, exit!!!!")
+        sys.exit(1)
+
     if validset is not None:
         valid_count = len(validset) + args.valid_count#int(len(train_dataset)*valid_ratio)
     else:
@@ -446,8 +450,8 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
             
         else:
             valid_ids, new_valid_representations = get_representative_valid_ids(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
-        if existing_valid_representation is not None:
-            valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer=args.cluster_method_three)
+            if existing_valid_representation is not None:
+                valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer=args.cluster_method_three)
     else:
 
         valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)

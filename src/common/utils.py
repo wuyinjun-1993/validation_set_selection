@@ -56,7 +56,7 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
             optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
             optimizer.param_groups[0]['initial_lr'] = args.lr
             if args.do_train:
-                mile_stones_epochs = [80, 90]
+                mile_stones_epochs = [100, 200]
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(
                     optimizer,
                     milestones=mile_stones_epochs,
@@ -66,9 +66,9 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
 
             else:
                 if args.use_pretrained_model:
-                    mile_stones_epochs = [120,150]
+                    mile_stones_epochs = [120,200]
                 else:
-                    mile_stones_epochs = [120,160]
+                    mile_stones_epochs = [120,200]
                 if args.lr_decay:
                     scheduler = torch.optim.lr_scheduler.MultiStepLR(
                         optimizer,
@@ -86,7 +86,7 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
                     mile_stones_epochs = [100, 200, 250]
                     # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
                     #                                             milestones=mile_stones_epochs, last_epoch=start_epoch-1, gamma = 0.1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-                    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=mile_stones_epochs, gamma=0.2) #learning rate decay
+                    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=mile_stones_epochs, gamma=0.1) #learning rate decay
                 else:
                     if args.use_pretrained_model:
                         mile_stones_epochs = [100, 200, 250]
