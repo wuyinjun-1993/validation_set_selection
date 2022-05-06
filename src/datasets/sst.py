@@ -7,7 +7,7 @@ import torchtext
 import torch
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import logging
-MAX_SEQ_LENGTH = 64
+MAX_SEQ_LENGTH = 128
 
 
 class InputFeatures(object):
@@ -315,16 +315,16 @@ class SST5Processor(DatasetProcessor):
                 label=data.label))
         return examples
 
-def create_train_valid_test_set(sstprocess, label_list, tokenizer):
+def create_train_valid_test_set(sstprocess, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH):
     train_examples = sstprocess.get_train_examples()
     valid_examples = sstprocess.get_dev_examples()
     test_examples = sstprocess.get_test_examples()
-    train_dataset = sst_make_dataset(train_examples, label_list, tokenizer)
-    valid_dataset = sst_make_dataset(valid_examples, label_list, tokenizer)
-    test_dataset = sst_make_dataset(test_examples, label_list, tokenizer)
+    train_dataset = sst_make_dataset(train_examples, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH)
+    valid_dataset = sst_make_dataset(valid_examples, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH)
+    test_dataset = sst_make_dataset(test_examples, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH)
     return train_dataset, valid_dataset, test_dataset
 
-def sst_make_dataset(examples, label_list, tokenizer):
+def sst_make_dataset(examples, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH):
     all_features = _convert_examples_to_features(
         examples=examples,
         label_list=label_list,

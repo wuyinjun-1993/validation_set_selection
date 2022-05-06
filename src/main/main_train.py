@@ -518,7 +518,8 @@ def update_lr(optimizer, lr):
         param_group['lr'] = lr
 
 def basic_train(train_loader, valid_loader, test_loader, criterion, args,
-        network, optimizer, scheduler = None, heuristic=None, gt_training_labels=None):
+        network, optimizer, scheduler=None, heuristic=None,
+        warmup_scheduler=None, gt_training_labels=None):
 
     network.train()
     curr_lr = args.lr
@@ -547,6 +548,8 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
             loss = criterion(output, target)
             loss.backward()
             optimizer.step()
+            # if epoch < args.warm and warmup_scheduler is not None:
+            #     warmup_scheduler.step()
         if scheduler is not None:
             scheduler.step()
 
@@ -955,19 +958,33 @@ def main2(args, logger):
         optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('cifar'):
-        pretrained_rep_net = ResNet18().cuda()
+        if args.dataset == 'cifar10':
+            pretrained_rep_net = ResNet18().cuda()
+        else:
+            pretrained_rep_net = ResNet18(num_classes=100).cuda()
         optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('sst2'):
         pretrained_rep_net = custom_Bert(2)
+        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     elif args.dataset.startswith('sst5'):
         pretrained_rep_net = custom_Bert(5)
+        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+        optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+    elif args.dataset.startswith('imdb'):
+        pretrained_rep_net = custom_Bert(2)
+        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+        optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+    elif args.dataset.startswith('trec'):
+        pretrained_rep_net = custom_Bert(6)
+        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     else:
         raise NotImplementedError
-
+        # pretrained_rep_net = ResNet18().cuda()
     criterion = torch.nn.CrossEntropyLoss()
+
     meta_criterion = criterion
     if args.l1_meta_loss:
         meta_criterion = torch.nn.L1Loss()
@@ -1028,7 +1045,7 @@ def main2(args, logger):
 
     if args.bias_classes:
         num_train = len(trainloader.dataset.targets)
-        num_val = len(metaloader.dataset.targets)
+        num_val = len(validloader.dataset.targets)
         num_test = len(testloader.dataset.targets)
         if type(trainloader.dataset.targets) is numpy.ndarray:
             vsum = np.sum
@@ -1046,7 +1063,7 @@ def main2(args, logger):
                 {vsum(trainloader.dataset.targets == c) / num_train}")
         for c in range(10):
             logger.info(f"Validation set class {c} percentage: \
-                {vsum(metaloader.dataset.targets == c) / num_val}")
+                {vsum(validloader.dataset.targets == c) / num_val}")
         for c in range(10):
             logger.info(f"Test set class {c} percentage: \
                 {vsum(testloader.dataset.targets == c) / num_test}")
@@ -1057,11 +1074,18 @@ def main2(args, logger):
     if args.dataset == 'MNIST':
         net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
     elif args.dataset.startswith('cifar'):
-        net = ResNet18()
+        if args.dataset == 'cifar10':
+            net = ResNet18()
+        elif args.dataset == 'cifar100':
+            net = ResNet18(num_classes=100)
     elif args.dataset.startswith('sst2'):
         net = custom_Bert(2)
     elif args.dataset.startswith('sst5'):
         net = custom_Bert(5)
+    elif args.dataset.startswith('imdb'):
+        net = custom_Bert(2)
+    elif args.dataset.startswith('trec'):
+        net = custom_Bert(6)
     else:
         raise NotImplementedError
 
@@ -1078,6 +1102,12 @@ def main2(args, logger):
     net = DDP(net, device_ids=[args.local_rank])
     optimizer, scheduler = obtain_optimizer_scheduler(args, net, start_epoch = start_epoch)
     
+    warmup_scheduler = None
+
+    # if args.dataset == 'cifar100':
+    #     iter_per_epoch = len(trainloader)
+    #     warmup_scheduler = WarmUpLR(optimizer, iter_per_epoch * args.warm)
+
     if args.do_train:
         logger.info("starting basic training")
         basic_train(
@@ -1090,6 +1120,7 @@ def main2(args, logger):
             optimizer,
             scheduler=scheduler,
             heuristic=uncertainty_heuristic if args.active_learning else None,
+            warmup_scheduler=warmup_scheduler,
             gt_training_labels=torch.tensor(origin_labels) if args.active_learning else None,
         )
     else:

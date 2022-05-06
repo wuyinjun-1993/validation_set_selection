@@ -19,6 +19,8 @@ import numpy
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from datasets.sst import *
+from datasets.imdb import *
+from datasets.trec import *
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
 # process.
@@ -347,8 +349,8 @@ def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimi
     sample_representation_ls = []
 
     if not args.all_layer_grad:
-
-        full_sample_representation_tensor, all_sample_ids = get_representations_last_layer(args, validloader, criterion, optimizer, net)
+        full_sample_representation_tensor, all_sample_ids = get_representations_last_layer2(valid_set, args, validloader, criterion, optimizer, net)
+        # full_sample_representation_tensor, all_sample_ids = get_representations_last_layer(args, validloader, criterion, optimizer, net)
         return full_sample_representation_tensor
         # with torch.no_grad():
 
@@ -368,66 +370,7 @@ def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimi
         full_sample_representation_tensor, all_sample_ids = get_grad_by_example(args, validloader, net, criterion, optimizer)
         return full_sample_representation_tensor
 
-    
 
-
-def determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representations, valid_count, cosine_dist = False, all_layer = False, is_cuda = False):
-    existing_valid_count = 0
-    if all_layer:
-        existing_valid_count = existing_valid_representations[0].shape[0]
-    else:
-        existing_valid_count = existing_valid_representations.shape[0]
-    if not args.all_layer_grad:
-
-        if not cosine_dist:
-            if not all_layer:
-                existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
-            else:
-                existing_new_dists = pairwise_distance_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
-        else:
-            if not all_layer:
-                existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
-            else:
-                existing_new_dists = pairwise_cosine_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
-    
-    else:
-        existing_new_dists = pairwise_cosine2(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
-
-
-    nearset_new_valid_distance,_ = torch.min(existing_new_dists, dim = 0)
-
-    sorted_min_distance, sorted_min_sample_ids = torch.sort(nearset_new_valid_distance, descending=True)
-
-    remaining_valid_ids = valid_ids[sorted_min_sample_ids[0:valid_count - existing_valid_count]]
-    
-
-    
-
-
-
-    # nearset_new_valid_ids = torch.argmin(existing_new_dists, dim = 1)
-
-
-    # unique_nearest_new_valid_ids = torch.unique(nearset_new_valid_ids)
-
-    # remaining_new_valid_id_tensor =  torch.ones(new_valid_representations.shape[0])
-
-    # remaining_new_valid_id_tensor[unique_nearest_new_valid_ids] = 0
-
-    # remaining_valid_ids = valid_ids[remaining_new_valid_id_tensor.nonzero().view(-1)]
-
-    # if len(remaining_valid_ids) > valid_count - existing_valid_representations.shape[0]:
-    #     existing_new_dists = existing_new_dists[:, remaining_new_valid_id_tensor.nonzero().view(-1)]
-    #     nearset_new_valid_distances, nearset_new_valid_ids = torch.min(existing_new_dists, dim = 0)
-
-    #     sorted_nearset_new_valid_distances, sorted_nearset_new_valid_ids = torch.sort(nearset_new_valid_distances.view(-1), descending=False)
-
-    #     remaining_valid_ids = remaining_valid_ids[nearset_new_valid_ids[sorted_nearset_new_valid_ids[len(remaining_valid_ids) -(valid_count - existing_valid_representations.shape[0]):]]]
-
-        # nearset_new_valid_ids[sorted_nearset_new_valid_ids]
-
-
-    return remaining_valid_ids
 
 def init_sampling_valid_samples(net, train_dataset, train_transform, args, origin_labels):
     trainloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
@@ -489,22 +432,22 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
 
     trainloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
 
-    if validset is not None:
-        existing_valid_representation = obtain_representations_for_valid_set(args, validset, net, criterion, optimizer)
-    else:
-        existing_valid_representation = None
+    # if validset is not None:
+    #     existing_valid_representation = obtain_representations_for_valid_set(args, validset, net, criterion, optimizer)
+    # else:
+    existing_valid_representation = None
 
     
 
     if not args.cluster_method_two:
         if args.cluster_method_three:
             # valid_ids, new_valid_representations = get_representative_valid_ids3(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
-            valid_ids, new_valid_representations = get_representative_valid_ids2_3(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
+            valid_ids, new_valid_representations = get_representative_valid_ids2_4(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)
             
         else:
             valid_ids, new_valid_representations = get_representative_valid_ids(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
-            if existing_valid_representation is not None:
-                valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda)
+        if existing_valid_representation is not None:
+            valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer=args.cluster_method_three)
     else:
 
         valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
@@ -713,16 +656,51 @@ def get_dataloader_for_post_evaluations(args):
 
 
 def cache_train_valid_set(args, train_set, valid_set, meta_set, remaining_origin_labels):
-    torch.save(train_set, os.path.join(args.save_path, "cached_train_set"))
-    torch.save(valid_set, os.path.join(args.save_path, "cached_valid_set"))
-    torch.save(meta_set, os.path.join(args.save_path, "cached_meta_set"))
-    torch.save(remaining_origin_labels, os.path.join(args.save_path, "cached_train_origin_labels"))
+    if train_set is not None:
+        torch.save(train_set, os.path.join(args.save_path, "cached_train_set"))
+    if valid_set is not None:
+        torch.save(valid_set, os.path.join(args.save_path, "cached_valid_set"))
+    if meta_set is not None:
+        torch.save(meta_set, os.path.join(args.save_path, "cached_meta_set"))
+    if remaining_origin_labels is not None:
+        torch.save(remaining_origin_labels, os.path.join(args.save_path, "cached_train_origin_labels"))
 
+def cache_test_set(args, test_set):
+    test_set_path = os.path.join(args.save_path, "cached_test_set")
+    if test_set is not None:
+        torch.save(test_set, test_set_path)
+
+def load_test_set(args):
+    test_set_path = os.path.join(args.prev_save_path, "cached_test_set")
+    test_set = None
+    if os.path.exists(test_set_path):
+        test_set = torch.load(test_set_path)
+    return test_set
+    
 def load_train_valid_set(args):
-    train_set = torch.load(os.path.join(args.prev_save_path, "cached_train_set"))
-    valid_set = torch.load(os.path.join(args.prev_save_path, "cached_valid_set"))
-    meta_set = torch.load(os.path.join(args.prev_save_path, "cached_meta_set"))
-    remaining_origin_labels = torch.load(os.path.join(args.prev_save_path, "cached_train_origin_labels"))
+    train_set_path = os.path.join(args.prev_save_path, "cached_train_set")
+    valid_set_path = os.path.join(args.prev_save_path, "cached_valid_set")
+    meta_set_path = os.path.join(args.prev_save_path, "cached_meta_set")
+    origin_label_path = os.path.join(args.prev_save_path, "cached_train_origin_labels")
+    if os.path.exists(train_set_path):
+        train_set = torch.load(train_set_path)
+    else:
+        train_set = None
+    
+    if os.path.exists(valid_set_path):
+        valid_set = torch.load(valid_set_path)
+    else:
+        valid_set = None
+    
+    if os.path.exists(meta_set_path):
+        meta_set = torch.load(meta_set_path)
+    else:
+        meta_set = None
+
+    if os.path.exists(origin_label_path):
+        remaining_origin_labels = torch.load(origin_label_path)
+    else:
+        remaining_origin_labels = None
     return train_set, valid_set, meta_set, remaining_origin_labels
 
 def evaluate_dataset_with_basic_models(args, dataset, model, criterion):
@@ -794,6 +772,39 @@ def generate_class_biased_dataset(trainset, args, testset, origin_labels):
     return trainset, origin_labels
 
 
+def generate_noisy_dataset(args, trainset):
+    flipped_labels = None
+    logging.info("add errors to train set")
+
+    # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
+    # flipped_labels = obtain_flipped_labels(train_dataset, args)
+    if not args.load_dataset:
+        logging.info("Not loading dataset")
+        if args.adversarial_flip:
+            flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
+        else:
+            if args.biased_flip:
+                flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
+            else:
+                flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+        torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
+    else:
+        logging.info("Loading dataset")
+        flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
+        if not os.path.exists(flipped_label_dir):
+            if args.adversarial_flip:
+                flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
+            else:
+                if args.biased_flip:
+                    flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
+                else:
+                    flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+            torch.save(flipped_labels, flipped_label_dir)
+        flipped_labels = torch.load(flipped_label_dir)
+    trainset.targets = flipped_labels
+    return trainset
+
+
 def get_dataloader_for_meta(
     criterion,
     optimizer,
@@ -835,16 +846,45 @@ def get_dataloader_for_meta(
         if type(trainset.data) is numpy.ndarray:
             trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
             testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
-
             origin_labels = numpy.copy(trainset.targets)
         else:
             trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
             testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+            origin_labels = trainset.targets.clone()
 
+    elif args.dataset == 'cifar100':
+        CIFAR100_TRAIN_MEAN = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
+        CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+        transform_train_list = [
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(15),
+            transforms.ToTensor(),
+            transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD)
+            # transforms.RandomCrop(32, padding=4),
+            # transforms.RandomHorizontalFlip(),
+            # transforms.ToTensor(),
+            # transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD),
+        ]
+        transform_train = transforms.Compose(transform_train_list)
+        transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD),
+            ])
+        trainset = torchvision.datasets.CIFAR100(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train)
+
+        testset = torchvision.datasets.CIFAR100(root=os.path.join(args.data_dir, 'CIFAR-100'), train=False, download=True, transform=transform_test)
+        args.pool_len = 4
+        if type(trainset.data) is numpy.ndarray:
+            trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
+            testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
+            origin_labels = numpy.copy(trainset.targets)
+        else:
+            trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
+            testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
             origin_labels = trainset.targets.clone()
 
     elif args.dataset == 'MNIST':
-
         transform_train = torchvision.transforms.Compose([
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(
@@ -880,7 +920,6 @@ def get_dataloader_for_meta(
             testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
             origin_labels = trainset.targets.clone()
 
-    
     elif args.dataset.startswith('sst'):
         label_list = None
         if args.dataset.startswith('sst2'):
@@ -892,6 +931,24 @@ def get_dataloader_for_meta(
         trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
         origin_labels = trainset.targets.clone()
 
+    elif args.dataset.startswith('imdb'):
+        label_list = None
+        
+        sstprocess = imdb_Processor(args.data_dir)
+        label_list = sstprocess.get_labels()
+        trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
+        origin_labels = trainset.targets.clone()
+
+    elif args.dataset.startswith("trec"):
+        label_list = None
+        
+        sstprocess = trec_Processor(args.data_dir)
+        label_list = sstprocess.get_labels()
+        trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
+        origin_labels = trainset.targets.clone()
+
+    metaset = None
+        
     assert trainset is not None, "Training set was not initialized"
     assert testset is not None, "Test set was not initialized"
 
@@ -906,9 +963,29 @@ def get_dataloader_for_meta(
     elif split_method == 'uncertainty':
         selection_method = uncertainty_sample
 
-    if args.continue_label:
-        trainset, validset, metaset, origin_labels = load_train_valid_set(args)
-        trainset, new_metaset, remaining_origin_labels = selection_method(
+    remaining_origin_labels = origin_labels
+
+    if args.do_train:
+        if args.bias_classes:
+            trainset, origin_labels = generate_class_biased_dataset(trainset, args, testset, origin_labels)
+        if args.flip_labels:
+            trainset = generate_noisy_dataset(args, trainset)
+    else:
+        if args.continue_label:
+            trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+            trainset, new_metaset, remaining_origin_labels = selection_method(
+                criterion,
+                optimizer,
+                pretrained_model,
+                trainset,
+                None,
+                args,
+                origin_labels,
+                cached_sample_weights=cached_sample_weights,
+            )
+            metaset = metaset.concat_validset(metaset, new_metaset)
+
+        trainset, metaset, remaining_origin_labels = selection_method(
             criterion,
             optimizer,
             pretrained_model,
@@ -918,95 +995,34 @@ def get_dataloader_for_meta(
             origin_labels,
             cached_sample_weights=cached_sample_weights,
         )
-        metaset =metaset.concat_validset(metaset, new_metaset)
-    else:
-        flipped_labels = None
-
-        if args.bias_classes:
-            trainset, remaining_origin_labels = generate_class_biased_dataset(
-                trainset,
-                args,
-                testset,
-                origin_labels,
-            )
         
-        if args.flip_labels:
-            logger.info("add errors to train set")
-
-            if not args.load_dataset:
-                logger.info("Not loading dataset")
-                if args.adversarial_flip:
-                    logger.info("Adding adversarial noise")
-                    flipped_labels = adversarial_flip_labels(
-                        trainset,
-                        ratio=args.err_label_ratio,
-                    )
-                elif args.biased_flip:
-                    logger.info("Adding biased noise")
-                    flipped_labels = random_flip_labels_on_training3(
-                        trainset,
-                        ratio=args.err_label_ratio,
-                    )
-                else:
-                    logger.info("Adding uniform noise")
-                    flipped_labels = random_flip_labels_on_training2(
-                        trainset,
-                        ratio=args.err_label_ratio,
-                    )
-                torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
-            else:
-                logger.info("Loading dataset")
-                flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
-                if not os.path.exists(flipped_label_dir):
-                    if args.adversarial_flip:
-                        flipped_labels = adversarial_flip_labels(
-                            trainset,
-                            ratio=args.err_label_ratio,
-                        )
-                    elif args.biased_flip:
-                        flipped_labels = random_flip_labels_on_training3(
-                            trainset,
-                            ratio=args.err_label_ratio,
-                        )
-                    else:
-                        flipped_labels = random_flip_labels_on_training2(
-                            trainset,
-                            ratio=args.err_label_ratio,
-                        )
-                    torch.save(flipped_labels, flipped_label_dir)
-                flipped_labels = torch.load(flipped_label_dir)
-
-            # logger.info(torch.sum(torch.tensor(trainset.targets) == torch.tensor(flipped_labels)) / trainset.targets.shape[0])
-            trainset.targets = flipped_labels
-
-
-        trainset, metaset, remaining_origin_labels = selection_method(
-            criterion,
-            optimizer,
-            pretrained_model,
-            trainset,
-            None,
-            args,
-            remaining_origin_labels,
-            cached_sample_weights=cached_sample_weights,
-        )
-        logger.info(f"Size of training dataset is: {trainset.data.shape[0]}")
-        logger.info(f"Size of meta dataset is: {metaset.data.shape[0]}")
+    # if args.flip_labels:
 
     if validset is None:
         validset, testset = randomly_produce_valid_set(testset, transform_test, rate = 0.1)
+
     cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
+    cache_test_set(args, testset)
 
     train_sampler = DistributedSampler(
         trainset,
         num_replicas=args.world_size,
         rank=args.local_rank,
     )
-    meta_sampler = DistributedSampler(
-        metaset,
-        num_replicas=args.world_size,
-        rank=args.local_rank,
-    )
+    metaloader = None
+    if metaset is not None:
+        meta_sampler = DistributedSampler(
+            metaset,
+            num_replicas=args.world_size,
+            rank=args.local_rank,
+        )
+        metaloader = DataLoader(
+            metaset,
+            batch_size=args.test_batch_size,
+            num_workers=args.num_workers,
+            pin_memory=True,
+            sampler=meta_sampler,
+        )
 
     trainloader = DataLoader(
         trainset,
@@ -1015,13 +1031,7 @@ def get_dataloader_for_meta(
         pin_memory=True,
         sampler=train_sampler,
     )
-    metaloader = DataLoader(
-        metaset,
-        batch_size=args.test_batch_size,
-        num_workers=args.num_workers,
-        pin_memory=True,
-        sampler=meta_sampler,
-    )
+    
     validloader = DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
     testloader = DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
 
