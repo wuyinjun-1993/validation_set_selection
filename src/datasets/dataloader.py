@@ -500,7 +500,7 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
     if not args.cluster_method_two:
         if args.cluster_method_three:
             # valid_ids, new_valid_representations = get_representative_valid_ids3(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
-            valid_ids, new_valid_representations = get_representative_valid_ids2_3(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)
+            valid_ids, new_valid_representations = get_representative_valid_ids2_4(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)
             
         else:
             valid_ids, new_valid_representations = get_representative_valid_ids(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
