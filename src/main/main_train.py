@@ -1046,6 +1046,7 @@ def main2(args, logger):
     if args.bias_classes:
         num_train = len(trainloader.dataset.targets)
         num_val = len(validloader.dataset.targets)
+        num_meta = len(metaloader.dataset.targets)
         num_test = len(testloader.dataset.targets)
         if type(trainloader.dataset.targets) is numpy.ndarray:
             vsum = np.sum
@@ -1064,6 +1065,9 @@ def main2(args, logger):
         for c in range(10):
             logger.info(f"Validation set class {c} percentage: \
                 {vsum(validloader.dataset.targets == c) / num_val}")
+        for c in range(10):
+            logger.info(f"Meta set class {c} percentage: \
+                {vsum(metaloader.dataset.targets == c) / num_meta}")
         for c in range(10):
             logger.info(f"Test set class {c} percentage: \
                 {vsum(testloader.dataset.targets == c) / num_test}")
