@@ -423,7 +423,7 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
     # valid_ratio = args.valid_ratio
     prob_gap_ls = torch.zeros(len(train_dataset))
 
-    if args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
+    if validset is not None and args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
         args.logger.info("already collect enough samples, exit!!!!")
         sys.exit(1)
 
