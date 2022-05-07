@@ -857,14 +857,14 @@ def get_dataloader_for_meta(
             origin_labels = trainset.targets.clone()
 
     elif args.dataset == 'cifar100':
-        CIFAR100_TRAIN_MEAN = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
-        CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+        # CIFAR100_TRAIN_MEAN = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
+        # CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+        norm_mean, norm_std = (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)
         transform_train_list = [
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
-            transforms.RandomRotation(15),
             transforms.ToTensor(),
-            transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD)
+            transforms.Normalize(norm_mean, norm_std)
             # transforms.RandomCrop(32, padding=4),
             # transforms.RandomHorizontalFlip(),
             # transforms.ToTensor(),
@@ -873,7 +873,7 @@ def get_dataloader_for_meta(
         transform_train = transforms.Compose(transform_train_list)
         transform_test = transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD),
+                transforms.Normalize(norm_mean, norm_std),
             ])
         trainset = torchvision.datasets.CIFAR100(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train)
 
