@@ -242,7 +242,6 @@ def meta_learning_model(
     test_acc_ls = []
     w_array_delta_ls = []
 
-    model.train()
     for ep in tqdm(range(start_ep + 1, args.epochs+1)):
         
         train_loss, train_acc = 0, 0
@@ -285,6 +284,7 @@ def meta_learning_model(
 
         metaloader = itertools.cycle(meta_loader)
 
+        model.train()
         for idx, inputs in enumerate(train_loader):
             # inputs, labels = inputs.to(device=args['device'], non_blocking=True),\
                                 # labels.to(device=args['device'], non_blocking=True)
@@ -522,7 +522,6 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
         network, optimizer, scheduler=None, heuristic=None,
         warmup_scheduler=None, gt_training_labels=None):
 
-    network.train()
     curr_lr = args.lr
     valid_loss_ls = []
     valid_acc_ls = []
@@ -537,8 +536,8 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
                 )
                 train_loader.dataset.targets[indices[:10]] = gt_training_labels[indices[:10]]
 
+        network.train()
         for batch_idx, (_, data, target) in enumerate(train_loader):
-            optimizer.zero_grad()
             if args.cuda:
                 data, target = train_loader.dataset.to_cuda(data, target)
 
@@ -547,6 +546,7 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
                 target = F.one_hot(target, num_classes=10)
                 output = F.softmax(output)
             loss = criterion(output, target)
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             # if epoch < args.warm and warmup_scheduler is not None:
@@ -589,7 +589,6 @@ def uncertainty_heuristic(model, train_loader):
 def active_learning(train_loader, valid_loader, test_loader, criterion,
         gt_training_labels, heuristic, args, network, optimizer, scheduler = None):
 
-    network.train()
     valid_loss_ls = []
     valid_acc_ls = []
     test_loss_ls = []
@@ -602,6 +601,7 @@ def active_learning(train_loader, valid_loader, test_loader, criterion,
             )
             train_loader.dataset.targets[indices[:10]] = gt_training_labels[indices[:10]]
 
+        network.train()
         for _, (_, data, target) in enumerate(train_loader):
             optimizer.zero_grad()
             if args.cuda:
@@ -1046,34 +1046,36 @@ def main2(args, logger):
     elif args.hard_bootstrapping_loss:
         criterion = HardBootstrappingLoss()
 
-    if args.bias_classes:
-        num_train = len(trainloader.dataset.targets)
-        num_val = len(validloader.dataset.targets)
-        num_meta = len(metaloader.dataset.targets)
-        num_test = len(testloader.dataset.targets)
-        if type(trainloader.dataset.targets) is numpy.ndarray:
-            vsum = np.sum
-        else:
-            vsum = torch.sum
+    # if args.bias_classes:
+    #     num_train = len(trainloader.dataset.targets)
+    #     num_val = len(validloader.dataset.targets)
 
-        if type(testloader.dataset.targets) is list:
-            if type(testloader.dataset.data) is numpy.ndarray:
-                testloader.dataset.targets = np.array(testloader.dataset.targets)
-            else:
-                testloader.dataset.targets = torch.tensor(testloader.dataset.targets)
+    #     num_test = len(testloader.dataset.targets)
+    #     if type(trainloader.dataset.targets) is numpy.ndarray:
+    #         vsum = np.sum
+    #     else:
+    #         vsum = torch.sum
 
-        for c in range(10):
-            logger.info(f"Training set class {c} percentage: \
-                {vsum(trainloader.dataset.targets == c) / num_train}")
-        for c in range(10):
-            logger.info(f"Validation set class {c} percentage: \
-                {vsum(validloader.dataset.targets == c) / num_val}")
-        for c in range(10):
-            logger.info(f"Meta set class {c} percentage: \
-                {vsum(metaloader.dataset.targets == c) / num_meta}")
-        for c in range(10):
-            logger.info(f"Test set class {c} percentage: \
-                {vsum(testloader.dataset.targets == c) / num_test}")
+    #     if type(testloader.dataset.targets) is list:
+    #         if type(testloader.dataset.data) is numpy.ndarray:
+    #             testloader.dataset.targets = np.array(testloader.dataset.targets)
+    #         else:
+    #             testloader.dataset.targets = torch.tensor(testloader.dataset.targets)
+
+    #     for c in range(10):
+    #         logger.info(f"Training set class {c} percentage: \
+    #             {vsum(trainloader.dataset.targets == c) / num_train}")
+    #     for c in range(10):
+    #         logger.info(f"Validation set class {c} percentage: \
+    #             {vsum(validloader.dataset.targets == c) / num_val}")
+    #     if metaloader is not None:
+    #         num_meta = len(metaloader.dataset.targets)
+    #         for c in range(10):
+    #             logger.info(f"Meta set class {c} percentage: \
+    #                 {vsum(metaloader.dataset.targets == c) / num_meta}")
+    #     for c in range(10):
+    #         logger.info(f"Test set class {c} percentage: \
+    #             {vsum(testloader.dataset.targets == c) / num_test}")
 
     prev_weights = None
     start_epoch = 0
@@ -1265,10 +1267,10 @@ def main2(args, logger):
 
 if __name__ == "__main__":
     args = parse_args()
-    dist.init_process_group(backend='nccl', init_method='env://')
-    args.world_size = dist.get_world_size()
     args.local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(args.local_rank)
+    dist.init_process_group(backend='nccl', init_method='env://')
+    args.world_size = dist.get_world_size()
 
     cudnn.benchmark = True
     
