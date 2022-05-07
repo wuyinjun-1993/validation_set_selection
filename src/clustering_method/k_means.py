@@ -265,7 +265,7 @@ def kmeans_init(data, num_clusters, distance, all_layer,is_cuda, weight_by_norm 
         ## points from nearest centroid
         # dist = []
 
-        full_dist = distance(data, torch.stack(centroids, dim=0), is_cuda, weight_by_norm = weight_by_norm)
+        full_dist = distance(data, centroids, is_cuda, weight_by_norm = weight_by_norm)
         dist = torch.min(full_dist, dim = 1)[0]
         # for i in range(num_samples):
         #     if not all_layer:
@@ -295,7 +295,10 @@ def kmeans_init(data, num_clusters, distance, all_layer,is_cuda, weight_by_norm 
 
         dist = []
         # plot(data, np.array(centroids))
-    return torch.stack(centroids, dim=0)
+    if not all_layer:
+        return torch.stack(centroids, dim=0)
+    else:
+        return centroids
 
 
 def kmeans(
