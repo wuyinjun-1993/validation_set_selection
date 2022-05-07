@@ -963,7 +963,13 @@ def main2(args, logger):
             pretrained_rep_net = ResNet34().cuda()
         else:
             pretrained_rep_net = ResNet34(num_classes=100).cuda()
-        optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+        optimizer = torch.optim.SGD(
+            pretrained_rep_net.parameters(),
+            lr=args.lr,
+            momentum=0.9,
+            weight_decay=5e-4,
+            nesterov=True,
+        )
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('sst2'):
         pretrained_rep_net = custom_Bert(2)
@@ -1047,7 +1053,7 @@ def main2(args, logger):
     if args.bias_classes:
         num_train = len(trainloader.dataset.targets)
         num_val = len(validloader.dataset.targets)
-        num_meta = len(metaloader.dataset.targets)
+
         num_test = len(testloader.dataset.targets)
         if type(trainloader.dataset.targets) is numpy.ndarray:
             vsum = np.sum
@@ -1066,9 +1072,11 @@ def main2(args, logger):
         for c in range(10):
             logger.info(f"Validation set class {c} percentage: \
                 {vsum(validloader.dataset.targets == c) / num_val}")
-        for c in range(10):
-            logger.info(f"Meta set class {c} percentage: \
-                {vsum(metaloader.dataset.targets == c) / num_meta}")
+        if metaloader is not None:
+            num_meta = len(metaloader.dataset.targets)
+            for c in range(10):
+                logger.info(f"Meta set class {c} percentage: \
+                    {vsum(metaloader.dataset.targets == c) / num_meta}")
         for c in range(10):
             logger.info(f"Test set class {c} percentage: \
                 {vsum(testloader.dataset.targets == c) / num_test}")

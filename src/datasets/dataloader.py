@@ -24,9 +24,9 @@ from datasets.trec import *
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
 # process.
-torch.manual_seed(0)
-random.seed(0)
-numpy.random.seed(0)
+torch.manual_seed(42)
+random.seed(42)
+numpy.random.seed(42)
 
 class GaussianBlur(object):
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
@@ -822,16 +822,20 @@ def get_dataloader_for_meta(
     validset = None
     testset = None
     if args.dataset == 'cifar10':
+        normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
+                                     std=[x / 255.0 for x in [63.0, 62.1, 66.7]])
         transform_train_list = [
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            normalize,
+            # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ]
         transform_train = transforms.Compose(transform_train_list)
         transform_test = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            normalize,
+            # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ])
 
         trainset = torchvision.datasets.CIFAR10(
