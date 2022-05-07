@@ -961,9 +961,11 @@ def main2(args, logger):
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
             pretrained_rep_net = ResNet34().cuda()
+            optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         else:
             pretrained_rep_net = resnet34(num_classes=100).cuda()
-        optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+            optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
+        
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('sst2'):
         pretrained_rep_net = custom_Bert(2)
