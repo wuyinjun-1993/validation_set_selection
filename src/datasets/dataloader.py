@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -24,9 +23,9 @@ from datasets.trec import *
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
 # process.
-torch.manual_seed(0)
-random.seed(0)
-numpy.random.seed(0)
+torch.manual_seed(42)
+random.seed(42)
+numpy.random.seed(42)
 
 class GaussianBlur(object):
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
@@ -761,13 +760,14 @@ def randomly_produce_valid_set(testset, transform_test, rate = 0.1):
 
     return validset, testset
 
-def generate_class_biased_dataset(trainset, args, testset, origin_labels):
+def generate_class_biased_dataset(trainset, args, logger, testset, origin_labels):
     if not args.load_dataset:
         imb_trainset = datasets.ImbalanceDataset(trainset, args.imb_factor)
         trainset = trainset.get_subset_dataset(trainset, torch.nonzero(imb_trainset.mask).view(-1))
         origin_labels = origin_labels[imb_trainset.mask]
-        logging.info(f"Total number of training samples: {trainset.data.shape[0]}")
-        logging.info(f"Total number of testing samples: {testset.data.shape[0]}")
+        logger.info(f"Total number of training samples: {trainset.data.shape[0]}")
+        logger.info(f"Total number of testing samples: {testset.data.shape[0]}")
+        assert trainset.data.shape[0] == len(trainset)
         torch.save(trainset, os.path.join(args.data_dir, args.dataset + "_bias_class_dataset"))
         torch.save(origin_labels, os.path.join(args.data_dir, args.dataset + "_bias_class_origin_labels"))
     else:
@@ -826,12 +826,12 @@ def get_dataloader_for_meta(
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
         ]
         transform_train = transforms.Compose(transform_train_list)
         transform_test = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
         ])
 
         trainset = torchvision.datasets.CIFAR10(
@@ -971,7 +971,8 @@ def get_dataloader_for_meta(
 
     if args.do_train:
         if args.bias_classes:
-            trainset, origin_labels = generate_class_biased_dataset(trainset, args, testset, origin_labels)
+            trainset, remaining_origin_labels = generate_class_biased_dataset(trainset,
+                    args, logger, testset, remaining_origin_labels)
         if args.flip_labels:
             trainset = generate_noisy_dataset(args, trainset)
     else:
@@ -984,7 +985,7 @@ def get_dataloader_for_meta(
                 trainset,
                 None,
                 args,
-                origin_labels,
+                remaining_origin_labels,
                 cached_sample_weights=cached_sample_weights,
             )
             metaset = metaset.concat_validset(metaset, new_metaset)
@@ -996,7 +997,7 @@ def get_dataloader_for_meta(
             trainset,
             None,
             args,
-            origin_labels,
+            remaining_origin_labels,
             cached_sample_weights=cached_sample_weights,
         )
         
@@ -1031,8 +1032,9 @@ def get_dataloader_for_meta(
     trainloader = DataLoader(
         trainset,
         batch_size=args.batch_size,
-        num_workers=args.num_workers,
+        num_workers=0, #args.num_workers,
         pin_memory=True,
+        shuffle=False,
         sampler=train_sampler,
     )
     

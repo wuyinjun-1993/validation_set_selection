@@ -1,3 +1,9 @@
+#Install the pre-requiste:
+```
+pip install -r requiresment.txt
+python -m spacy download en_core_web_sm
+```
+
 # How to run the code for validation set selections
 
 
