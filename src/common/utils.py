@@ -74,7 +74,7 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
                         optimizer,
                         milestones=mile_stones_epochs,
                         last_epoch=start_epoch-1,
-                        gamma=0.01,
+                        gamma=0.1,
                     )#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
                 else:
                     scheduler = None
