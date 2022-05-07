@@ -168,6 +168,16 @@ def remove_intermediate_models(epochs_to_remove):
             os.remove(model_path)
 
 
+def resume_training_by_epoch(args, model):
+    model_file_name = os.path.join(args.save_path, "model_" + str(args.resumed_training_epoch))
+    
+    state = torch.load(model_file_name)
+    if type(state) is collections.OrderedDict:
+        model.load_state_dict(state)
+    else:
+        model.load_state_dict(state.state_dict())
+    return model
+
 def resume_meta_training_by_loading_cached_info(args, net):
 
     # if args.resume_meta_train:
@@ -520,7 +530,7 @@ def update_lr(optimizer, lr):
 
 def basic_train(train_loader, valid_loader, test_loader, criterion, args,
         network, optimizer, scheduler=None, heuristic=None,
-        warmup_scheduler=None, gt_training_labels=None):
+        warmup_scheduler=None, gt_training_labels=None, start_epoch = 0):
 
     network.train()
     curr_lr = args.lr
@@ -528,7 +538,9 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
     valid_acc_ls = []
     test_loss_ls = []
     test_acc_ls = []
-    for epoch in tqdm(range(args.epochs)):
+    for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
+        if scheduler is not None:
+            scheduler.step(epoch)
         if args.active_learning:
             with torch.no_grad():
                 # Select 10 samples based on heuristic and assign correct label
@@ -551,8 +563,7 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
             optimizer.step()
             # if epoch < args.warm and warmup_scheduler is not None:
             #     warmup_scheduler.step()
-        if scheduler is not None:
-            scheduler.step()
+        
 
         if args.local_rank == 0:
             model_path = os.path.join(args.save_path, "model_" + str(epoch))
@@ -1101,8 +1112,12 @@ def main2(args, logger):
 
     mile_stones_epochs = None
 
-    if args.resume_meta_train:
+    if not args.do_train and args.resume_meta_train:
         net, prev_weights, start_epoch = resume_meta_training_by_loading_cached_info(args, net)
+    if args.do_train and args.resume_train:
+        net = resume_training_by_epoch(args, net)
+        start_epoch = args.resumed_training_epoch
+        # net, prev_weights, start_epoch = resume_meta_training_by_loading_cached_info(args, net)
 
     if args.cuda:
         net = net.cuda()
@@ -1129,6 +1144,7 @@ def main2(args, logger):
             heuristic=uncertainty_heuristic if args.active_learning else None,
             warmup_scheduler=warmup_scheduler,
             gt_training_labels=torch.tensor(origin_labels) if args.active_learning else None,
+            start_epoch=start_epoch
         )
     else:
         logger.info("starting meta training")
