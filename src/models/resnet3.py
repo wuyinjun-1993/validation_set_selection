@@ -168,13 +168,17 @@ class ResNet(nn.Module):
     return x
 
 def resnet10(**kwargs):
-  return ResNet(BasicBlock, [1,1,1,1], **kwargs)
+    n_planes = [64, 128, 256, 512]
+    return ResNet(BasicBlock, [1,1,1,1], n_planes, **kwargs)
 
 def resnet18(**kwargs):
-  return ResNet(BasicBlock, [2,2,2,2], **kwargs)
+    n_planes = [64, 128, 256, 512]
+    return ResNet(BasicBlock, [2,2,2,2], n_planes, **kwargs)
 
 def resnet34(**kwargs):
-  return ResNet(BasicBlock, [3,4,6,3], **kwargs)
+    n_planes = [64, 128, 256, 512]
+    return ResNet(BasicBlock, [3,4,6,3], n_planes, **kwargs)
 
 def resnet50(**kwargs):
-  return ResNet(Bottleneck, [3,4,6,3], **kwargs)
+    n_planes = [64, 128, 256, 512]
+    return ResNet(Bottleneck, [3,4,6,3], n_planes, **kwargs)
