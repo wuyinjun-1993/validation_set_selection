@@ -242,7 +242,6 @@ def meta_learning_model(
     test_acc_ls = []
     w_array_delta_ls = []
 
-    model.train()
     for ep in tqdm(range(start_ep + 1, args.epochs+1)):
         
         train_loss, train_acc = 0, 0
@@ -285,6 +284,7 @@ def meta_learning_model(
 
         metaloader = itertools.cycle(meta_loader)
 
+        model.train()
         for idx, inputs in enumerate(train_loader):
             # inputs, labels = inputs.to(device=args['device'], non_blocking=True),\
                                 # labels.to(device=args['device'], non_blocking=True)
@@ -589,7 +589,6 @@ def uncertainty_heuristic(model, train_loader):
 def active_learning(train_loader, valid_loader, test_loader, criterion,
         gt_training_labels, heuristic, args, network, optimizer, scheduler = None):
 
-    network.train()
     valid_loss_ls = []
     valid_acc_ls = []
     test_loss_ls = []
@@ -602,6 +601,7 @@ def active_learning(train_loader, valid_loader, test_loader, criterion,
             )
             train_loader.dataset.targets[indices[:10]] = gt_training_labels[indices[:10]]
 
+        network.train()
         for _, (_, data, target) in enumerate(train_loader):
             optimizer.zero_grad()
             if args.cuda:
