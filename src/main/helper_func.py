@@ -5,6 +5,7 @@ def test(test_loader, network, criterion, args, logger, prefix = "test"):
     test_loss = 0
     correct = 0
     with torch.no_grad():
+        network.eval()
         for test_batch in test_loader:
             if len(test_batch) == 3:
                 _, data, target = test_batch
