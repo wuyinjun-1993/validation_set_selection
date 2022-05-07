@@ -295,7 +295,10 @@ def kmeans_init(data, num_clusters, distance, all_layer,is_cuda, weight_by_norm 
 
         dist = []
         # plot(data, np.array(centroids))
-    return centroids
+    if not all_layer:
+        return torch.stack(centroids, dim=0)
+    else:
+        return centroids
 
 
 def kmeans(
@@ -331,7 +334,6 @@ def kmeans(
             pairwise_distance_function = pairwise_distance
         else:
             pairwise_distance_function = pairwise_distance_ls
-
     elif distance == 'cosine':
         if not all_layer:
             pairwise_distance_function = pairwise_cosine
@@ -436,6 +438,8 @@ def kmeans(
                 selected = X[selected]
                 if is_cuda:
                     selected = selected.cuda()
+                    if selected_sample_weights is not None:
+                        selected_sample_weights = selected_sample_weights.cuda()
 
                 if selected_sample_weights is None:
                     if selected_sample_norm is None:
@@ -1021,7 +1025,8 @@ def pairwise_distance_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, a
 
     return full_dist_tensor
 
-def pairwise_distance(data1, data2, is_cuda=False, batch_size = 128):
+def pairwise_distance(data1, data2, is_cuda=False, batch_size = 128,
+        weight_by_norm=False):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     if is_cuda:

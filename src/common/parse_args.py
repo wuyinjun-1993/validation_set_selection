@@ -9,6 +9,9 @@ def parse_args(args=None):
 
     parser.add_argument('--cuda', action='store_true', help='use GPU')
     parser.add_argument('--biased_flip', action='store_true', help='use GPU')
+    parser.add_argument('--noisy_valid', action='store_true', help='use the noisy labels in the validation set')
+    parser.add_argument('--w_rectified_gaussian_init', action='store_true',
+        help='initialize the sample weights with a rectified gaussian')
 
     parser.add_argument('--all_layer', action='store_true', help='use GPU')
     parser.add_argument('--all_layer2', action='store_true', help='use GPU')
@@ -17,7 +20,8 @@ def parse_args(args=None):
     parser.add_argument('--all_layer_grad_greedy', action='store_true', help='use GPU')
     parser.add_argument('--all_layer_grad_no_full_loss', action='store_true', help='use GPU')
     parser.add_argument('--weight_by_norm', action='store_true', help='use GPU')
-    
+    parser.add_argument('--warm', type=int, default=1, help='warm up training phase')
+
     parser.add_argument('--grad_layer_depth', default=1, type=int, help='capture model_prov')
     # sampled_param_count
 
@@ -30,6 +34,7 @@ def parse_args(args=None):
     parser.add_argument('--flip_labels', action='store_true', help='flip labels')
     parser.add_argument('--adversarial_flip', action='store_true', help='flip labels')
     parser.add_argument('--bias_classes', action='store_true', help='Create class bias')
+    parser.add_argument('--imb_factor', default=1.0, type=float, help='Create class bias')
     parser.add_argument('--l1_loss', action='store_true', help='Use the L1 loss for the basic learning step')
     parser.add_argument('--soft_bootstrapping_loss', action='store_true', help='Use the Bootstrapping loss for the basic learning step')
     parser.add_argument('--hard_bootstrapping_loss', action='store_true', help='Use the Bootstrapping loss for the basic learning step')
@@ -38,6 +43,8 @@ def parse_args(args=None):
     parser.add_argument('--continue_label', action='store_true', help='load dataset')
     parser.add_argument('--use_model_prov', action='store_true', help='capture model_prov')
     parser.add_argument('--model_prov_period', default=20, type=int, help='capture model_prov')
+
+    parser.add_argument('--total_valid_sample_count', default=-1, type=int, help='capture model_prov')
 
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
     parser.add_argument('--select_valid_set', action='store_true', help='select valid set')
@@ -54,6 +61,8 @@ def parse_args(args=None):
     parser.add_argument('--add_under_rep_samples', action='store_true', help='add under represented samples')
 
     parser.add_argument('--do_train', action='store_true', help='do training')
+    parser.add_argument('--active_learning', action='store_true', help='perform training with active learning')
+    parser.add_argument('--active_select', action='store_true', help='perform training with active learning')
     parser.add_argument('--load_cached_weights', action='store_true', help='load_cached_weights')
     parser.add_argument('--lr_decay', action='store_true', help='load_cached_weights')
 

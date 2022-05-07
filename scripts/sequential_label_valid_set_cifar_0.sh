@@ -3,7 +3,7 @@ trap "exit" INT
 
 
 
-err_label_ratio=0.8
+err_label_ratio=0.6
 
 dataset_name=$1
 data_dir=$2
@@ -26,6 +26,9 @@ valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 
 save_path_prefix=${save_path_root_dir}/rand_error_${err_label_ratio}_valid_select
 
+
+total_valid_sample_count=100
+
 export CUDA_VISIBLE_DEVICES=${gpu_ids}
 echo CUDA_VISIBLE_DEVICES::${CUDA_VISIBLE_DEVICES}
 
@@ -34,8 +37,8 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_two --cosin_dist"
-lr_decay_flag="--lr_decay"
+add_valid_in_training_flag="--cluster_method_three --cosin_dist --weight_by_norm --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
+lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
 if (( add_valid_in_training_set == true ))
@@ -104,15 +107,15 @@ exe_cmd="python -m torch.distributed.launch \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  --cluster_method_two \
-  --cosin_dist"
+  ${add_valid_in_training_flag} \
+  ${lr_decay_flag}"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_all_rand.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
-#${exe_cmd} > ${output_file_name} 2>&1 
+${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
@@ -151,8 +154,8 @@ do
     --batch_size ${batch_size} \
     --test_batch_size ${test_batch_size} \
     --epochs ${epochs} \
-    --cluster_method_two \
-    --cosin_dist"
+    ${add_valid_in_training_flag} \
+	${lr_decay_flag}"
 
 	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_$k.txt
 
