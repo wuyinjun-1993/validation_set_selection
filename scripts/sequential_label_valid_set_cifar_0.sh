@@ -84,7 +84,7 @@ output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_rat
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+#${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
@@ -107,7 +107,8 @@ exe_cmd="python -m torch.distributed.launch \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  ${add_valid_in_training_flag}"
+  ${add_valid_in_training_flag} \
+  ${lr_decay_flag}"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_all_rand.txt
@@ -153,7 +154,8 @@ do
     --batch_size ${batch_size} \
     --test_batch_size ${test_batch_size} \
     --epochs ${epochs} \
-    ${add_valid_in_training_flag}"
+    ${add_valid_in_training_flag} \
+	${lr_decay_flag}"
 
 	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_$k.txt
 

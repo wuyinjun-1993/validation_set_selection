@@ -22,7 +22,7 @@ from lib.NCECriterion import NCESoftmaxLoss
 from lib.lr_scheduler import get_scheduler
 from lib.BootstrappingLoss import SoftBootstrappingLoss, HardBootstrappingLoss
 from models.resnet import *
-from models.resnet2 import *
+from models.resnet3 import *
 from models.bert import *
 import collections
 
@@ -962,14 +962,8 @@ def main2(args, logger):
         if args.dataset == 'cifar10':
             pretrained_rep_net = ResNet34().cuda()
         else:
-            pretrained_rep_net = ResNet34(num_classes=100).cuda()
-        optimizer = torch.optim.SGD(
-            pretrained_rep_net.parameters(),
-            lr=args.lr,
-            momentum=0.9,
-            weight_decay=5e-4,
-            nesterov=True,
-        )
+            pretrained_rep_net = resnet34(num_classes=100).cuda()
+        optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('sst2'):
         pretrained_rep_net = custom_Bert(2)
@@ -1090,7 +1084,7 @@ def main2(args, logger):
         if args.dataset == 'cifar10':
             net = ResNet34()
         elif args.dataset == 'cifar100':
-            net = ResNet34(num_classes=100)
+            net = resnet34(num_classes=100)
     elif args.dataset.startswith('sst2'):
         net = custom_Bert(2)
     elif args.dataset.startswith('sst5'):
