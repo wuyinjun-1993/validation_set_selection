@@ -983,23 +983,23 @@ def get_dataloader_for_meta(
                 optimizer,
                 pretrained_model,
                 trainset,
-                None,
+                metaset,
                 args,
                 remaining_origin_labels,
                 cached_sample_weights=cached_sample_weights,
             )
             metaset = metaset.concat_validset(metaset, new_metaset)
-
-        trainset, metaset, remaining_origin_labels = selection_method(
-            criterion,
-            optimizer,
-            pretrained_model,
-            trainset,
-            None,
-            args,
-            remaining_origin_labels,
-            cached_sample_weights=cached_sample_weights,
-        )
+        else:
+            trainset, metaset, remaining_origin_labels = selection_method(
+                criterion,
+                optimizer,
+                pretrained_model,
+                trainset,
+                metaset,
+                args,
+                remaining_origin_labels,
+                cached_sample_weights=cached_sample_weights,
+            )
         
     # if args.flip_labels:
 

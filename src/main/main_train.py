@@ -971,7 +971,7 @@ def main2(args, logger):
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
-            pretrained_rep_net = ResNet34().cuda()
+            pretrained_rep_net = resnet34(num_classes=10).cuda()
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         else:
             pretrained_rep_net = resnet34(num_classes=100).cuda()
@@ -1095,7 +1095,7 @@ def main2(args, logger):
         net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
-            net = ResNet34()
+            net = resnet34(num_classes=10)
         elif args.dataset == 'cifar100':
             net = resnet34(num_classes=100)
     elif args.dataset.startswith('sst2'):
