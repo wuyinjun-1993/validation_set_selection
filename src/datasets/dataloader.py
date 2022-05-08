@@ -98,6 +98,37 @@ class dataset_wrapper(Dataset):
         return dataset_wrapper(subset_data, subset_labels, transform, three_imgs, two_imgs)
 
     @staticmethod
+    def subsampling_dataset_by_class(dataset, num_per_class=45):
+        if type(dataset.data) is numpy.ndarray:
+            label_set = np.unique(dataset.targets)
+        else:
+            label_set = torch.unique(dataset.targets)
+
+        full_sel_sample_ids = []
+        for label in label_set:
+            if type(dataset.data) is numpy.ndarray:
+                sample_ids_with_curr_labels = np.nonzero((dataset.targets == label)).reshape(-1)
+                sample_ids_with_curr_labels = torch.from_numpy(sample_ids_with_curr_labels)
+            else:
+                sample_ids_with_curr_labels = torch.nonzero((dataset.targets == label)).reshape(-1)
+
+            random_sample_ids_with_curr_labels = torch.randperm(len(sample_ids_with_curr_labels))
+
+            selected_sample_ids_with_curr_labels = random_sample_ids_with_curr_labels[0:num_per_class]
+
+            full_sel_sample_ids.append(selected_sample_ids_with_curr_labels)
+
+        full_sel_sample_ids_tensor = torch.cat(full_sel_sample_ids)
+        
+        if type(dataset.data) is numpy.ndarray:
+            return dataset.get_subset_dataset(dataset, full_sel_sample_ids_tensor.numpy())
+        else:
+            return dataset.get_subset_dataset(dataset, full_sel_sample_ids_tensor)
+
+
+
+
+    @staticmethod
     def concat_validset(dataset1, dataset2):
         valid_data_mat = dataset1.data
         valid_labels = dataset1.targets
@@ -950,6 +981,9 @@ def get_dataloader_for_meta(
         label_list = sstprocess.get_labels()
         trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
         origin_labels = trainset.targets.clone()
+
+    if args.low_data:
+        trainset = trainset.subsampling_dataset_by_class(trainset, num_per_class=args.low_data_num_samples_per_class)
 
     metaset = None
         

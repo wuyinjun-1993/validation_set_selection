@@ -23,6 +23,7 @@ def parse_args(args=None):
     parser.add_argument('--warm', type=int, default=1, help='warm up training phase')
 
     parser.add_argument('--grad_layer_depth', default=1, type=int, help='capture model_prov')
+    parser.add_argument('--model_type', default="resnet34", type=str, help='capture model_prov')
     # sampled_param_count
 
     parser.add_argument('--sampled_param_count', default=0, type=int, help='capture model_prov')
@@ -31,6 +32,9 @@ def parse_args(args=None):
     parser.add_argument('--full_model_out', action='store_true', help='use GPU')
 
     parser.add_argument('--cluster_no_reweighting', action='store_true', help='use GPU')
+    parser.add_argument('--low_data', action='store_true', help='low data application')
+    parser.add_argument('--low_data_num_samples_per_class', default=40, type=int, help='Create class bias')
+
     parser.add_argument('--flip_labels', action='store_true', help='flip labels')
     parser.add_argument('--adversarial_flip', action='store_true', help='flip labels')
     parser.add_argument('--bias_classes', action='store_true', help='Create class bias')
