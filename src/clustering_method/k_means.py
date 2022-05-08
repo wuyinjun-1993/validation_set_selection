@@ -419,6 +419,9 @@ def kmeans(
             selected_sample_norm = None
             if sample_norm_ls is not None:
                 selected_sample_norm = sample_norm_ls[selected]
+
+            if is_cuda:
+                selected_sample_norm = selected_sample_norm.cuda()
             if torch.sum(choice_cluster == index) <= 0:
                 continue
 

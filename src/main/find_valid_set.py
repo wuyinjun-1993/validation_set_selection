@@ -1362,7 +1362,7 @@ def get_extra_representations_last_layer2(train_dataset, args, train_loader, cri
 
     epoch_count = 0 
     for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
-        if epoch_count > 10:
+        if epoch_count > 5:
             break
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:

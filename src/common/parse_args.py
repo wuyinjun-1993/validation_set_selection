@@ -52,6 +52,9 @@ def parse_args(args=None):
     parser.add_argument('--cluster_method_two', action='store_true', help='select valid set')
     parser.add_argument('--init_cluster_by_confident', action='store_true', help='select valid set')
     parser.add_argument('--resume_meta_train', action='store_true', help='resume meta training')
+    parser.add_argument('--resume_train', action='store_true', help='resume training')
+    parser.add_argument('--resumed_training_epoch',  default=0, type=int, help='start from epoch')
+
     parser.add_argument('--cluster_method_three', action='store_true', help='cache_loss_per_epoch')
     parser.add_argument('--cosin_dist', action='store_true', help='use cosine distance for k-means clustering')
     parser.add_argument('--prev_save_path', default=None, type=str)

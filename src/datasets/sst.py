@@ -7,7 +7,7 @@ import torchtext
 import torch
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import logging
-MAX_SEQ_LENGTH = 128
+MAX_SEQ_LENGTH = 64
 
 
 class InputFeatures(object):

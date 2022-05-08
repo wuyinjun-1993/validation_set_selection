@@ -168,6 +168,16 @@ def remove_intermediate_models(epochs_to_remove):
             os.remove(model_path)
 
 
+def resume_training_by_epoch(args, model):
+    model_file_name = os.path.join(args.save_path, "model_" + str(args.resumed_training_epoch))
+    
+    state = torch.load(model_file_name)
+    if type(state) is collections.OrderedDict:
+        model.load_state_dict(state)
+    else:
+        model.load_state_dict(state.state_dict())
+    return model
+
 def resume_meta_training_by_loading_cached_info(args, net):
 
     # if args.resume_meta_train:
@@ -498,9 +508,9 @@ def meta_learning_model(
             
 
         if args.local_rank == 0:
-            torch.save(model.module, os.path.join(args.save_path, 'refined_model_' + str(ep)))
+            torch.save(model.module.state_dict(), os.path.join(args.save_path, 'refined_model_' + str(ep)))
             torch.save(w_array, os.path.join(args.save_path, 'sample_weights_' + str(ep)))
-            torch.save(model.module, os.path.join(args.save_path, 'curr_refined_model'))
+            torch.save(model.module.state_dict(), os.path.join(args.save_path, 'curr_refined_model'))
             torch.save(w_array, os.path.join(args.save_path, 'curr_sample_weights'))
             torch.save(torch.tensor(ep), os.path.join(args.save_path, "curr_epoch"))
             torch.save(torch.stack(w_array_delta_ls, dim = 0), os.path.join(args.save_path, "curr_w_array_delta_ls"))
@@ -520,14 +530,16 @@ def update_lr(optimizer, lr):
 
 def basic_train(train_loader, valid_loader, test_loader, criterion, args,
         network, optimizer, scheduler=None, heuristic=None,
-        warmup_scheduler=None, gt_training_labels=None):
+        warmup_scheduler=None, gt_training_labels=None, start_epoch = 0):
 
     curr_lr = args.lr
     valid_loss_ls = []
     valid_acc_ls = []
     test_loss_ls = []
     test_acc_ls = []
-    for epoch in tqdm(range(args.epochs)):
+    for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
+        if scheduler is not None:
+            scheduler.step(epoch)
         if args.active_learning:
             with torch.no_grad():
                 # Select 10 samples based on heuristic and assign correct label
@@ -551,8 +563,7 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
             optimizer.step()
             # if epoch < args.warm and warmup_scheduler is not None:
             #     warmup_scheduler.step()
-        if scheduler is not None:
-            scheduler.step()
+        
 
         if args.local_rank == 0:
             model_path = os.path.join(args.save_path, "model_" + str(epoch))
@@ -959,7 +970,7 @@ def main2(args, logger):
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
-            pretrained_rep_net = ResNet34().cuda()
+            pretrained_rep_net = resnet34(num_classes=10).cuda()
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         else:
             pretrained_rep_net = resnet34(num_classes=100).cuda()
@@ -1083,7 +1094,7 @@ def main2(args, logger):
         net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
-            net = ResNet34()
+            net = resnet34(num_classes=10)
         elif args.dataset == 'cifar100':
             net = resnet34(num_classes=100)
     elif args.dataset.startswith('sst2'):
@@ -1102,8 +1113,12 @@ def main2(args, logger):
 
     mile_stones_epochs = None
 
-    if args.resume_meta_train:
+    if not args.do_train and args.resume_meta_train:
         net, prev_weights, start_epoch = resume_meta_training_by_loading_cached_info(args, net)
+    if args.do_train and args.resume_train:
+        net = resume_training_by_epoch(args, net)
+        start_epoch = args.resumed_training_epoch
+        # net, prev_weights, start_epoch = resume_meta_training_by_loading_cached_info(args, net)
 
     if args.cuda:
         net = net.cuda()
@@ -1131,6 +1146,7 @@ def main2(args, logger):
             heuristic=uncertainty_heuristic if args.active_learning else None,
             warmup_scheduler=warmup_scheduler,
             gt_training_labels=torch.tensor(origin_labels) if args.active_learning else None,
+            start_epoch=start_epoch
         )
     else:
         logger.info("starting meta training")
