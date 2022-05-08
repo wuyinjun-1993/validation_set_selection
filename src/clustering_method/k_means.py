@@ -310,7 +310,7 @@ def kmeans(
         is_cuda=False,
         sample_weights = None,
         existing_cluster_mean_ls = None,
-        total_iter_count=500,
+        total_iter_count=200,
         all_layer = False,
         agg_sim_array = 'mean',
         weight_by_norm = False
@@ -1355,7 +1355,7 @@ def pairwise_cosine_full_by_sample_ids(full_cosin_sim, sample_ids_ls, is_cuda=Fa
 
 
 
-def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg = 'mean', weight_by_norm=False):
+def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 64, agg = 'mean', weight_by_norm=False):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     B_ls = []
