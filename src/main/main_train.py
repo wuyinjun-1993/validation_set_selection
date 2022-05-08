@@ -508,9 +508,9 @@ def meta_learning_model(
             
 
         if args.local_rank == 0:
-            torch.save(model.module, os.path.join(args.save_path, 'refined_model_' + str(ep)))
+            torch.save(model.module.state_dict(), os.path.join(args.save_path, 'refined_model_' + str(ep)))
             torch.save(w_array, os.path.join(args.save_path, 'sample_weights_' + str(ep)))
-            torch.save(model.module, os.path.join(args.save_path, 'curr_refined_model'))
+            torch.save(model.module.state_dict(), os.path.join(args.save_path, 'curr_refined_model'))
             torch.save(w_array, os.path.join(args.save_path, 'curr_sample_weights'))
             torch.save(torch.tensor(ep), os.path.join(args.save_path, "curr_epoch"))
             torch.save(torch.stack(w_array_delta_ls, dim = 0), os.path.join(args.save_path, "curr_w_array_delta_ls"))
