@@ -573,7 +573,6 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
     if args.local_rank == 0:
         best_index = report_final_performance_by_early_stopping(valid_loss_ls,
                 valid_acc_ls, test_loss_ls, test_acc_ls, args, logger, is_meta=False)
-        remove_intermediate_models([i for i in range(args.epochs) if i != best_index])
 
 
 def uncertainty_heuristic(model, train_loader):
@@ -1046,36 +1045,36 @@ def main2(args, logger):
     elif args.hard_bootstrapping_loss:
         criterion = HardBootstrappingLoss()
 
-    # if args.bias_classes:
-    #     num_train = len(trainloader.dataset.targets)
-    #     num_val = len(validloader.dataset.targets)
+    if args.bias_classes:
+        num_train = len(trainloader.dataset.targets)
+        num_val = len(validloader.dataset.targets)
 
-    #     num_test = len(testloader.dataset.targets)
-    #     if type(trainloader.dataset.targets) is numpy.ndarray:
-    #         vsum = np.sum
-    #     else:
-    #         vsum = torch.sum
+        num_test = len(testloader.dataset.targets)
+        if type(trainloader.dataset.targets) is numpy.ndarray:
+            vsum = np.sum
+        else:
+            vsum = torch.sum
 
-    #     if type(testloader.dataset.targets) is list:
-    #         if type(testloader.dataset.data) is numpy.ndarray:
-    #             testloader.dataset.targets = np.array(testloader.dataset.targets)
-    #         else:
-    #             testloader.dataset.targets = torch.tensor(testloader.dataset.targets)
+        if type(testloader.dataset.targets) is list:
+            if type(testloader.dataset.data) is numpy.ndarray:
+                testloader.dataset.targets = np.array(testloader.dataset.targets)
+            else:
+                testloader.dataset.targets = torch.tensor(testloader.dataset.targets)
 
-    #     for c in range(10):
-    #         logger.info(f"Training set class {c} percentage: \
-    #             {vsum(trainloader.dataset.targets == c) / num_train}")
-    #     for c in range(10):
-    #         logger.info(f"Validation set class {c} percentage: \
-    #             {vsum(validloader.dataset.targets == c) / num_val}")
-    #     if metaloader is not None:
-    #         num_meta = len(metaloader.dataset.targets)
-    #         for c in range(10):
-    #             logger.info(f"Meta set class {c} percentage: \
-    #                 {vsum(metaloader.dataset.targets == c) / num_meta}")
-    #     for c in range(10):
-    #         logger.info(f"Test set class {c} percentage: \
-    #             {vsum(testloader.dataset.targets == c) / num_test}")
+        for c in range(10):
+            logger.info(f"Training set class {c} percentage: \
+                {vsum(trainloader.dataset.targets == c) / num_train}")
+        for c in range(10):
+            logger.info(f"Validation set class {c} percentage: \
+                {vsum(validloader.dataset.targets == c) / num_val}")
+        if metaloader is not None:
+            num_meta = len(metaloader.dataset.targets)
+            for c in range(10):
+                logger.info(f"Meta set class {c} percentage: \
+                    {vsum(metaloader.dataset.targets == c) / num_meta}")
+        for c in range(10):
+            logger.info(f"Test set class {c} percentage: \
+                {vsum(testloader.dataset.targets == c) / num_test}")
 
     prev_weights = None
     start_epoch = 0
@@ -1108,6 +1107,7 @@ def main2(args, logger):
 
     if args.cuda:
         net = net.cuda()
+
     net = DDP(net, device_ids=[args.local_rank])
     optimizer, scheduler = obtain_optimizer_scheduler(args, net, start_epoch = start_epoch)
     
