@@ -584,7 +584,7 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
     if args.local_rank == 0:
         best_index = report_final_performance_by_early_stopping(valid_loss_ls,
                 valid_acc_ls, test_loss_ls, test_acc_ls, args, logger, is_meta=False)
-        remove_intermediate_models([i for i in range(args.epochs) if i != best_index])
+        # remove_intermediate_models([i for i in range(args.epochs) if i != best_index])
 
 
 def uncertainty_heuristic(model, train_loader):
