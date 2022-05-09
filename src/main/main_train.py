@@ -538,8 +538,6 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
     test_loss_ls = []
     test_acc_ls = []
     for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
-        if scheduler is not None:
-            scheduler.step(epoch)
         if args.active_learning:
             with torch.no_grad():
                 # Select 10 samples based on heuristic and assign correct label
@@ -565,6 +563,8 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
             #     warmup_scheduler.step()
         
 
+        if scheduler is not None:
+            scheduler.step(epoch)
         if args.local_rank == 0:
             model_path = os.path.join(args.save_path, "model_" + str(epoch))
             torch.save(network.module.state_dict(), model_path)
