@@ -79,7 +79,7 @@ def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls,
     torch.save(best_valid_acc_idx, os.path.join(args.save_path, "early_stopping_epoch"))
 
     if is_meta:
-        cache_sample_weights_given_epoch(best_valid_acc_idx)
+        cache_sample_weights_given_epoch(best_valid_acc_idx+1)
     else:
         cache_sample_weights_given_epoch_basic_train(best_valid_acc_idx)
 
