@@ -133,10 +133,16 @@ class dataset_wrapper(Dataset):
         valid_data_mat = dataset1.data
         valid_labels = dataset1.targets
         if type(valid_data_mat) is numpy.ndarray:
+            if len(dataset2.data.shape) < len(valid_data_mat.shape):
+                dataset2.data = np.expand_dims(dataset2.data, 0)
+                dataset2.targets = np.expand_dims(dataset2.targets,0)
             valid_data_mat = numpy.concatenate((valid_data_mat, dataset2.data), axis = 0)
             valid_labels = numpy.concatenate((valid_labels, dataset2.targets), axis = 0)
             
         else:
+            if len(dataset2.data.shape) < len(valid_data_mat.shape):
+                dataset2.data = dataset2.data.unsqueeze(0)
+                dataset2.targets = dataset2.targets.unsqueeze(0)
             valid_data_mat = torch.cat([valid_data_mat, dataset2.data], dim = 0)
             valid_labels = torch.cat([valid_labels, dataset2.targets], dim = 0)
         valid_set = dataset_wrapper(valid_data_mat, valid_labels, dataset1.transform)
