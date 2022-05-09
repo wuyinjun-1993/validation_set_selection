@@ -1353,6 +1353,7 @@ def get_extra_representations_last_layer2(train_dataset, args, train_loader, cri
     start_epoch_id = 0
     if args.use_pretrained_model:
         start_epoch_id = torch.load(os.path.join(args.prev_save_path, "early_stopping_epoch"))
+        # start_epoch_id += 1
     args.logger.info("extra representation starting from epoch %d"%(start_epoch_id))
 
         # start_epoch_id = int(args.epochs/2)
