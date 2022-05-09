@@ -259,6 +259,28 @@ class sst_dataset(Dataset):
         
         return (input_ids.cuda(), input_mask.cuda(), segment_ids.cuda()), targets.cuda()
 
+
+    @staticmethod
+    def subsampling_dataset_by_class(dataset, num_per_class=45):
+        label_set = torch.unique(dataset.targets)
+
+        full_sel_sample_ids = []
+        for label in label_set:
+            sample_ids_with_curr_labels = torch.nonzero((dataset.targets == label)).reshape(-1)
+
+            random_sample_ids_with_curr_labels = torch.randperm(len(sample_ids_with_curr_labels))
+
+            selected_sample_ids_with_curr_labels = random_sample_ids_with_curr_labels[0:num_per_class]
+
+            full_sel_sample_ids.append(selected_sample_ids_with_curr_labels)
+
+        full_sel_sample_ids_tensor = torch.cat(full_sel_sample_ids)
+        
+        # if type(dataset.data) is numpy.ndarray:
+        #     return dataset.get_subset_dataset(dataset, full_sel_sample_ids_tensor.numpy())
+        # else:
+        return dataset.get_subset_dataset(dataset, full_sel_sample_ids_tensor)
+
 class SST5Processor(DatasetProcessor):
     """Processor for the SST-5 data set."""
     # def __init__(self, data_path):

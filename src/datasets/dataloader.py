@@ -98,6 +98,37 @@ class dataset_wrapper(Dataset):
         return dataset_wrapper(subset_data, subset_labels, transform, three_imgs, two_imgs)
 
     @staticmethod
+    def subsampling_dataset_by_class(dataset, num_per_class=45):
+        if type(dataset.data) is numpy.ndarray:
+            label_set = np.unique(dataset.targets)
+        else:
+            label_set = torch.unique(dataset.targets)
+
+        full_sel_sample_ids = []
+        for label in label_set:
+            if type(dataset.data) is numpy.ndarray:
+                sample_ids_with_curr_labels = np.nonzero((dataset.targets == label)).reshape(-1)
+                sample_ids_with_curr_labels = torch.from_numpy(sample_ids_with_curr_labels)
+            else:
+                sample_ids_with_curr_labels = torch.nonzero((dataset.targets == label)).reshape(-1)
+
+            random_sample_ids_with_curr_labels = torch.randperm(len(sample_ids_with_curr_labels))
+
+            selected_sample_ids_with_curr_labels = random_sample_ids_with_curr_labels[0:num_per_class]
+
+            full_sel_sample_ids.append(selected_sample_ids_with_curr_labels)
+
+        full_sel_sample_ids_tensor = torch.cat(full_sel_sample_ids)
+        
+        if type(dataset.data) is numpy.ndarray:
+            return dataset.get_subset_dataset(dataset, full_sel_sample_ids_tensor.numpy())
+        else:
+            return dataset.get_subset_dataset(dataset, full_sel_sample_ids_tensor)
+
+
+
+
+    @staticmethod
     def concat_validset(dataset1, dataset2):
         valid_data_mat = dataset1.data
         valid_labels = dataset1.targets
@@ -821,135 +852,144 @@ def get_dataloader_for_meta(
     trainset = None
     validset = None
     testset = None
-    if args.dataset == 'cifar10':
-        transform_train_list = [
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-        ]
-        transform_train = transforms.Compose(transform_train_list)
-        transform_test = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-        ])
+    if args.load_dataset:
+        trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+        testset = load_test_set(args)    
 
-        trainset = torchvision.datasets.CIFAR10(
-            root=os.path.join(args.data_dir, 'CIFAR-10'),
-            train=True,
-            download=True,
-            transform=transform_train,
-        )
-        testset = torchvision.datasets.CIFAR10(
-            root=os.path.join(args.data_dir, 'CIFAR-10'),
-            train=False,
-            download=True,
-            transform=transform_test,
-        )
-        args.pool_len = 4
-        if type(trainset.data) is numpy.ndarray:
-            trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
-            testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
-            origin_labels = numpy.copy(trainset.targets)
-        else:
-            trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
-            testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
-            origin_labels = trainset.targets.clone()
-
-    elif args.dataset == 'cifar100':
-        # CIFAR100_TRAIN_MEAN = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
-        # CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
-        norm_mean, norm_std = (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)
-        transform_train_list = [
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(norm_mean, norm_std)
-            # transforms.RandomCrop(32, padding=4),
-            # transforms.RandomHorizontalFlip(),
-            # transforms.ToTensor(),
-            # transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD),
-        ]
-        transform_train = transforms.Compose(transform_train_list)
-        transform_test = transforms.Compose([
+    else:
+        if args.dataset == 'cifar10':
+            transform_train_list = [
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
-                transforms.Normalize(norm_mean, norm_std),
+                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+            ]
+            transform_train = transforms.Compose(transform_train_list)
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
             ])
-        trainset = torchvision.datasets.CIFAR100(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train)
 
-        testset = torchvision.datasets.CIFAR100(root=os.path.join(args.data_dir, 'CIFAR-100'), train=False, download=True, transform=transform_test)
-        args.pool_len = 4
-        if type(trainset.data) is numpy.ndarray:
-            trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
-            testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
-            origin_labels = numpy.copy(trainset.targets)
-        else:
-            trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
-            testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+            trainset = torchvision.datasets.CIFAR10(
+                root=os.path.join(args.data_dir, 'CIFAR-10'),
+                train=True,
+                download=True,
+                transform=transform_train,
+            )
+            testset = torchvision.datasets.CIFAR10(
+                root=os.path.join(args.data_dir, 'CIFAR-10'),
+                train=False,
+                download=True,
+                transform=transform_test,
+            )
+            args.pool_len = 4
+            if type(trainset.data) is numpy.ndarray:
+                trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
+                testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
+                origin_labels = numpy.copy(trainset.targets)
+            else:
+                trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
+                testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+                origin_labels = trainset.targets.clone()
+
+        elif args.dataset == 'cifar100':
+            # CIFAR100_TRAIN_MEAN = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
+            # CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+            norm_mean, norm_std = (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)
+            transform_train_list = [
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(norm_mean, norm_std)
+                # transforms.RandomCrop(32, padding=4),
+                # transforms.RandomHorizontalFlip(),
+                # transforms.ToTensor(),
+                # transforms.Normalize(CIFAR100_TRAIN_MEAN, CIFAR100_TRAIN_STD),
+            ]
+            transform_train = transforms.Compose(transform_train_list)
+            transform_test = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(norm_mean, norm_std),
+                ])
+            trainset = torchvision.datasets.CIFAR100(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train)
+
+            testset = torchvision.datasets.CIFAR100(root=os.path.join(args.data_dir, 'CIFAR-100'), train=False, download=True, transform=transform_test)
+            args.pool_len = 4
+            if type(trainset.data) is numpy.ndarray:
+                trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
+                testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
+                origin_labels = numpy.copy(trainset.targets)
+            else:
+                trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
+                testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+                origin_labels = trainset.targets.clone()
+
+        elif args.dataset == 'MNIST':
+            transform_train = torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize(
+                    (0.1307,), (0.3081,))
+            ])
+            trainset = torchvision.datasets.MNIST(
+                args.data_dir,
+                train=True,
+                download=True,
+                transform=transform_train,
+            )
+
+            transform_test = torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize(
+                    (0.1307,), (0.3081,))
+            ])
+
+            testset = torchvision.datasets.MNIST(
+                args.data_dir,
+                train=False,
+                download=True,
+                transform=transform_test,
+            )
+            args.pool_len = 4
+
+            if type(trainset.data) is numpy.ndarray:
+                trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
+                testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
+                origin_labels = numpy.copy(trainset.targets)
+            else:
+                trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
+                testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+                origin_labels = trainset.targets.clone()
+
+        elif args.dataset.startswith('sst'):
+            label_list = None
+            if args.dataset.startswith('sst2'):
+                sstprocess = SST2Processor(args.data_dir)
+                label_list = sstprocess.get_labels()
+            elif args.dataset.startswith('sst5'):
+                sstprocess = SST5Processor(args.data_dir)
+                label_list = sstprocess.get_labels()
+            trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
             origin_labels = trainset.targets.clone()
 
-    elif args.dataset == 'MNIST':
-        transform_train = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(
-                (0.1307,), (0.3081,))
-        ])
-        trainset = torchvision.datasets.MNIST(
-            args.data_dir,
-            train=True,
-            download=True,
-            transform=transform_train,
-        )
-
-        transform_test = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(
-                (0.1307,), (0.3081,))
-        ])
-
-        testset = torchvision.datasets.MNIST(
-            args.data_dir,
-            train=False,
-            download=True,
-            transform=transform_test,
-        )
-        args.pool_len = 4
-
-        if type(trainset.data) is numpy.ndarray:
-            trainset = dataset_wrapper(numpy.copy(trainset.data), numpy.copy(trainset.targets), transform_train)
-            testset = dataset_wrapper(numpy.copy(testset.data), numpy.copy(testset.targets), transform_test)
-            origin_labels = numpy.copy(trainset.targets)
-        else:
-            trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
-            testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
+        elif args.dataset.startswith('imdb'):
+            label_list = None
+            
+            sstprocess = imdb_Processor(args.data_dir)
+            label_list = sstprocess.get_labels()
+            trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
             origin_labels = trainset.targets.clone()
 
-    elif args.dataset.startswith('sst'):
-        label_list = None
-        if args.dataset.startswith('sst2'):
-            sstprocess = SST2Processor(args.data_dir)
+        elif args.dataset.startswith("trec"):
+            label_list = None
+            
+            sstprocess = trec_Processor(args.data_dir)
             label_list = sstprocess.get_labels()
-        elif args.dataset.startswith('sst5'):
-            sstprocess = SST5Processor(args.data_dir)
-            label_list = sstprocess.get_labels()
-        trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
-        origin_labels = trainset.targets.clone()
+            trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
+            origin_labels = trainset.targets.clone()
 
-    elif args.dataset.startswith('imdb'):
-        label_list = None
-        
-        sstprocess = imdb_Processor(args.data_dir)
-        label_list = sstprocess.get_labels()
-        trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
-        origin_labels = trainset.targets.clone()
-
-    elif args.dataset.startswith("trec"):
-        label_list = None
-        
-        sstprocess = trec_Processor(args.data_dir)
-        label_list = sstprocess.get_labels()
-        trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
-        origin_labels = trainset.targets.clone()
+        if args.low_data:
+            trainset = trainset.subsampling_dataset_by_class(trainset, num_per_class=args.low_data_num_samples_per_class)
+            origin_labels = trainset.targets.clone()
 
     metaset = None
         
