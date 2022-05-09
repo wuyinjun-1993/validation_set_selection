@@ -225,9 +225,10 @@ def print_cluster_dist_info(dist):
 
     print("max dist sample to assigned cluster mean::", torch.max(min_dist_values).item())
 
-    second_min_cluster_dist, second_min_cluster_ids = torch.topk(dist, k = 2, largest=False)
+    if dist.shape[1] >= 2:
+        second_min_cluster_dist, second_min_cluster_ids = torch.topk(dist, k = 2, largest=False)
 
-    print("min dist sample to other cluster mean::", torch.min(second_min_cluster_dist[:,1]).item())
+        print("min dist sample to other cluster mean::", torch.min(second_min_cluster_dist[:,1]).item())
 
 
 def rescale_dist_by_cluster_mean_norm(dist, cluster_mean_ls, all_layer = False):

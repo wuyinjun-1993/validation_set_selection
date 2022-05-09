@@ -107,7 +107,7 @@ class dataset_wrapper(Dataset):
         full_sel_sample_ids = []
         for label in label_set:
             if type(dataset.data) is numpy.ndarray:
-                sample_ids_with_curr_labels = np.nonzero((dataset.targets == label)).reshape(-1)
+                sample_ids_with_curr_labels = np.nonzero((dataset.targets == label))[0].reshape(-1)
                 sample_ids_with_curr_labels = torch.from_numpy(sample_ids_with_curr_labels)
             else:
                 sample_ids_with_curr_labels = torch.nonzero((dataset.targets == label)).reshape(-1)
@@ -496,8 +496,7 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
     update_train_ids = update_train_ids.nonzero().view(-1)
     
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
-    unique_labels_count = len(set(meta_set.targets.tolist()))
-    args.logger.info("unique label count in meta set::%d"%(unique_labels_count))
+    
 
     remaining_origin_labels = origin_labels[update_train_ids]
 
@@ -989,7 +988,10 @@ def get_dataloader_for_meta(
 
         if args.low_data:
             trainset = trainset.subsampling_dataset_by_class(trainset, num_per_class=args.low_data_num_samples_per_class)
-            origin_labels = trainset.targets.clone()
+            if type(trainset.data) is numpy.ndarray:
+                origin_labels = numpy.copy(trainset.targets)
+            else:
+                origin_labels = trainset.targets.clone()
 
     metaset = None
         
@@ -1040,6 +1042,9 @@ def get_dataloader_for_meta(
                 remaining_origin_labels,
                 cached_sample_weights=cached_sample_weights,
             )
+
+        unique_labels_count = len(set(metaset.targets.tolist()))
+        args.logger.info("unique label count in meta set::%d"%(unique_labels_count))
         
     # if args.flip_labels:
 
