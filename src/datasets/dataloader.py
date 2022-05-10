@@ -1009,14 +1009,13 @@ def get_dataloader_for_meta(
 
     remaining_origin_labels = origin_labels
 
-    if args.bias_classes:
-        trainset, remaining_origin_labels = generate_class_biased_dataset(trainset,
-                args, logger, testset, remaining_origin_labels)
-    if args.flip_labels:
-        trainset = generate_noisy_dataset(args, trainset)
-
-    if args.continue_label:
-        trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+    if args.do_train:
+        if args.bias_classes:
+            trainset, remaining_origin_labels = generate_class_biased_dataset(trainset,
+                    args, logger, testset, remaining_origin_labels)
+        if args.flip_labels:
+            trainset = generate_noisy_dataset(args, trainset)
+    else:
         trainset, new_metaset, remaining_origin_labels = selection_method(
             criterion,
             optimizer,
@@ -1027,21 +1026,11 @@ def get_dataloader_for_meta(
             remaining_origin_labels,
             cached_sample_weights=cached_sample_weights,
         )
-        metaset = metaset.concat_validset(metaset, new_metaset)
-    else:
-        trainset, metaset, remaining_origin_labels = selection_method(
-            criterion,
-            optimizer,
-            pretrained_model,
-            trainset,
-            metaset,
-            args,
-            remaining_origin_labels,
-            cached_sample_weights=cached_sample_weights,
-        )
+        if args.continue_label:
+            metaset = metaset.concat_validset(metaset, new_metaset)
+        else:
+            metaset = new_metaset
         
-    # if args.flip_labels:
-
     if validset is None:
         validset, testset = randomly_produce_valid_set(testset, transform_test, rate = 0.1)
 
