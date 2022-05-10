@@ -64,7 +64,7 @@ def handle_outliers(args, sample_ids, sample_representation_vec_ls, valid_sample
         if args.valid_count > valid_sample_representation_tensor[0].shape[0]:
             extra_cluster_count = args.valid_count - valid_sample_representation_tensor[0].shape[0]
         else:
-            extra_cluster_count = 2
+            return None, None
         
         extra_valid_ids, extra_valid_sample_representation_tensor = cluster_per_class(args, subset_outlier, subset_outlier_sample_ids, valid_count_per_class = extra_cluster_count, num_clusters = extra_cluster_count, sample_weights=sub_sample_weights, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, existing_cluster_centroids = None, handles_outlier=False)  
             # do_cluster(args, extra_cluster, subset_outlier, args.cuda, args.cosin_dist, sub_sample_weights, None, all_layer = True)
