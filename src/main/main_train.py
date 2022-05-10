@@ -79,7 +79,7 @@ def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls,
     torch.save(best_valid_acc_idx, os.path.join(args.save_path, "early_stopping_epoch"))
 
     if is_meta:
-        cache_sample_weights_given_epoch(best_valid_acc_idx+1)
+        cache_sample_weights_given_epoch(best_valid_acc_idx)
     else:
         cache_sample_weights_given_epoch_basic_train(best_valid_acc_idx)
 
@@ -252,7 +252,7 @@ def meta_learning_model(
     test_acc_ls = []
     w_array_delta_ls = []
 
-    for ep in tqdm(range(start_ep + 1, args.epochs+1)):
+    for ep in tqdm(range(start_ep, args.epochs)):
         
         train_loss, train_acc = 0, 0
         curr_w_array_delta = torch.zeros_like(w_array)
@@ -977,7 +977,7 @@ def main2(args, logger):
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         else:
             if args.model_type == 'resnet18':
-                pretrained_rep_net = resnet18(num_classes=10).cuda()
+                pretrained_rep_net = resnet18(num_classes=100).cuda()
             else:
                 pretrained_rep_net = resnet34(num_classes=100).cuda()
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
