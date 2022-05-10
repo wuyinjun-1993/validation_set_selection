@@ -91,9 +91,9 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
                     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=mile_stones_epochs, gamma=0.1) #learning rate decay
                 else:
                     if args.use_pretrained_model:
-                        mile_stones_epochs = [150, 225]
+                        mile_stones_epochs = [50, 120]
                     else:
-                        mile_stones_epochs = [150, 225]
+                        mile_stones_epochs = [150, 200]
                     if args.lr_decay:
                         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1, gamma = 0.1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
                     else:
