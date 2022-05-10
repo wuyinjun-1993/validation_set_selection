@@ -47,9 +47,11 @@ def parse_args(args=None):
     parser.add_argument('--continue_label', action='store_true', help='load dataset')
     parser.add_argument('--use_model_prov', action='store_true', help='capture model_prov')
     parser.add_argument('--model_prov_period', default=20, type=int, help='capture model_prov')
+    parser.add_argument('--valid_count', default=None, type=int, help='capture model_prov')
 
     parser.add_argument('--total_valid_sample_count', default=-1, type=int, help='capture model_prov')
 
+    parser.add_argument('--inner_prod', action='store_true', help='not save dataset')
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
     parser.add_argument('--clustering_by_class', action='store_true', help='not save dataset')
 

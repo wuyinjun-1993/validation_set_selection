@@ -1111,7 +1111,7 @@ def get_dataloader_for_meta(
 
         if args.low_data:
             trainset = trainset.subsampling_dataset_by_class(trainset, num_per_class=args.low_data_num_samples_per_class)
-            if type(trainset.data) is numpy.ndarray:
+            if type(trainset.targets) is numpy.ndarray:
                 origin_labels = numpy.copy(trainset.targets)
             else:
                 origin_labels = trainset.targets.clone()
@@ -1121,9 +1121,13 @@ def get_dataloader_for_meta(
     assert trainset is not None, "Training set was not initialized"
     assert testset is not None, "Test set was not initialized"
 
-    valid_ratio = args.valid_ratio
-    valid_count = int(len(trainset)*valid_ratio)
-    args.valid_count = valid_count
+    if args.valid_count is None:
+        valid_ratio = args.valid_ratio
+        valid_count = int(len(trainset)*valid_ratio)
+        args.valid_count = valid_count
+    else:
+        valid_count = args.valid_count
+        args.valid_count = valid_count
 
     remaining_origin_labels = []
 

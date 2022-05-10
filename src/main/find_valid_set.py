@@ -1755,7 +1755,7 @@ def obtain_farthest_training_samples(args, cosine_dist, all_layer, full_sample_r
 
     _, sorted_dist_sample_ids = torch.sort(min_dist_per_sample, descending = True)
 
-    far_sample_count = int(5*len(sorted_dist_sample_ids)/6)
+    far_sample_count = int(len(sorted_dist_sample_ids)/4)
 
     far_sample_ids = sorted_dist_sample_ids[0:far_sample_count]
 
@@ -1937,7 +1937,7 @@ def get_representative_valid_ids2_4(train_dataset, criterion, optimizer, train_l
         curr_total_valid_count = len(valid_ids) + existing_valid_representation[0].shape[0]
         # if curr_total_valid_count
         if args.total_valid_sample_count > 0 and args.total_valid_sample_count < curr_total_valid_count:
-            remaining_valid_ids, remaining_valid_sample_ids, _ = get_uncovered_new_valid_ids2(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, curr_total_valid_count- args.total_valid_sample_count, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+            remaining_valid_ids, remaining_valid_sample_ids, _ = get_uncovered_new_valid_ids2(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, args.total_valid_sample_count- existing_valid_representation[0].shape[0], cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
             valid_ids = remaining_valid_sample_ids
             valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_valid_ids] for k in range(len(valid_sample_representation_tensor))]
 
