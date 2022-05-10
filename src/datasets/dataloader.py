@@ -90,9 +90,13 @@ class dataset_wrapper(Dataset):
 
         if not type(dataset.data) is numpy.ndarray:
             subset_data = subset_data.clone()
+            if len(sample_ids) <= 1:
+                subset_data = subset_data.unsqueeze(0)
             subset_labels = subset_labels.clone()
         else:
             subset_data = numpy.copy(subset_data)
+            if len(sample_ids) <= 1:
+                subset_data = np.expand_dims(subset_data, 0)
             subset_labels = numpy.copy(subset_labels)
 
         return dataset_wrapper(subset_data, subset_labels, transform, three_imgs, two_imgs)
@@ -379,6 +383,50 @@ def random_partition_train_valid_dataset0(criterion, optimizer, net, train_datas
     return train_set, meta_set, remaining_origin_labels
 
 
+def random_partition_train_valid_dataset0_by_class(criterion, optimizer, net, train_dataset, validset, args, origin_labels, cached_sample_weights=None, sample_count_per_class = None):
+
+    unique_label_set = set(origin_labels.tolist())
+    valid_size = args.valid_count
+    if not type(origin_labels) is torch.Tensor:
+        origin_labels = torch.from_numpy(origin_labels)
+    label_id = 0
+    curr_total_valid_size = 0
+    all_selected_train_ids = []
+    all_selected_valid_ids = []
+    for label in unique_label_set:
+        if label_id < len(unique_label_set) - 1:
+            if sample_count_per_class is None:
+                curr_valid_size = int(valid_size/len(unique_label_set))
+            else:
+                curr_valid_size = int(valid_size/sum(sample_count_per_class)*sample_count_per_class[label_id])
+        else:
+            curr_valid_size = valid_size - curr_total_valid_size
+
+        curr_total_valid_size += curr_valid_size
+        curr_train_ids = torch.nonzero(origin_labels == label).view(-1)
+        rand_train_id_ids = torch.randperm(len(curr_train_ids))
+        curr_train_sample_ids = curr_train_ids[rand_train_id_ids]
+        assert torch.all(origin_labels[curr_train_sample_ids] == label) == True
+        all_selected_train_ids.append(curr_train_sample_ids[curr_valid_size:])
+        all_selected_valid_ids.append(curr_train_sample_ids[0:curr_valid_size])
+        label_id += 1
+
+    # train_ids = torch.arange(len(train_dataset))
+    # rand_train_ids = torch.randperm(len(train_ids))
+    valid_ids = torch.cat(all_selected_valid_ids)
+    update_train_ids = torch.cat(all_selected_train_ids)
+    assert curr_total_valid_size == valid_size
+    assert len(valid_ids) + len(update_train_ids) == len(origin_labels)
+    # valid_ids = rand_train_ids[:valid_size]
+
+    # update_train_ids = rand_train_ids[valid_size:]
+
+    # torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
+    train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
+    remaining_origin_labels = origin_labels[update_train_ids]
+    return train_set, meta_set, remaining_origin_labels
+
+
 def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimizer):
     validloader = DataLoader(valid_set, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
 
@@ -450,12 +498,80 @@ def init_sampling_valid_samples(net, train_dataset, train_transform, args, origi
     remaining_origin_labels = origin_labels[update_train_ids]
 
     return train_set, valid_set, meta_set, remaining_origin_labels
+
+def obtain_valid_count_ls_per_class(unique_label_set, total_valid_count, sample_count_per_class = None):
+    label_id = 0
+    curr_total_valid_count = 0
+    valid_count_ls = []
+    for label in unique_label_set:
+        if label_id < len(unique_label_set) - 1:
+            if sample_count_per_class is None:
+                curr_valid_size = int(total_valid_count/len(unique_label_set))
+            else:
+                curr_valid_size = int(total_valid_count/sum(sample_count_per_class)*sample_count_per_class[label_id])
+        else:
+            curr_valid_size = total_valid_count - curr_total_valid_count
+
+        curr_total_valid_count += curr_valid_size
+        valid_count_ls.append(curr_valid_size)
+        label_id += 1
+    
+    return valid_count_ls
+
+def find_representative_samples0_by_class(criterion, optimizer, net, train_dataset,validset,  args, origin_labels, cached_sample_weights = None, sample_count_per_class = None):
+    unique_label_set = set(origin_labels.tolist())
+    valid_labels = None
+    if validset is not None:
+        valid_labels = validset.targets
+    if not type(origin_labels) is torch.Tensor:
+        origin_labels = torch.from_numpy(origin_labels)
+        if valid_labels is not None:
+            valid_labels = torch.from_numpy(valid_labels)
+    label_id = 0
+    curr_total_valid_size = 0
+    all_selected_train_ids = []
+    all_selected_valid_ids = []
+    res_train_set, res_meta_set, res_remaining_origin_labels = None, None, None
     
 
+    valid_count_ls = obtain_valid_count_ls_per_class(unique_label_set, args.valid_count, sample_count_per_class = sample_count_per_class)
+    origin_total_valid_sample_count = args.total_valid_sample_count
+    total_valid_sample_count_ls = obtain_valid_count_ls_per_class(unique_label_set, args.total_valid_sample_count, sample_count_per_class = sample_count_per_class)
 
+    for label in unique_label_set:
+        args.logger.info("collecting meta set for label %d"%(label))
+        curr_sample_ids = torch.nonzero(origin_labels == label).view(-1)
+        curr_origin_labels = origin_labels[curr_sample_ids]
+        assert torch.all(curr_origin_labels == label) == True
+        curr_cached_sample_weights = None
+        if not cached_sample_weights is None:
+            curr_cached_sample_weights = cached_sample_weights[curr_sample_ids]
+        if not type(train_dataset.targets) is torch.Tensor:
+            curr_sample_ids = curr_sample_ids.numpy()
+        sub_trainset = train_dataset.get_subset_dataset(train_dataset, curr_sample_ids)
+        sub_validset = None
+        if validset is not None:
+            curr_valid_sample_ids = torch.nonzero(valid_labels == label).view(-1)
+            if not type(train_dataset.targets) is torch.Tensor:
+                curr_valid_sample_ids = curr_valid_sample_ids.numpy()
+            sub_validset = validset.get_subset_dataset(validset, curr_valid_sample_ids)
+        args.total_valid_sample_count = total_valid_sample_count_ls
+        res_sub_train_set, res_sub_meta_set, res_sub_remaining_origin_labels = find_representative_samples0(criterion, optimizer, net, sub_trainset,sub_validset,  args, curr_origin_labels, cached_sample_weights = curr_cached_sample_weights, valid_count=valid_count_ls[label_id])
+        if res_train_set is None:
+            res_train_set = res_sub_train_set
+            res_meta_set = res_sub_meta_set
+            res_remaining_origin_labels = res_sub_remaining_origin_labels
+        else:
+            res_train_set = res_train_set.concat_validset(res_train_set, res_sub_train_set)
+            res_meta_set = res_meta_set.concat_validset(res_meta_set, res_sub_meta_set)
+            res_remaining_origin_labels = torch.cat([res_remaining_origin_labels, res_sub_remaining_origin_labels])
+        label_id += 1
+    if not type(train_dataset.targets) is torch.Tensor:
+        res_remaining_origin_labels = res_remaining_origin_labels.numpy()
 
+    return res_train_set, res_meta_set, res_remaining_origin_labels
 
-def find_representative_samples0(criterion, optimizer, net, train_dataset,validset,  args, origin_labels, cached_sample_weights = None):
+def find_representative_samples0(criterion, optimizer, net, train_dataset,validset,  args, origin_labels, cached_sample_weights = None, valid_count = None):
     # valid_ratio = args.valid_ratio
     prob_gap_ls = torch.zeros(len(train_dataset))
 
@@ -463,10 +579,11 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
         args.logger.info("already collect enough samples, exit!!!!")
         sys.exit(1)
 
-    if validset is not None:
-        valid_count = len(validset) + args.valid_count#int(len(train_dataset)*valid_ratio)
-    else:
-        valid_count = args.valid_count
+    if valid_count is None:
+        if validset is not None:
+            valid_count = len(validset) + args.valid_count#int(len(train_dataset)*valid_ratio)
+        else:
+            valid_count = args.valid_count
 
     pred_labels = torch.zeros(len(train_dataset), dtype =torch.long)
 
@@ -1009,9 +1126,16 @@ def get_dataloader_for_meta(
     args.valid_count = valid_count
 
     remaining_origin_labels = []
-    selection_method = random_partition_train_valid_dataset0
+
+    if args.clustering_by_class:
+        selection_method = random_partition_train_valid_dataset0_by_class
+    else:
+        selection_method = random_partition_train_valid_dataset0
     if split_method == 'cluster':
-        selection_method = find_representative_samples0
+        if args.clustering_by_class:
+            selection_method = find_representative_samples0_by_class
+        else:
+            selection_method = find_representative_samples0
     elif split_method == 'uncertainty':
         selection_method = uncertainty_sample
 
