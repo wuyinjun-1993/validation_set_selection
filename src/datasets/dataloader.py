@@ -1121,9 +1121,13 @@ def get_dataloader_for_meta(
     assert trainset is not None, "Training set was not initialized"
     assert testset is not None, "Test set was not initialized"
 
-    valid_ratio = args.valid_ratio
-    valid_count = int(len(trainset)*valid_ratio)
-    args.valid_count = valid_count
+    if args.valid_count is None:
+        valid_ratio = args.valid_ratio
+        valid_count = int(len(trainset)*valid_ratio)
+        args.valid_count = valid_count
+    else:
+        valid_count = args.valid_count
+        args.valid_count = valid_count
 
     remaining_origin_labels = []
 
