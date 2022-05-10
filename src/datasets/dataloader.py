@@ -1111,7 +1111,7 @@ def get_dataloader_for_meta(
 
         if args.low_data:
             trainset = trainset.subsampling_dataset_by_class(trainset, num_per_class=args.low_data_num_samples_per_class)
-            if type(trainset.data) is numpy.ndarray:
+            if type(trainset.targets) is numpy.ndarray:
                 origin_labels = numpy.copy(trainset.targets)
             else:
                 origin_labels = trainset.targets.clone()
