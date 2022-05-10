@@ -90,14 +90,17 @@ class dataset_wrapper(Dataset):
 
         if not type(dataset.data) is numpy.ndarray:
             subset_data = subset_data.clone()
+            subset_labels = subset_labels.clone()
             if len(sample_ids) <= 1:
                 subset_data = subset_data.unsqueeze(0)
-            subset_labels = subset_labels.clone()
+                subset_labels = subset_labels.unsqueeze(0)
+            
         else:
             subset_data = numpy.copy(subset_data)
+            subset_labels = numpy.copy(subset_labels)
             if len(sample_ids) <= 1:
                 subset_data = np.expand_dims(subset_data, 0)
-            subset_labels = numpy.copy(subset_labels)
+                subset_labels = np.expand_dims(subset_labels, 0)
 
         return dataset_wrapper(subset_data, subset_labels, transform, three_imgs, two_imgs)
 

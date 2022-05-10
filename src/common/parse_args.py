@@ -50,6 +50,9 @@ def parse_args(args=None):
     parser.add_argument('--valid_count', default=None, type=int, help='capture model_prov')
 
     parser.add_argument('--total_valid_sample_count', default=-1, type=int, help='capture model_prov')
+    parser.add_argument('--k_means_lr', default=0.0001, type=float, help='capture model_prov')
+    parser.add_argument('--k_means_bz', default=128, type=int, help='capture model_prov')
+    parser.add_argument('--k_means_epochs', default=200, type=int, help='capture model_prov')
 
     parser.add_argument('--inner_prod', action='store_true', help='not save dataset')
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
