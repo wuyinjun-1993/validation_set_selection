@@ -223,7 +223,7 @@ def solve_k_mean_centroids(selected, initial_state, selected_sample_weights, ind
         else:
             full_dis = torch.mean(dis**2)
         curr_state_grad = torch.autograd.grad(full_dis, curr_state)
-        if i % 10 == 0:
+        if i % 100 == 0:
             print("grad norm::", sum([curr_state_grad[k].norm()**2 for k in range(len(curr_state_grad))]))
 
         curr_state = [curr_state[k] - learning_rate*curr_state_grad[k] for k in range(len(curr_state))]
