@@ -161,6 +161,7 @@ def cluster_per_class(
                 #         full_x_cosin_sim = torch.load(sim_mat_file_name)
                 # distance = 'cosine'
 
+            num_clusters = unique_cluster_count
         if return_cluster_info:
             return cluster_ids_x, cluster_centers
 
@@ -236,12 +237,19 @@ def cluster_per_class(
             # for idx in range(num_clusters):
 
         if not all_layer:        
-            curr_cluster_sample_representation = sample_representation_vec_ls[cluster_ids_x == cluster_id].view(torch.sum(cluster_ids_x == cluster_id), -1)
+            curr_cluster_sample_representation = sample_representation_vec_ls[cluster_ids_x == cluster_id].view(
+                torch.sum(cluster_ids_x == cluster_id), -1,
+            )
 
             if is_cuda:
                 curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
             
-            cluster_dist_ls_tensor = pairwise_distance_function(curr_cluster_sample_representation, cluster_centers[cluster_id].view(1,-1), is_cuda = is_cuda, weight_by_norm=args.weight_by_norm)
+            cluster_dist_ls_tensor = pairwise_distance_function(
+                curr_cluster_sample_representation,
+                cluster_centers[cluster_id].view(1,-1),
+                is_cuda=is_cuda,
+                weight_by_norm=args.weight_by_norm,
+            )
             
             # if args.weight_by_norm:
             #     cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, cluster_centers[cluster_id].view(1,-1), all_layer)
@@ -250,10 +258,13 @@ def cluster_per_class(
             sorted_dist_tensor, sorted_sample_idx_tensor = torch.sort(cluster_dist_ls_tensor, descending=False)
 
             selected_count = int(valid_count_per_class/num_clusters)
+            args.logger.info("Validation samples to select: %s"%(selected_count))
 
-            representive_id_ls.append(sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+            representive_id_ls.append(
+                sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
         
-            representive_representation_ls.append(sample_representation_vec_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+            representive_representation_ls.append(
+                sample_representation_vec_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
     
         else:
             curr_cluster_sample_representation_ls = []
@@ -265,7 +276,13 @@ def cluster_per_class(
                 if is_cuda:
                     curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
                 curr_cluster_sample_representation_ls.append(curr_cluster_sample_representation)
-            cluster_dist_ls_tensor = pairwise_distance_function(curr_cluster_sample_representation_ls, curr_cluster_center_ls, is_cuda = is_cuda, weight_by_norm=args.weight_by_norm)
+
+            cluster_dist_ls_tensor = pairwise_distance_function(
+                curr_cluster_sample_representation_ls,
+                curr_cluster_center_ls,
+                is_cuda=is_cuda,
+                weight_by_norm=args.weight_by_norm,
+            )
 
             # if args.weight_by_norm:
             #     cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, curr_cluster_center_ls,all_layer)
@@ -282,7 +299,8 @@ def cluster_per_class(
 
             for arr_idx in range(len(sample_representation_vec_ls)):
 
-                curr_representive_represetation.append(sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+                curr_representive_represetation.append(
+                    sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
 
             representive_representation_ls.append(curr_representive_represetation)
 

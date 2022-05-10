@@ -377,7 +377,7 @@ def random_partition_train_valid_dataset0(criterion, optimizer, net, train_datas
 
     update_train_ids = rand_train_ids[valid_size:]
 
-    torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
+    # torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
     remaining_origin_labels = origin_labels[update_train_ids]
     return train_set, meta_set, remaining_origin_labels
@@ -612,7 +612,7 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
             valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer = args.all_layer)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
 
-    torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
+    # torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
     update_train_ids = torch.ones(len(train_dataset))
     if not args.include_valid_set_in_training:
         update_train_ids[valid_ids] = 0
@@ -641,7 +641,7 @@ def uncertainty_sample(criterion, optimizer, net, train_dataset, validset, args,
     valid_ids = indices[:valid_size]
     update_train_ids = indices[valid_size:]
 
-    torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
+    # torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
     remaining_origin_labels = origin_labels[update_train_ids]
     return train_set, meta_set, remaining_origin_labels
@@ -720,7 +720,7 @@ def find_representative_samples1(net, train_dataset,validset, train_transform, a
     #     valid_ids = determine_new_valid_ids(valid_ids, new_valid_representations, existing_valid_representation, valid_count)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
 
-    torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
+    # torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
     update_train_ids = torch.ones(len(train_dataset))
     if not args.include_valid_set_in_training:
         update_train_ids[valid_ids] = 0
@@ -913,6 +913,18 @@ def randomly_produce_valid_set(testset, transform_test, rate = 0.1):
 
     return validset, testset
 
+def experiment_tag(args):
+    if args.bias_classes:
+        return args.dataset + "_imb_" + str(args.imb_factor)
+    elif args.flip_labels and args.biased_flip:
+        return args.dataset + "_biased_noise_" + str(args.err_label_ratio)
+    elif args.flip_labels and args.adversarial_flip:
+        return args.dataset + "_adversarial_noise_" + str(args.err_label_ratio)
+    elif args.flip_labels:
+        return args.dataset + "_unif_noise_" + str(args.err_label_ratio)
+    else:
+        return ""
+
 def generate_class_biased_dataset(trainset, args, logger, testset, origin_labels):
     if not args.load_dataset:
         imb_trainset = datasets.ImbalanceDataset(trainset, args.imb_factor)
@@ -921,11 +933,23 @@ def generate_class_biased_dataset(trainset, args, logger, testset, origin_labels
         logger.info(f"Total number of training samples: {trainset.data.shape[0]}")
         logger.info(f"Total number of testing samples: {testset.data.shape[0]}")
         assert trainset.data.shape[0] == len(trainset)
-        torch.save(trainset, os.path.join(args.data_dir, args.dataset + "_bias_class_dataset"))
-        torch.save(origin_labels, os.path.join(args.data_dir, args.dataset + "_bias_class_origin_labels"))
+        torch.save(trainset, os.path.join(
+            args.data_dir,
+            experiment_tag(args) + "_bias_class_dataset"),
+        )
+        torch.save(origin_labels, os.path.join(
+            args.data_dir,
+            experiment_tag(args) + "_bias_class_origin_labels"),
+        )
     else:
-        trainset = torch.load(os.path.join(args.data_dir, args.dataset + "_bias_class_dataset"))
-        origin_labels = torch.load(os.path.join(args.data_dir, args.dataset + "_bias_class_origin_labels"))
+        trainset = torch.load(os.path.join(
+            args.data_dir,
+            experiment_tag(args) + "_bias_class_dataset"),
+        )
+        origin_labels = torch.load(os.path.join(
+            args.data_dir,
+            experiment_tag(args) + "_bias_class_origin_labels"),
+        )
     return trainset, origin_labels
 
 
@@ -939,23 +963,27 @@ def generate_noisy_dataset(args, trainset):
         logging.info("Not loading dataset")
         if args.adversarial_flip:
             flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
+        elif args.biased_flip:
+            flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
         else:
-            if args.biased_flip:
-                flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
-            else:
-                flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
-        torch.save(flipped_labels, os.path.join(args.data_dir, args.dataset + "_flipped_labels"))
+            flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+        torch.save(flipped_labels, os.path.join(
+            args.data_dir,
+            experiment_tag(args) + "_flipped_labels"),
+        )
     else:
         logging.info("Loading dataset")
-        flipped_label_dir = os.path.join(args.data_dir, args.dataset + "_flipped_labels")
+        flipped_label_dir = os.path.join(
+            args.data_dir,
+            experiment_tag(args) + "_flipped_labels",
+        )
         if not os.path.exists(flipped_label_dir):
             if args.adversarial_flip:
                 flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
+            elif args.biased_flip:
+                flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
             else:
-                if args.biased_flip:
-                    flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
-                else:
-                    flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
+                flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
             torch.save(flipped_labels, flipped_label_dir)
         flipped_labels = torch.load(flipped_label_dir)
     trainset.targets = flipped_labels
@@ -1152,6 +1180,9 @@ def get_dataloader_for_meta(
         if args.flip_labels:
             trainset = generate_noisy_dataset(args, trainset)
     else:
+        if args.continue_label:
+            trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+
         trainset, new_metaset, remaining_origin_labels = selection_method(
             criterion,
             optimizer,
