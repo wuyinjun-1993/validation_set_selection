@@ -75,6 +75,7 @@ exe_cmd="python -m torch.distributed.launch \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
+  --lr_decay \
   --do_train"
 
 

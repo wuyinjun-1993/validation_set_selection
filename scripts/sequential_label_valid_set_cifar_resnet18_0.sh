@@ -21,6 +21,7 @@ epochs=${13}
 #cached_model_name=${14}
 add_valid_in_training_set=${14}
 lr_decay=${15}
+model_type=${16}
 
 valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 
@@ -65,17 +66,19 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_count ${valid_ratio_each_run} \
+  --valid_ratio ${valid_ratio_each_run} \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr 0.02 \
+  --lr 0.05 \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  --do_train"
+  --model_type ${model_type} \
+  --do_train\
+  --lr_decay"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_0.txt
@@ -84,7 +87,7 @@ output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_rat
 echo "${exe_cmd} > ${output_file_name}"
 
 
-#${exe_cmd} > ${output_file_name} 2>&1
+${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
@@ -96,13 +99,14 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_count ${valid_ratio_each_run} \
+  --valid_ratio ${valid_ratio_each_run} \
   --meta_lr 5 \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
   --prev_save_path ${save_path_prefix}_do_train/ \
   --cuda \
+  --model_type ${model_type} \
   --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
@@ -142,7 +146,7 @@ do
     --nce-k 200 \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
-    --valid_count ${valid_ratio_each_run} \
+    --valid_ratio ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     --flip_labels \
@@ -150,6 +154,7 @@ do
     --save_path ${save_path_prefix}_seq_select_$k/ \
     --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
     --cuda \
+    --model_type ${model_type} \
     --lr ${lr} \
     --batch_size ${batch_size} \
     --test_batch_size ${test_batch_size} \
