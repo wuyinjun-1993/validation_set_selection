@@ -1981,7 +1981,7 @@ def get_representative_valid_ids2_4(train_dataset, criterion, optimizer, train_l
     origin_X_ls_lenth = len(full_sample_representation_tensor)
 
     args.origin_X_ls_lenth = origin_X_ls_lenth
-    if args.not_rescale_features:
+    if not args.not_rescale_features:
         full_sample_representation_tensor = scale_and_extend_data_vector(full_sample_representation_tensor)
 
     if only_sample_representation:
