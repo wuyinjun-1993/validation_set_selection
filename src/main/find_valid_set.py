@@ -215,7 +215,6 @@ def cluster_per_class(
                 #         full_x_cosin_sim = torch.load(sim_mat_file_name)
                 # distance = 'cosine'
 
-            num_clusters = unique_cluster_count
         if return_cluster_info:
             return cluster_ids_x, cluster_centers
 

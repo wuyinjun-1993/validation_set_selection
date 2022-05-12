@@ -1030,12 +1030,22 @@ def main2(args, logger):
             pretrained_model=pretrained_rep_net,
             cached_sample_weights=cached_sample_weights,
         )
-    elif args.active_select:
+    elif args.uncertain_select:
         trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
             criterion,
             optimizer,
             args,
             'uncertainty',
+            logger,
+            pretrained_model=pretrained_rep_net,
+            cached_sample_weights=cached_sample_weights,
+        )
+    elif args.certain_select:
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
+            criterion,
+            optimizer,
+            args,
+            'certainty',
             logger,
             pretrained_model=pretrained_rep_net,
             cached_sample_weights=cached_sample_weights,

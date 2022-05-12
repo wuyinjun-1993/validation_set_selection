@@ -76,7 +76,8 @@ def parse_args(args=None):
 
     parser.add_argument('--do_train', action='store_true', help='do training')
     parser.add_argument('--active_learning', action='store_true', help='perform training with active learning')
-    parser.add_argument('--active_select', action='store_true', help='perform training with active learning')
+    parser.add_argument('--uncertain_select', action='store_true', help='perform training with active learning')
+    parser.add_argument('--certain_select', action='store_true', help='perform training with active learning')
     parser.add_argument('--load_cached_weights', action='store_true', help='load_cached_weights')
     parser.add_argument('--lr_decay', action='store_true', help='load_cached_weights')
 

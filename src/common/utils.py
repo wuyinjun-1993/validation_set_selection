@@ -67,7 +67,10 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
 
             else:
                 if args.use_pretrained_model:
-                    mile_stones_epochs = [40,43]
+                    if args.bias_classes:
+                        mile_stones_epochs = [80, 90]
+                    else:
+                        mile_stones_epochs = [40,43]
                 else:
                     mile_stones_epochs = [100,180]
                 if args.lr_decay:

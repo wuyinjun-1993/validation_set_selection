@@ -632,18 +632,68 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
 
 def uncertainty_sample(criterion, optimizer, net, train_dataset, validset, args, origin_labels, cached_sample_weights=None):
     vals = torch.zeros((train_dataset.targets.shape[0],))
+    labels = torch.zeros((train_dataset.targets.shape[0],)).long()
     trainloader = DataLoader(train_dataset, batch_size=32, shuffle=False)
-    for _, (indices, data, _) in enumerate(trainloader):
+    for _, (indices, data, target) in enumerate(trainloader):
         if args.cuda:
             data = data.cuda()
         with torch.no_grad():
             output = net(data)
         vals[indices] = F.cross_entropy(output, output).cpu()
+        labels[indices] = target.cpu()
 
-    valid_size = args.valid_count
-    _, indices = torch.sort(vals, descending=True)
-    valid_ids = indices[:valid_size]
-    update_train_ids = indices[valid_size:]
+    if args.clustering_by_class:
+        valid_ids = []
+        update_train_ids = []
+        unique_label_set = set(labels.tolist())
+        valid_size = int(args.valid_count / len(unique_label_set))
+        all_indices = torch.arange(labels.shape[0])
+        for l in unique_label_set:
+            _, indices = torch.sort(vals[labels == l], descending=True)
+            valid_ids.append(all_indices[labels == l][indices[:valid_size]])
+            update_train_ids.append(all_indices[labels == l][indices[valid_size:]])
+        valid_ids = torch.cat(valid_ids)
+        update_train_ids = torch.cat(update_train_ids)
+    else:
+        valid_size = args.valid_count
+        _, indices = torch.sort(vals, descending=True)
+        valid_ids = indices[:valid_size]
+        update_train_ids = indices[valid_size:]
+
+    # torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
+    train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
+    remaining_origin_labels = origin_labels[update_train_ids]
+    return train_set, meta_set, remaining_origin_labels
+
+def certainty_sample(criterion, optimizer, net, train_dataset, validset, args, origin_labels, cached_sample_weights=None):
+    vals = torch.zeros((train_dataset.targets.shape[0],))
+    labels = torch.zeros((train_dataset.targets.shape[0],)).long()
+    trainloader = DataLoader(train_dataset, batch_size=32, shuffle=False)
+    for _, (indices, data, target) in enumerate(trainloader):
+        if args.cuda:
+            data = data.cuda()
+        with torch.no_grad():
+            output = net(data)
+        vals[indices] = F.cross_entropy(output, output).cpu()
+        labels[indices] = target.cpu()
+
+    if args.clustering_by_class:
+        valid_ids = []
+        update_train_ids = []
+        unique_label_set = set(labels.tolist())
+        valid_size = int(args.valid_count / len(unique_label_set))
+        all_indices = torch.arange(labels.shape[0])
+        for l in unique_label_set:
+            _, indices = torch.sort(vals[labels == l], descending=False)
+            valid_ids.append(all_indices[labels == l][indices[:valid_size]])
+            update_train_ids.append(all_indices[labels == l][indices[valid_size:]])
+        valid_ids = torch.cat(valid_ids)
+        update_train_ids = torch.cat(update_train_ids)
+    else:
+        valid_size = args.valid_count
+        _, indices = torch.sort(vals, descending=False)
+        valid_ids = indices[:valid_size]
+        update_train_ids = indices[valid_size:]
 
     # torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
@@ -1174,6 +1224,8 @@ def get_dataloader_for_meta(
             selection_method = find_representative_samples0
     elif split_method == 'uncertainty':
         selection_method = uncertainty_sample
+    elif split_method == 'certainty':
+        selection_method = certainty_sample
 
     remaining_origin_labels = origin_labels
 
