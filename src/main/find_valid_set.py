@@ -1607,6 +1607,12 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
 
 
         print()
+
+    origin_X_ls_lenth = len(full_sample_representation_tensor)
+
+    args.origin_X_ls_lenth = origin_X_ls_lenth
+
+    full_sample_representation_tensor = scale_and_extend_data_vector(full_sample_representation_tensor)
     # valid_ids_ls = []
     # valid_sample_representation_ls = []
     # full_sample_representation_ls = []

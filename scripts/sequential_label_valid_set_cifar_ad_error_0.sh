@@ -37,7 +37,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_three --cosin_dist --weight_by_norm --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
+add_valid_in_training_flag="--cluster_method_three --cosin_dist --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -65,7 +65,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_ratio ${valid_ratio_each_run} \
+  --valid_count ${valid_ratio_each_run} \
   --meta_lr ${meta_lr} \
   --biased_flip \
   --flip_labels \
@@ -98,7 +98,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_ratio ${valid_ratio_each_run} \
+  --valid_count ${valid_ratio_each_run} \
   --meta_lr 5 \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
@@ -145,7 +145,7 @@ do
     --nce-k 200 \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
-    --valid_ratio ${valid_ratio_each_run} \
+    --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     --flip_labels \

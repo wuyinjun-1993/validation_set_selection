@@ -162,6 +162,10 @@ class ResNet(nn.Module):
     x = x.view(x.size(0), -1)
     return x
 
+  def feature_forward(self, x, all_layer=False):
+    out = self.features(x)
+    return out
+
   def forward(self, x):
     x = self.features(x)
     x = self.fc(x)

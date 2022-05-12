@@ -234,8 +234,8 @@ def meta_learning_model(
             w_array = (w_array / torch.sum(w_array)) * w_array.shape[0]
             w_array.requires_grad = True
         else:
-            # w_array = torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
-            w_array = torch.ones(len(train_loader.dataset), requires_grad=True, device=device)
+            w_array = torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
+            # w_array = torch.ones(len(train_loader.dataset), requires_grad=True, device=device)
     else:
         cached_w_array.requires_grad = False
         w_array = cached_w_array.clone()
@@ -971,13 +971,13 @@ def main2(args, logger):
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
             if args.model_type == 'resnet18':
-                pretrained_rep_net = resnet18(num_classes=10).cuda()
+                pretrained_rep_net = ResNet18(num_classes=10).cuda()
             else:    
                 pretrained_rep_net = resnet34(num_classes=10).cuda()
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         else:
             if args.model_type == 'resnet18':
-                pretrained_rep_net = resnet18(num_classes=100).cuda()
+                pretrained_rep_net = ResNet18(num_classes=100).cuda()
             else:
                 pretrained_rep_net = resnet34(num_classes=100).cuda()
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
@@ -1100,9 +1100,15 @@ def main2(args, logger):
         net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
-            net = resnet34(num_classes=10)
+            if args.model_type == 'resnet18':
+                net = ResNet18(num_classes=10)
+            else:
+                net = resnet34(num_classes=10)
         elif args.dataset == 'cifar100':
-            net = resnet34(num_classes=100)
+            if args.model_type == 'resnet18':
+                net = ResNet18(num_classes=100)
+            else:
+                net = resnet34(num_classes=100)
     elif args.dataset.startswith('sst2'):
         net = custom_Bert(2)
     elif args.dataset.startswith('sst5'):
