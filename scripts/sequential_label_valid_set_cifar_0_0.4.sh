@@ -3,7 +3,7 @@ trap "exit" INT
 
 
 
-err_label_ratio=0.6
+err_label_ratio=0.4
 
 dataset_name=$1
 data_dir=$2
@@ -84,7 +84,7 @@ output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_rat
 echo "${exe_cmd} > ${output_file_name}"
 
 
-#${exe_cmd} > ${output_file_name} 2>&1
+${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
