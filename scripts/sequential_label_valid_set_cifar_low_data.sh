@@ -37,7 +37,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 #-cluster_method_three --cosin_dist --weight_by_norm --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}
-add_valid_in_training_flag="--cluster_method_three --cosin_dist --weight_by_norm --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
+add_valid_in_training_flag="--cluster_method_three --cosin_dist --weight_by_norm --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --all_layer_grad_no_full_loss --inner_prod --k_means_epochs 200 --k_means_lr 0.00002"
 lr_decay_flag="--use_pretrained_model"
 
 <<cmd
@@ -65,7 +65,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_ratio ${valid_ratio_each_run} \
+  --valid_count ${valid_ratio_each_run} \
   --meta_lr ${meta_lr} \
   --low_data \
   --low_data_num_samples_per_class ${err_label_ratio} \
@@ -95,7 +95,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_ratio ${valid_ratio_each_run} \
+  --valid_count ${valid_ratio_each_run} \
   --meta_lr 5 \
   --select_valid_set \
   --low_data \
@@ -111,7 +111,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_low_data_${err_label_ratio}_valid_select_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_low_data_${err_label_ratio}_valid_select_0_2.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -142,7 +142,7 @@ do
     --nce-k 200 \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
-    --valid_ratio ${valid_ratio_each_run} \
+    --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     --low_data \
@@ -157,7 +157,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_low_data_${err_label_ratio}_valid_select_seq_select_$k.txt
+	output_file_name=${output_dir}/output_${dataset_name}_low_data_${err_label_ratio}_valid_select_seq_select_${k}_2.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	

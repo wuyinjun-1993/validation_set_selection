@@ -65,7 +65,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_ratio ${valid_ratio_each_run} \
+  --valid_count ${valid_ratio_each_run} \
   --meta_lr ${meta_lr} \
   --low_data \
   --low_data_num_samples_per_class ${err_label_ratio} \
@@ -95,7 +95,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_ratio ${valid_ratio_each_run} \
+  --valid_count ${valid_ratio_each_run} \
   --meta_lr 5 \
   --low_data \
   --low_data_num_samples_per_class ${err_label_ratio} \
@@ -140,7 +140,7 @@ do
     --nce-k 200 \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
-    --valid_ratio ${valid_ratio_each_run} \
+    --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     --low_data \
@@ -155,7 +155,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_low_data_${err_label_ratio}_valid_select_seq_select_$k.txt
+	output_file_name=${output_dir}/output_${dataset_name}_low_data_${err_label_ratio}_rand_seq_select_$k.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	
