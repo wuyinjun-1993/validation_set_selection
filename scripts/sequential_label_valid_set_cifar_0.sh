@@ -37,7 +37,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_three --cosin_dist --weight_by_norm --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
+add_valid_in_training_flag="--cluster_method_three --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -71,10 +71,11 @@ exe_cmd="python -m torch.distributed.launch \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr 0.02 \
+  --lr 0.1 \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
+  --lr_decay \
   --do_train"
 
 
@@ -84,7 +85,7 @@ output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_rat
 echo "${exe_cmd} > ${output_file_name}"
 
 
-#${exe_cmd} > ${output_file_name} 2>&1
+${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \

@@ -338,6 +338,7 @@ def load_checkpoint_by_epoch(args, model, epoch):
             cached_model_file_name = os.path.join(args.prev_save_path, cached_model_name)
 
         if not os.path.exists(cached_model_file_name):
+            args.logger.warning("Could not find cached model: %s"%(cached_model_file_name))
             return None
             
         state = torch.load(cached_model_file_name, map_location=torch.device("cpu"))
