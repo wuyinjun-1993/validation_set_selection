@@ -447,8 +447,8 @@ def kmeans(
     #     X = X.cuda()
 
     # initialize
-    # initial_state = initialize(X, num_clusters, all_layer = all_layer)
-    initial_state = kmeans_init(X, num_clusters, pairwise_distance_function, all_layer, is_cuda, weight_by_norm=weight_by_norm, inner_prod=inner_prod, ls_idx_range=origin_X_ls_lenth)
+    initial_state = initialize(X, num_clusters, all_layer = all_layer)
+    # initial_state = kmeans_init(X, num_clusters, pairwise_distance_function, all_layer, is_cuda, weight_by_norm=weight_by_norm, inner_prod=inner_prod, ls_idx_range=origin_X_ls_lenth)
     if is_cuda:
         if not all_layer:
             initial_state = initial_state.cuda()

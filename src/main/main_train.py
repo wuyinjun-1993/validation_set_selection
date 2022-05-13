@@ -494,11 +494,13 @@ def meta_learning_model(
                     ms_idx = len(mile_stones_epochs)
 
                 curr_ilp_learning_rate = args.meta_lr*(0.1**(ms_idx))
-                logger.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
+                
             else:
                 if ep > 120:
                     curr_ilp_learning_rate = args.meta_lr*0.1
-                    logger.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
+                    # logger.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
+
+            logger.info("meta learning rate at iteration %d: %f" %(int(ep), curr_ilp_learning_rate))
             # min_valid_loss_epoch = numpy.argmin(numpy.array(valid_loss_ls))
             # if min_valid_loss_epoch < ep-1:
             # opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
@@ -1146,7 +1148,7 @@ def main2(args, logger):
         net = net.cuda()
 
     net = DDP(net, device_ids=[args.local_rank])
-    optimizer, scheduler = obtain_optimizer_scheduler(args, net, start_epoch = start_epoch)
+    optimizer, (scheduler, mile_stones_epochs) = obtain_optimizer_scheduler(args, net, start_epoch = start_epoch)
     
     warmup_scheduler = None
 

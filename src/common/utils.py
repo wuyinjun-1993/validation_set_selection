@@ -48,6 +48,7 @@ def set_logger(args):
 
 
 def obtain_optimizer_scheduler(args, net, start_epoch = 0):
+    mile_stones_epochs = None
     if args.dataset == 'MNIST':
         optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
         scheduler = None
@@ -119,4 +120,4 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
                             scheduler = None
 
 
-    return optimizer, scheduler
+    return optimizer, (scheduler, mile_stones_epochs)
