@@ -1464,10 +1464,13 @@ def get_extra_representations_last_layer2(train_dataset, args, train_loader, cri
         if full_valid_sample_representation_vec_ls is not None:
             full_valid_sample_representation_vec_ls = [full_valid_sample_representation_vec_ls]
 
-    epoch_count = 0 
-    for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
-        if epoch_count > 5:
-            break
+    epoch_count = 0
+    max_net_prov_count = 5 
+    for k in range(0, max_net_prov_count):
+    # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+        ep = start_epoch_id + k*args.model_prov_period
+        # if epoch_count > 5:
+        #     break
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:
             continue
@@ -1497,7 +1500,11 @@ def get_extra_gradient_layer(args, train_loader, criterion, net, full_sample_rep
         # start_epoch_id = int(args.epochs/2)
     
 
-    for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+    # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+    max_net_prov_count = 5 
+    for k in range(0, max_net_prov_count):
+    # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+        ep = start_epoch_id + k*args.model_prov_period
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:
             continue
