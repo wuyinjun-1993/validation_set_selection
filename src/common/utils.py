@@ -52,72 +52,90 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
     if args.dataset == 'MNIST':
         optimizer = torch.optim.SGD(net.parameters(), lr=args.lr)
         scheduler = None
-    else:
-        if args.dataset == 'cifar10':
-            optimizer = torch.optim.SGD(net.parameters(), lr=args.lr,
-                    momentum=0.9, weight_decay=5e-4)
-            optimizer.param_groups[0]['initial_lr'] = args.lr
-            if args.do_train:
+    elif args.dataset == 'cifar10':
+        optimizer = torch.optim.SGD(net.parameters(), lr=args.lr,
+                momentum=0.9, weight_decay=5e-4, nesterov=True)
+        optimizer.param_groups[0]['initial_lr'] = args.lr
+        if args.do_train:
+            if args.bias_classes:
+                mile_stones_epochs = [160, 180]
+                gamma = 0.1
+            else:
                 mile_stones_epochs = [100, 110]
+                gamma = 0.2
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer,
+                milestones=mile_stones_epochs,
+                last_epoch=start_epoch-1,
+                gamma=gamma,
+            )
+
+        else:
+            if args.use_pretrained_model:
+                if args.bias_classes:
+                    mile_stones_epochs = [0, 80, 90]
+                    gamma = 0.2
+                else:
+                    mile_stones_epochs = [80,90]
+                    gamma = 0.1
+            else:
+                mile_stones_epochs = [100,110]
+                gamma = 0.1
+
+            if args.lr_decay:
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(
                     optimizer,
                     milestones=mile_stones_epochs,
                     last_epoch=start_epoch-1,
-                    gamma=0.2,
-                )#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-
+                    gamma=gamma,
+                )
             else:
-                if args.use_pretrained_model:
-                    if args.bias_classes:
-                        mile_stones_epochs = [80, 90]
-                    else:
-                        mile_stones_epochs = [80,90]
-                else:
-                    mile_stones_epochs = [100,110]
-                if args.lr_decay:
-                    scheduler = torch.optim.lr_scheduler.MultiStepLR(
-                        optimizer,
-                        milestones=mile_stones_epochs,
-                        last_epoch=start_epoch-1,
-                        gamma=0.1,
-                    )#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-                else:
-                    scheduler = None
+                scheduler = None
+    elif args.dataset == 'cifar100':
+        optimizer = torch.optim.SGD(net.parameters(), lr=args.lr,
+                momentum=0.9, weight_decay=5e-4, nesterov=True)
+        optimizer.param_groups[0]['initial_lr'] = args.lr
+        if args.do_train:
+            if args.bias_classes:
+                mile_stones_epochs = [160, 180]
+            else:
+                mile_stones_epochs = [150, 225]
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer,
+                milestones=mile_stones_epochs,
+                gamma=0.1,
+            )
         else:
-            if args.dataset == 'cifar100':
-                optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
-                optimizer.param_groups[0]['initial_lr'] = args.lr
-                if args.do_train:
-                    # mile_stones_epochs = [100, 200]
-                    mile_stones_epochs = [150, 225]
-                    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                    #                                             milestones=mile_stones_epochs, last_epoch=start_epoch-1, gamma = 0.1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-                    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=mile_stones_epochs, gamma=0.1) #learning rate decay
-                else:
-                    if args.use_pretrained_model:
-                        mile_stones_epochs = [80, 90]#[150, 225]
-                    else:
-                        mile_stones_epochs = [150, 200]
-                    if args.lr_decay:
-                        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=mile_stones_epochs, last_epoch=start_epoch-1, gamma = 0.1)#torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-                    else:
-                        scheduler = None
+            if args.use_pretrained_model:
+                mile_stones_epochs = [0, 80, 90]
+                gamma = 0.2
             else:
-                if args.dataset.startswith('sst'):
-                    optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-                    scheduler = None
-                else:
-                    if args.dataset.startswith('imdb'):
-                        # pretrained_rep_net = custom_Bert(2)
-                        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
-                        optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-                        scheduler = None
-                    else:
-                        if args.dataset.startswith('trec'):
-                            # pretrained_rep_net = custom_Bert(2)
-                            # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
-                            optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-                            scheduler = None
+                mile_stones_epochs = [150, 200]
+                gamma = 0.1
+            if args.lr_decay:
+                scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=mile_stones_epochs,
+                    last_epoch=start_epoch-1,
+                    gamma=gamma,
+                )
+            else:
+                scheduler = None
+    elif args.dataset.startswith('sst'):
+        optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+        scheduler = None
+    elif args.dataset.startswith('imdb'):
+        # pretrained_rep_net = custom_Bert(2)
+        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+        optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+        scheduler = None
+    elif args.dataset.startswith('trec'):
+        # pretrained_rep_net = custom_Bert(2)
+        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
+        optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+        scheduler = None
+    else:
+        raise NotImplementedError
 
 
     return optimizer, (scheduler, mile_stones_epochs)

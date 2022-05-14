@@ -983,6 +983,7 @@ def main2(args, logger):
             else:
                 pretrained_rep_net = resnet34(num_classes=100).cuda()
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
+        pretrained_rep_net.eval()
         
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('sst2'):
