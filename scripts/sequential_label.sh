@@ -23,17 +23,25 @@ then
   noise_cmd="--bias_classes --imb_factor ${err_param} --all_layer_grad_no_full_loss"
 fi
 
-if [ ${valid_selection} = "ours" ];
+if [ ${valid_selection} = "ours1" ];
 then
   # selection_cmd="--select_valid_set --cluster_method_three --cosin_dist --lr_decay --weight_by_norm --use_model_prov --model_prov_period 10 --replace"
   selection_cmd="--select_valid_set \
     --cluster_method_two \
-    --clustering_by_class \
-    --cosin_dist \
-    --lr_decay \
     --use_model_prov \
     --model_prov_period 10 \
-    --replace"
+    --replace \
+    --cosin_dist \
+    --lr_decay"
+elif [ ${valid_selection} = "ours2" ];
+then
+  selection_cmd="--select_valid_set \
+    --cluster_method_three \
+    --use_model_prov \
+    --model_prov_period 10 \
+    --replace \
+    --cosin_dist \
+    --lr_decay"
 elif [ ${valid_selection} = "uncertainty" ];
 then
   selection_cmd="--uncertain_select --lr_decay --clustering_by_class"
@@ -82,7 +90,7 @@ do
 
   if [ $k -ge 2 ]
   then
-    ${exe_cmd} --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights > ${output_file_name} 2>&1
+    ${exe_cmd} --load_cached_weights --cached_sample_weights_name cached_sample_weights > ${output_file_name} 2>&1
   else
     ${exe_cmd} > ${output_file_name} 2>&1
   fi
