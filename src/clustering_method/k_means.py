@@ -309,8 +309,13 @@ def kmeans_init(data, num_clusters, distance, all_layer,is_cuda, weight_by_norm 
         ## initialize a list to store distances of data
         ## points from nearest centroid
         # dist = []
+        if all_layer:
+            full_dist = distance(data, centroids,is_cuda, weight_by_norm=weight_by_norm, inner_prod= inner_prod, ls_idx_range=ls_idx_range)
+        else:
+            full_dist = distance(data, centroids,is_cuda, weight_by_norm=weight_by_norm)
 
-        full_dist = distance(data, centroids, is_cuda, weight_by_norm = weight_by_norm, inner_prod = inner_prod, ls_idx_range = ls_idx_range)
+
+        # full_dist = distance(data, centroids, is_cuda, weight_by_norm = weight_by_norm, inner_prod = inner_prod, ls_idx_range = ls_idx_range)
         dist = torch.min(full_dist, dim = 1)[0]
         # for i in range(num_samples):
         #     if not all_layer:
@@ -447,8 +452,8 @@ def kmeans(
     #     X = X.cuda()
 
     # initialize
-    initial_state = initialize(X, num_clusters, all_layer = all_layer)
-    # initial_state = kmeans_init(X, num_clusters, pairwise_distance_function, all_layer, is_cuda, weight_by_norm=weight_by_norm, inner_prod=inner_prod, ls_idx_range=origin_X_ls_lenth)
+    # initial_state = initialize(X, num_clusters, all_layer = all_layer)
+    initial_state = kmeans_init(X, num_clusters, pairwise_distance_function, all_layer, is_cuda, weight_by_norm=weight_by_norm, inner_prod=inner_prod, ls_idx_range=origin_X_ls_lenth)
     if is_cuda:
         if not all_layer:
             initial_state = initial_state.cuda()
@@ -561,6 +566,13 @@ def kmeans(
             break
     
     print_cluster_dist_info(dis)
+    
+    if all_layer:
+        no_abs_dis = pairwise_distance_function(X, full_centroid_state,is_cuda, agg = agg_sim_array, weight_by_norm=weight_by_norm, inner_prod= inner_prod, ls_idx_range=origin_X_ls_lenth, no_abs = True)
+    else:
+        no_abs_dis = pairwise_distance_function(X, full_centroid_state,is_cuda, weight_by_norm=weight_by_norm, no_abs = True)
+
+
     if not all_layer:
         return choice_cluster.cpu(), initial_state.cpu()
     else:
@@ -1429,7 +1441,7 @@ def pairwise_cosine_full_by_sample_ids(full_cosin_sim, sample_ids_ls, is_cuda=Fa
 
 
 
-def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg = 'mean', ls_idx_range=-1, weight_by_norm=False, inner_prod = False):
+def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg = 'mean', ls_idx_range=-1, weight_by_norm=False, inner_prod = False, no_abs = False):
 
     if ls_idx_range < 0:
         ls_idx_range = len(data1_ls)
@@ -1506,10 +1518,16 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg 
             if not weight_by_norm:
                 # total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
                 total_norm_ls = torch.sqrt(vec_norm_ls1.view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
-                max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
+                if no_abs:
+                    max_cosine_sim = total_cosin_ls/total_norm_ls
+                else:
+                    max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
             else:
                 total_norm_ls = torch.sqrt(vec_norm_ls1.view(-1).unsqueeze(1)*torch.ones_like(torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1)).unsqueeze(0))
-                max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
+                if no_abs:
+                    max_cosine_sim = total_cosin_ls/total_norm_ls
+                else:
+                    max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
         # if agg == 'mean':
         # max_cosine_sim = torch.mean(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
         # else:
