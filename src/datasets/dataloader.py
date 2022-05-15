@@ -778,7 +778,7 @@ def find_representative_samples1(net, train_dataset,validset, train_transform, a
     valid_count = len(validset) + args.valid_count
 
     cluster_ids_x, cluster_centers = kmeans( 
-        X=torch.transpose(prev_w_array_delta_ls_tensor,0,1), num_clusters=valid_count, distance='euclidean', device = prev_w_array_delta_ls_tensor.device)
+        X=torch.transpose(prev_w_array_delta_ls_tensor,0,1), num_clusters=valid_count, distance='euclidean', device = prev_w_array_delta_ls_tensor.device, rand_init=args.rand_init)
 
     sorted_prev_w_array_idx_cluster_idx = cluster_ids_x[sorted_prev_w_array_total_delta_tensor_idx]
 
