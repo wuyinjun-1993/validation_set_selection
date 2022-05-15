@@ -1174,7 +1174,7 @@ def obtain_representations_last_layer_given_model(args, train_loader, net, crite
         if args.cuda:
             data, labels = train_loader.dataset.to_cuda(data, labels)
             # labels = labels.cuda()
-        if not args.full_model_out:
+        if not args.cluster_method_two_plus:
             sample_representation = net.feature_forward(data, all_layer=False)
         else:
             # sample_representation = F.softmax(net.forward(data),dim=1)
