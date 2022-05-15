@@ -1177,7 +1177,8 @@ def obtain_representations_last_layer_given_model(args, train_loader, net, crite
         if not args.full_model_out:
             sample_representation = net.feature_forward(data, all_layer=False)
         else:
-            sample_representation = F.softmax(net.forward(data),dim=1)
+            # sample_representation = F.softmax(net.forward(data),dim=1)
+            sample_representation = net.feature_forward2(data, all_layer=False)
 
         if not args.all_layer and not args.all_layer2:
             sample_representation_vec_ls.append(sample_representation.detach().cpu())

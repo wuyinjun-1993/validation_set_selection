@@ -574,6 +574,58 @@ def find_representative_samples0_by_class(criterion, optimizer, net, train_datas
 
     return res_train_set, res_meta_set, res_remaining_origin_labels
 
+
+def obtain_grad_last_layer(trainloader, args, net):
+    output_probs_ls = []
+
+    for batch_id, (sample_ids, data, labels) in tqdm(enumerate(trainloader)):
+
+        if args.cuda:
+            data, labels = trainloader.dataset.to_cuda(data, labels)
+
+        output_probs = F.softmax(net.forward(data),dim=1)
+
+        label_info = F.one_hot(labels.view(-1), num_classes=output_probs.shape[1])
+
+        output_probs_ls.append((output_probs.detach() - label_info).cpu())
+
+    output_probs_tensor = torch.cat(output_probs_ls)
+
+    return output_probs_tensor
+
+def obtain_sample_pair_distance_bound(train_dataset, metaset, criterion, optimizer, trainloader, args, net, valid_representations, cached_sample_weights, valid_count, validset):
+    if not args.cluster_method_two:
+        if args.cluster_method_three:
+            # valid_ids, new_valid_representations = get_representative_valid_ids3(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
+            full_sample_representation_tensor = get_representative_valid_ids2_4(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, only_sample_representation=True)
+            
+        else:
+            # train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None
+            full_sample_representation_tensor = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, only_sample_representation=True)
+            
+    else:
+
+        full_sample_representation_tensor = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, only_sample_representation=True)
+    
+    full_distance = compute_distance(args, args.cosin_dist, True, full_sample_representation_tensor, valid_representations, args.cuda)
+
+    full_sim = -(full_distance.cpu() - 1)
+
+    train_output_probs_grad_tensor = obtain_grad_last_layer(trainloader, args, net)
+
+    metaloader = DataLoader(metaset, batch_size=args.batch_size, shuffle=False)
+
+    meta_output_probs_grad_tensor = obtain_grad_last_layer(metaloader, args, net)
+
+    full_sim_mat = torch.mm(train_output_probs_grad_tensor, torch.t(meta_output_probs_grad_tensor))*full_sim
+
+    print(torch.abs(full_sim_mat).max())
+
+    print(full_sim_mat.max())
+
+    
+
+
 def find_representative_samples0(criterion, optimizer, net, train_dataset,validset,  args, origin_labels, cached_sample_weights = None, valid_count = None):
     # valid_ratio = args.valid_ratio
     prob_gap_ls = torch.zeros(len(train_dataset))
@@ -624,6 +676,8 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
     
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
     
+    if args.qualitiative:
+        obtain_sample_pair_distance_bound(train_dataset, meta_set, criterion, optimizer, trainloader, args, net, new_valid_representations, cached_sample_weights, valid_count, validset)
 
     remaining_origin_labels = origin_labels[update_train_ids]
 
