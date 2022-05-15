@@ -44,7 +44,7 @@ def find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance
     s_score_ls = []
     for k in range(5, 100, 5):
         cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_ls, num_clusters=k, distance=distance, is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=None, all_layer = all_layer)
+            X=sample_representation_vec_ls, num_clusters=k, distance=distance, is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=None, all_layer = all_layer, rand_init=args.rand_init)
         s_score2 = calculate_silhouette_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, is_cuda=is_cuda, distance = distance, sample_weights = sample_weights)
         logging.info("s score for cluste count %d: %f" %(k, s_score2))
         s_score_ls.append(s_score2)
@@ -148,6 +148,7 @@ def do_cluster(args, num_clusters, sample_representation_vec_ls, is_cuda, cosin_
         k_means_epochs=args.k_means_epochs,
         inner_prod=args.inner_prod,
         origin_X_ls_lenth = args.origin_X_ls_lenth,
+        rand_init=args.rand_init
         # no_abs_cluster_sim = args.no_abs_cluster_sim
     )
     return cluster_ids_x, cluster_centers
@@ -2121,10 +2122,10 @@ def get_representative_valid_ids3(train_loader, args, net, valid_count, cached_s
 
     if not args.cosin_dist:
         cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='euclidean', is_cuda=args.cuda, sample_weights=sample_weights, all_layer=args.all_layer)
+            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='euclidean', is_cuda=args.cuda, sample_weights=sample_weights, all_layer=args.all_layer, rand_init=args.rand_init)
     else:
         cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='cosine', is_cuda=args.cuda, sample_weights=sample_weights, all_layer=args.all_layer)
+            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='cosine', is_cuda=args.cuda, sample_weights=sample_weights, all_layer=args.all_layer, rand_init=args.rand_init)
 
 
     if not args.cosin_dist:

@@ -56,6 +56,7 @@ def parse_args(args=None):
     parser.add_argument('--k_means_epochs', default=200, type=int, help='capture model_prov')
 
     parser.add_argument('--inner_prod', action='store_true', help='not save dataset')
+    parser.add_argument('--rand_init', action='store_true', help='not save dataset')
     parser.add_argument('--not_rescale_features', action='store_true', help='not save dataset')
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
     parser.add_argument('--clustering_by_class', action='store_true', help='not save dataset')
