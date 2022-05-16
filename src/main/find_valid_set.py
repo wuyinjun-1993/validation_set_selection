@@ -1433,7 +1433,10 @@ def get_extra_representations_last_layer(args, train_loader, criterion, net, ful
         # start_epoch_id = int(args.epochs/2)
     if not args.all_layer and not args.all_layer2:
         full_sample_representation_vec_ls = [full_sample_representation_vec_ls]
-        full_valid_sample_representation_vec_ls = [valid_sample_representation_vec_ls]
+        if validloader is not None:
+            full_valid_sample_representation_vec_ls = [valid_sample_representation_vec_ls]
+        else:
+            full_valid_sample_representation_vec_ls = None
 
     # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
     #     net = load_checkpoint_by_epoch(args, net, ep)
@@ -1449,14 +1452,17 @@ def get_extra_representations_last_layer(args, train_loader, criterion, net, ful
         optimizer, _=obtain_optimizer_scheduler(args, net, start_epoch = 0)
         sample_representation_vec_ls, _,sampled_col_ids = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
 
-        curr_valid_sample_representation_vec_ls, _,_ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+        if validloader is not None:
+            curr_valid_sample_representation_vec_ls, _,_ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
 
         if args.all_layer or args.all_layer2:
             full_sample_representation_vec_ls.extend(sample_representation_vec_ls)
-            full_valid_sample_representation_vec_ls.extend(curr_valid_sample_representation_vec_ls)
+            if validloader is not None:
+                full_valid_sample_representation_vec_ls.extend(curr_valid_sample_representation_vec_ls)
         else:
             full_sample_representation_vec_ls.append(sample_representation_vec_ls)
-            full_valid_sample_representation_vec_ls.append(curr_valid_sample_representation_vec_ls)
+            if validloader is not None:
+                full_valid_sample_representation_vec_ls.append(curr_valid_sample_representation_vec_ls)
 
     return full_sample_representation_vec_ls, full_valid_sample_representation_vec_ls
 
@@ -1594,9 +1600,14 @@ def get_representations_last_layer(args, train_loader, criterion, optimizer, net
 
     sample_representation_vec_ls, sample_id_ls, sampled_col_ids = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
     
-    validloader = torch.utils.data.DataLoader(validset, batch_size=args.batch_size, shuffle=True)
+    if validset is not None:
+        validloader = torch.utils.data.DataLoader(validset, batch_size=args.batch_size, shuffle=True)
+        valid_sample_representation_vec_ls, _, _ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+    else:
+        validloader = None
+        valid_sample_representation_vec_ls = None
 
-    valid_sample_representation_vec_ls, _, _ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+    
 
     if args.use_model_prov:
         sample_representation_vec_ls, valid_sample_representation_vec_ls = get_extra_representations_last_layer(args, train_loader, criterion, net, sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = validloader)
@@ -1671,7 +1682,7 @@ def get_representations_last_layer2(train_dataset, args, train_loader, criterion
 
     return full_sample_representation_tensor, all_sample_ids, valid_sample_representation_ls
 
-def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False, validset=None):
+def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False, validset=None):
 
     if args.add_under_rep_samples:
         under_represent_count = int(valid_count/2)
@@ -1685,7 +1696,7 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
     # sample_id_ls_by_class = dict()
     full_sim_mat1 = None
     if not args.all_layer_grad:
-        full_sample_representation_tensor, all_sample_ids, valid_sample_representation_tensor = get_representations_last_layer(args, train_loader, criterion, optimizer, net, validset = validset)
+        full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer(args, train_loader, criterion, optimizer, net, validset = validset)
     else:
 
         full_sample_representation_tensor, all_sample_ids = get_grad_by_example(args, train_loader, net, criterion, optimizer, vectorize_grad=True)
