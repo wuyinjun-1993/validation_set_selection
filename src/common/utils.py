@@ -73,8 +73,8 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
         else:
             if args.use_pretrained_model:
                 if args.bias_classes:
-                    mile_stones_epochs = [0, 80, 90]
-                    gamma = 0.2
+                    mile_stones_epochs = [80, 90]
+                    gamma = 0.1
                 else:
                     mile_stones_epochs = [80,90]
                     gamma = 0.1
@@ -108,8 +108,8 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
         else:
             if args.use_pretrained_model:
                 if args.bias_classes:
-                    mile_stones_epochs = [0, 80, 90]
-                    gamma = 0.2
+                    mile_stones_epochs = [80, 90]
+                    gamma = 0.1
                 else:
                     mile_stones_epochs = [80, 90]
                     gamma = 0.2
