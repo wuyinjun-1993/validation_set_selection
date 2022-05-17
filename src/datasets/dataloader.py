@@ -673,7 +673,7 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
         #     valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer = args.all_layer)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
 
-    # torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
+    torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
     update_train_ids = torch.ones(len(train_dataset))
     if not args.include_valid_set_in_training:
         update_train_ids[valid_ids] = 0
@@ -685,6 +685,7 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
         obtain_sample_pair_distance_bound(train_dataset, meta_set, criterion, optimizer, trainloader, args, net, new_valid_representations, cached_sample_weights, valid_count, validset)
 
     remaining_origin_labels = origin_labels[update_train_ids]
+    torch.save(origin_labels, os.path.join(args.save_path, "train_and_meta_labels"))
 
     return train_set, meta_set, remaining_origin_labels
 

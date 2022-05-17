@@ -1716,6 +1716,10 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
 
     origin_X_ls_lenth = len(full_sample_representation_tensor)
 
+    if args.get_representations:
+        torch.save(full_sample_representation_tensor, os.path.join(args.save_path,
+            "sample_representation"))
+
     args.origin_X_ls_lenth = origin_X_ls_lenth
     if not args.not_rescale_features:
         full_sample_representation_tensor = scale_and_extend_data_vector(full_sample_representation_tensor)
