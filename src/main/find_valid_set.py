@@ -183,25 +183,26 @@ def cluster_per_class(
 
         unique_cluster_count = len(cluster_ids_x.unique())
         args.logger.info("cluster count before and after:(%d,%d)"%(num_clusters, unique_cluster_count))
-        if unique_cluster_count < num_clusters:
-            while(True):
-                cluster_ids_x, cluster_centers = do_cluster(
-                    args,
-                    unique_cluster_count,
-                    sample_representation_vec_ls,
-                    is_cuda,
-                    cosin_distance,
-                    sample_weights,
-                    existing_cluster_centroids=existing_cluster_centroids,
-                    all_layer=all_layer,
-                )
+        if not args.no_remove_empty_clusters:
+            if unique_cluster_count < num_clusters:
+                while(True):
+                    cluster_ids_x, cluster_centers = do_cluster(
+                        args,
+                        unique_cluster_count,
+                        sample_representation_vec_ls,
+                        is_cuda,
+                        cosin_distance,
+                        sample_weights,
+                        existing_cluster_centroids=existing_cluster_centroids,
+                        all_layer=all_layer,
+                    )
 
-                new_unique_cluster_count = len(cluster_ids_x.unique())
-                args.logger.info("cluster count before and after:(%d,%d)"%(unique_cluster_count, new_unique_cluster_count))
+                    new_unique_cluster_count = len(cluster_ids_x.unique())
+                    args.logger.info("cluster count before and after:(%d,%d)"%(unique_cluster_count, new_unique_cluster_count))
 
-                if new_unique_cluster_count >= unique_cluster_count:
-                    break
-                unique_cluster_count = new_unique_cluster_count
+                    if new_unique_cluster_count >= unique_cluster_count:
+                        break
+                    unique_cluster_count = new_unique_cluster_count
                 # else:
                 #     cluster_assignment_file_name = os.path.join(args.save_path, "cluster_assignments")
 
@@ -271,8 +272,8 @@ def cluster_per_class(
 
         min_cluster_distance = 0
         min_sample_id = -1
-        if torch.sum(cluster_ids_x == cluster_id).item() <= 0:
-            continue
+        # if torch.sum(cluster_ids_x == cluster_id).item() <= 0:
+        #     continue
 
         # if args.all_layer_grad:
         #     curr_sample_ids = torch.nonzero(cluster_ids_x == cluster_id).view(-1)
@@ -292,9 +293,11 @@ def cluster_per_class(
             # for idx in range(num_clusters):
 
         if not all_layer:        
-            curr_cluster_sample_representation = sample_representation_vec_ls[cluster_ids_x == cluster_id].view(
-                torch.sum(cluster_ids_x == cluster_id), -1,
-            )
+            # curr_cluster_sample_representation = sample_representation_vec_ls[cluster_ids_x == cluster_id].view(
+            #     torch.sum(cluster_ids_x == cluster_id), -1,
+            # )
+
+            curr_cluster_sample_representation = sample_representation_vec_ls
 
             if is_cuda:
                 curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
@@ -317,17 +320,23 @@ def cluster_per_class(
             selected_count = int(valid_count_per_class/num_clusters)
             args.logger.info("Validation samples to select: %s"%(selected_count))
 
+            # representive_id_ls.append(
+            #     sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
             representive_id_ls.append(
-                sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+                sample_id_ls[sorted_sample_idx_tensor[0:selected_count]].cpu())
         
+            # representive_representation_ls.append(
+            #     sample_representation_vec_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+
             representive_representation_ls.append(
-                sample_representation_vec_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+                sample_representation_vec_ls[sorted_sample_idx_tensor[0:selected_count]].cpu())
     
         else:
             curr_cluster_sample_representation_ls = []
             curr_cluster_center_ls = []
             for arr_idx in range(len(sample_representation_vec_ls)):
-                curr_cluster_sample_representation = sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id].view(torch.sum(cluster_ids_x == cluster_id), -1)
+                # curr_cluster_sample_representation = sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id].view(torch.sum(cluster_ids_x == cluster_id), -1)
+                curr_cluster_sample_representation = sample_representation_vec_ls[arr_idx]
                 curr_cluster_center = cluster_centers[arr_idx][cluster_id].view(1,-1)
                 curr_cluster_center_ls.append(curr_cluster_center)
                 if is_cuda:
@@ -352,14 +361,17 @@ def cluster_per_class(
 
             selected_count = int(valid_count_per_class/num_clusters)
 
-            representive_id_ls.append(sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+            # representive_id_ls.append(sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+            representive_id_ls.append(sample_id_ls[sorted_sample_idx_tensor[0:selected_count]].cpu())
 
             curr_representive_represetation = []
 
             for arr_idx in range(len(sample_representation_vec_ls)):
 
+                # curr_representive_represetation.append(
+                #     sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
                 curr_representive_represetation.append(
-                    sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+                    sample_representation_vec_ls[arr_idx][sorted_sample_idx_tensor[0:selected_count]].cpu())
 
             representive_representation_ls.append(curr_representive_represetation)
 

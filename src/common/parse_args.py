@@ -80,6 +80,7 @@ def parse_args(args=None):
 
     parser.add_argument('--unsup_rep', action='store_true', help='unsupervised representation usage')
     parser.add_argument('--no_sample_weights_k_means', action='store_true', help='unsupervised representation usage')
+    parser.add_argument('--no_remove_empty_clusters', action='store_true', help='unsupervised representation usage')
 
     parser.add_argument('--add_under_rep_samples', action='store_true', help='add under represented samples')
 
