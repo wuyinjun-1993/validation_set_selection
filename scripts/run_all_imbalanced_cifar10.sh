@@ -60,4 +60,12 @@ CUDA_VISIBLE_DEVICES=2 ./sequential_label.sh cifar10 imbalanced finetune 1 0.1 0
 CUDA_VISIBLE_DEVICES=3 ./sequential_label.sh cifar10 imbalanced certainty 1 0.1 0.1 20 100 10034 ${data_dir} ${res_dir} &
 wait
 
+CUDA_VISIBLE_DEVICES=0 ./sequential_label.sh cifar10 imbalanced glc 1 0.005 0.1 20 100 10031 ${data_dir} ${res_dir} &
+CUDA_VISIBLE_DEVICES=1 ./sequential_label.sh cifar10 imbalanced glc 1 0.01 0.1 20 100 10032 ${data_dir} ${res_dir} &
+CUDA_VISIBLE_DEVICES=2 ./sequential_label.sh cifar10 imbalanced glc 1 0.02 0.1 20 100 10033 ${data_dir} ${res_dir} &
+CUDA_VISIBLE_DEVICES=3 ./sequential_label.sh cifar10 imbalanced glc 1 0.05 0.1 20 100 10034 ${data_dir} ${res_dir} &
+wait
+CUDA_VISIBLE_DEVICES=0 ./sequential_label.sh cifar10 imbalanced glc 1 0.1 0.1 20 100 10031 ${data_dir} ${res_dir} &
+wait
+
 echo Finished!
