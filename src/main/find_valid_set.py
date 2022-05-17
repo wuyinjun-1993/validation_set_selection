@@ -1792,10 +1792,13 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
         far_sample_representation_tensor, far_sample_ids = obtain_farthest_training_samples(args, args.cosin_dist, True, far_sample_representation_tensor, existing_valid_representation, args.cuda)
         all_sample_ids = all_sample_ids[far_sample_ids]
         main_represent_count = valid_count - existing_valid_representation[0].shape[0]
-        if cached_sample_weights is not None:
-            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
-        else:
+        if args.no_sample_weights_k_means:
             valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+        else:
+            if cached_sample_weights is not None:
+                valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+            else:
+                valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
 
         curr_total_valid_count = len(valid_ids) + existing_valid_representation[0].shape[0]
         # if curr_total_valid_count
@@ -2232,10 +2235,13 @@ def get_representative_valid_ids2_4(train_dataset, criterion, optimizer, train_l
         far_sample_representation_tensor, far_sample_ids = obtain_farthest_training_samples(args, args.cosin_dist, True, far_sample_representation_tensor, existing_valid_representation, args.cuda)
         all_sample_ids = all_sample_ids[far_sample_ids]
         main_represent_count = valid_count - existing_valid_representation[0].shape[0]
-        if cached_sample_weights is not None:
-            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
-        else:
+        if args.no_sample_weights_k_means:
             valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+        else:
+            if cached_sample_weights is not None:
+                valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+            else:
+                valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
 
         curr_total_valid_count = len(valid_ids) + existing_valid_representation[0].shape[0]
         # if curr_total_valid_count
