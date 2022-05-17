@@ -309,7 +309,7 @@ def cluster_per_class(
                 weight_by_norm=args.weight_by_norm,
                 inner_prod=args.inner_prod,
                 ls_idx_range=args.origin_X_ls_lenth,
-                full_inner_prod=True
+                full_inner_prod=False
             )
             
             # if args.weight_by_norm:
@@ -351,7 +351,7 @@ def cluster_per_class(
                 weight_by_norm=args.weight_by_norm,
                 inner_prod=args.inner_prod,
                 ls_idx_range=args.origin_X_ls_lenth,
-                full_inner_prod=True
+                full_inner_prod=False
             )
 
             # if args.weight_by_norm:
@@ -1908,7 +1908,7 @@ def get_uncovered_new_valid_ids(args, valid_ids, new_valid_representations, exis
             if not all_layer:
                 existing_new_dists = pairwise_cosine(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
             else:
-                existing_new_dists = pairwise_cosine_ls(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=True)
+                existing_new_dists = pairwise_cosine_ls(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=False)
     
     else:
         existing_new_dists = pairwise_cosine2(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
@@ -1939,7 +1939,7 @@ def get_uncovered_new_valid_ids2(args, valid_ids, new_valid_representations, exi
             if not all_layer:
                 existing_new_dists = pairwise_cosine(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
             else:
-                existing_new_dists = pairwise_cosine_ls(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth,full_inner_prod=True)
+                existing_new_dists = pairwise_cosine_ls(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth,full_inner_prod=False)
     
     else:
         existing_new_dists = pairwise_cosine2(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
@@ -1981,7 +1981,7 @@ def determine_new_valid_ids(args, valid_ids, new_valid_representations, existing
             if not all_layer:
                 existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
             else:
-                existing_new_dists = pairwise_cosine_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=True)
+                existing_new_dists = pairwise_cosine_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=False)
     
     else:
         existing_new_dists = pairwise_cosine2(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
@@ -2053,7 +2053,7 @@ def compute_distance(args, cosine_dist, all_layer, full_sample_representation_te
         if not all_layer:
             existing_new_dists = pairwise_cosine(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
         else:
-            existing_new_dists = pairwise_cosine_ls(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=True)
+            existing_new_dists = pairwise_cosine_ls(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=False)
     return existing_new_dists
 
 def obtain_farthest_training_samples(args, cosine_dist, all_layer, full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda):

@@ -76,7 +76,7 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
                     mile_stones_epochs = [80, 90]
                     gamma = 0.1
                 else:
-                    mile_stones_epochs = [1,5]
+                    mile_stones_epochs = [80,90]
                     gamma = 0.1
             else:
                 mile_stones_epochs = [100,110]

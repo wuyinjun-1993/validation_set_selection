@@ -1538,10 +1538,13 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg 
         #         max_cosine_sim = torch.min(torch.stack(cosine_dis_ls, dim = 1), dim = 1)[0]
         #     else:
         #         raise NotImplementedError
-        if not inner_prod:
-            final_cosine_dis = 1 - max_cosine_sim
+        if full_inner_prod:
+            final_cosine_dis = max_cosine_sim
         else:
-            final_cosine_dis = -max_cosine_sim
+            if not inner_prod:
+                final_cosine_dis = 1 - max_cosine_sim
+            else:
+                final_cosine_dis = -max_cosine_sim
         full_dist_ls.append(final_cosine_dis)
 
     full_dist_tensor = torch.cat(full_dist_ls)
