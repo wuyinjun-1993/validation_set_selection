@@ -1444,7 +1444,7 @@ def pairwise_cosine_full_by_sample_ids(full_cosin_sim, sample_ids_ls, is_cuda=Fa
 
 
 
-def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg = 'mean', ls_idx_range=-1, weight_by_norm=False, inner_prod = False, no_abs = False):
+def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg = 'mean', ls_idx_range=-1, weight_by_norm=False, inner_prod = False, no_abs = False, full_inner_prod=False):
 
     if ls_idx_range < 0:
         ls_idx_range = len(data1_ls)
@@ -1521,14 +1521,14 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg 
             if not weight_by_norm:
                 # total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
                 total_norm_ls = torch.sqrt(vec_norm_ls1.view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
-                if no_abs:
-                    max_cosine_sim = total_cosin_ls/total_norm_ls
+                if full_inner_prod:
+                    max_cosine_sim = torch.abs(total_cosin_ls)
                 else:
                     max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
             else:
                 total_norm_ls = torch.sqrt(vec_norm_ls1.view(-1).unsqueeze(1)*torch.ones_like(torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1)).unsqueeze(0))
-                if no_abs:
-                    max_cosine_sim = total_cosin_ls/total_norm_ls
+                if full_inner_prod:
+                    max_cosine_sim = torch.abs(total_cosin_ls)
                 else:
                     max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
         # if agg == 'mean':
