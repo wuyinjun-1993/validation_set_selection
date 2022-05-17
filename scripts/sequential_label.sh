@@ -29,6 +29,8 @@ then
   selection_cmd="--select_valid_set \
     --cluster_method_two \
     --cluster_method_two_plus \
+    --cluster_method_two_sampling \
+    --cluster_method_two_sample_col_count 1000 \
     --not_rescale_features \
     --weight_by_norm \
     --use_model_prov \
@@ -59,6 +61,9 @@ then
 elif [ ${valid_selection} = "finetune" ];
 then
   selection_cmd="--finetune --clustering_by_class --lr_decay"
+elif [ ${valid_selection} = "glc" ];
+then
+  selection_cmd="--glc_train --clustering_by_class --lr_decay"
 fi
 
 result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_${lr}_batchsize_128_basemodel/

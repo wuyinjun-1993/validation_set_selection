@@ -589,6 +589,87 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
                 valid_acc_ls, test_loss_ls, test_acc_ls, args, logger, is_meta=False)
 
 
+def get_confusion_for_glc(meta_loader, net, num_classes):
+    meta_data = []
+    meta_target = []
+    for _, (_, data, target) in enumerate(meta_loader):
+        meta_data.append(data)
+        meta_target.append(target)
+    meta_data = torch.cat(meta_data)
+    meta_target = torch.cat(meta_target)
+
+    C = torch.zeros((num_classes, num_classes)).cuda()
+    for i in range(num_classes):
+        num_examples = 0
+        matches = torch.nonzero(meta_target == i)
+        for match in matches:
+            num_examples += 1
+            with torch.no_grad():
+                C[i, :] += net(meta_data[match]).flatten()
+        C[i, :] /= num_examples
+    return C
+
+
+def glc_train(train_loader, valid_loader, test_loader, meta_set, criterion, args,
+        network, optimizer, scheduler=None, heuristic=None,
+        warmup_scheduler=None, gt_training_labels=None, start_epoch = 0):
+    if args.dataset == 'cifar10':
+        num_classes = 10
+    elif args.dataset == 'cifar100':
+        num_classes = 100
+    else:
+        num_classes = 10
+
+    curr_lr = args.lr
+    valid_loss_ls = []
+    valid_acc_ls = []
+    test_loss_ls = []
+    test_acc_ls = []
+
+    network.eval()
+    C = get_confusion_for_glc(meta_set, network, num_classes)
+    for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
+
+        network.train()
+        for batch_idx, (_, data, target) in enumerate(train_loader):
+            if args.cuda:
+                data, target = train_loader.dataset.to_cuda(data, target)
+
+            output = network(data)
+            if isinstance(criterion, torch.nn.L1Loss):
+                target = F.one_hot(target, num_classes=num_classes)
+                output = F.softmax(output)
+            loss = criterion(torch.matmul(output, C), target)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            # if epoch < args.warm and warmup_scheduler is not None:
+            #     warmup_scheduler.step()
+        
+
+        if scheduler is not None:
+            scheduler.step(epoch)
+        if args.local_rank == 0:
+            model_path = os.path.join(args.save_path, "model_" + str(epoch))
+            torch.save(network.module.state_dict(), model_path)
+
+        logger.info("learning rate at epoch %d: %f"%(epoch, float(optimizer.param_groups[0]['lr'])))
+        with torch.no_grad():
+            if valid_loader is not None and args.local_rank == 0:
+                valid_loss, valid_acc = test(valid_loader, network, criterion, args, logger, "valid")
+                report_best_test_performance_so_far(logger, valid_loss_ls,
+                        valid_acc_ls, valid_loss, valid_acc, "valid")
+            
+            if args.local_rank == 0:
+                test_loss, test_acc = test(test_loader, network, criterion, args, logger, "test")
+                report_best_test_performance_so_far(logger, test_loss_ls,
+                        test_acc_ls, test_loss, test_acc, "test")
+
+    if args.local_rank == 0:
+        best_index = report_final_performance_by_early_stopping(valid_loss_ls,
+                valid_acc_ls, test_loss_ls, test_acc_ls, args, logger, is_meta=False)
+
+
 def uncertainty_heuristic(model, train_loader):
     vals = torch.zeros((train_loader.dataset.targets.shape[0],))
     for _, (indices, data, _) in enumerate(train_loader):
@@ -1186,6 +1267,23 @@ def main2(args, logger):
             metaloader,
             validloader,
             testloader,
+            criterion,
+            args,
+            net,
+            optimizer,
+            scheduler=scheduler,
+            heuristic=uncertainty_heuristic if args.active_learning else None,
+            warmup_scheduler=warmup_scheduler,
+            gt_training_labels=torch.tensor(origin_labels) if args.active_learning else None,
+            start_epoch=start_epoch
+        )
+    elif args.glc_train:
+        logger.info("starting glc training")
+        glc_train(
+            trainloader,
+            validloader,
+            testloader,
+            metaloader,
             criterion,
             args,
             net,

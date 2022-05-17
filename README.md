@@ -1,6 +1,6 @@
 #Install the pre-requiste:
 ```
-pip install -r requiresment.txt
+pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
