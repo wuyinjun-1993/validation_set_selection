@@ -3,7 +3,7 @@ trap "exit" INT
 
 
 
-err_label_ratio=0.6
+err_label_ratio=0.8
 
 dataset_name=$1
 data_dir=$2
@@ -27,7 +27,7 @@ valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 save_path_prefix=${save_path_root_dir}/rand_error_${err_label_ratio}_valid_select
 
 
-total_valid_sample_count=50
+total_valid_sample_count=100
 
 export CUDA_VISIBLE_DEVICES=${gpu_ids}
 echo CUDA_VISIBLE_DEVICES::${CUDA_VISIBLE_DEVICES}
@@ -37,7 +37,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count}"
+add_valid_in_training_flag="--cluster_method_two --cosin_dist --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -71,7 +71,7 @@ exe_cmd="python -m torch.distributed.launch \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr ${lr} \
+  --lr 0.02 \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
@@ -91,12 +91,13 @@ exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
   main_train.py \
-  --load_dataset \ 
+  --load_dataset \
+  --select_valid_set \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
-  --meta_lr ${meta_lr} \
+  --meta_lr 5 \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
@@ -110,7 +111,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_rand_select_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_all_rand.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -133,6 +134,7 @@ do
     --master_port ${port_num} \
     main_train.py \
     --load_dataset \
+    --select_valid_set \
     --continue_label \
     --load_cached_weights \
     --cached_sample_weights_name cached_sample_weights \
@@ -155,7 +157,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_rand_select_$k.txt
+	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_$k.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	

@@ -37,7 +37,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count}"
+add_valid_in_training_flag=""
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -71,10 +71,11 @@ exe_cmd="python -m torch.distributed.launch \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr ${lr} \
+  --lr 0.1 \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
-  --epochs ${epochs} \
+  --epochs 150 \
+  --lr_decay \
   --do_train"
 
 
@@ -91,7 +92,8 @@ exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
   main_train.py \
-  --load_dataset \ 
+  --load_dataset \
+  --certain_select \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
@@ -99,7 +101,7 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_seq_select_0/ \
+  --save_path ${save_path_prefix}_seq_select_0_certain/ \
   --prev_save_path ${save_path_prefix}_do_train/ \
   --cuda \
   --lr ${lr} \
@@ -110,7 +112,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_rand_select_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_all_rand_certain.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -133,6 +135,7 @@ do
     --master_port ${port_num} \
     main_train.py \
     --load_dataset \
+    --certain_select \
     --continue_label \
     --load_cached_weights \
     --cached_sample_weights_name cached_sample_weights \
@@ -145,8 +148,8 @@ do
     --not_save_dataset \
     --flip_labels \
     --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_$k/ \
-    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
+    --save_path ${save_path_prefix}_seq_select_${k}_certain/ \
+    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))_certain/ \
     --cuda \
     --lr ${lr} \
     --batch_size ${batch_size} \
@@ -155,7 +158,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_rand_select_$k.txt
+	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_${k}_certain.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	
