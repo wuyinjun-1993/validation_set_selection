@@ -183,40 +183,40 @@ def cluster_per_class(
 
         unique_cluster_count = len(cluster_ids_x.unique())
         args.logger.info("cluster count before and after:(%d,%d)"%(num_clusters, unique_cluster_count))
-        # if not args.no_remove_empty_clusters:
-        #     if unique_cluster_count < num_clusters:
-        #         while(True):
-        #             cluster_ids_x, cluster_centers = do_cluster(
-        #                 args,
-        #                 unique_cluster_count,
-        #                 sample_representation_vec_ls,
-        #                 is_cuda,
-        #                 cosin_distance,
-        #                 sample_weights,
-        #                 existing_cluster_centroids=existing_cluster_centroids,
-        #                 all_layer=all_layer,
-        #             )
+        if args.remove_empty_clusters:
+            if unique_cluster_count < num_clusters:
+                while(True):
+                    cluster_ids_x, cluster_centers = do_cluster(
+                        args,
+                        unique_cluster_count,
+                        sample_representation_vec_ls,
+                        is_cuda,
+                        cosin_distance,
+                        sample_weights,
+                        existing_cluster_centroids=existing_cluster_centroids,
+                        all_layer=all_layer,
+                    )
 
-        #             new_unique_cluster_count = len(cluster_ids_x.unique())
-        #             args.logger.info("cluster count before and after:(%d,%d)"%(unique_cluster_count, new_unique_cluster_count))
+                    new_unique_cluster_count = len(cluster_ids_x.unique())
+                    args.logger.info("cluster count before and after:(%d,%d)"%(unique_cluster_count, new_unique_cluster_count))
 
-        #             if new_unique_cluster_count >= unique_cluster_count:
-        #                 break
-        #             unique_cluster_count = new_unique_cluster_count
-        #         # else:
-        #         #     cluster_assignment_file_name = os.path.join(args.save_path, "cluster_assignments")
+                    if new_unique_cluster_count >= unique_cluster_count:
+                        break
+                    unique_cluster_count = new_unique_cluster_count
+                # else:
+                #     cluster_assignment_file_name = os.path.join(args.save_path, "cluster_assignments")
 
-        #         #     sim_mat_file_name = os.path.join(args.save_path, "full_similarity_mat")
-        #         #     if not (os.path.exists(cluster_assignment_file_name) and os.path.exists(sim_mat_file_name)):
-        #         #         cluster_ids_x, full_x_cosin_sim = kmeans_cosin(
-        #         #             X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, full_x_cosin_sim=full_sim_mat)
+                #     sim_mat_file_name = os.path.join(args.save_path, "full_similarity_mat")
+                #     if not (os.path.exists(cluster_assignment_file_name) and os.path.exists(sim_mat_file_name)):
+                #         cluster_ids_x, full_x_cosin_sim = kmeans_cosin(
+                #             X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, full_x_cosin_sim=full_sim_mat)
 
-        #         #         torch.save(cluster_ids_x, cluster_assignment_file_name)
-        #         #         torch.save(full_x_cosin_sim, sim_mat_file_name)
-        #         #     else:
-        #         #         cluster_ids_x = torch.load(cluster_assignment_file_name)
-        #         #         full_x_cosin_sim = torch.load(sim_mat_file_name)
-        #         # distance = 'cosine'
+                #         torch.save(cluster_ids_x, cluster_assignment_file_name)
+                #         torch.save(full_x_cosin_sim, sim_mat_file_name)
+                #     else:
+                #         cluster_ids_x = torch.load(cluster_assignment_file_name)
+                #         full_x_cosin_sim = torch.load(sim_mat_file_name)
+                # distance = 'cosine'
 
         if return_cluster_info:
             return cluster_ids_x, cluster_centers
