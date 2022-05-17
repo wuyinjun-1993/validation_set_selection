@@ -25,6 +25,7 @@ from models.resnet import *
 from models.resnet3 import *
 from models.bert import *
 import collections
+from models.LeNet5 import *
 
 cached_model_name="cached_model"
 pretrained_model_name="pretrained_model"
@@ -1048,7 +1049,10 @@ def main2(args, logger):
     logger.info('==> Preparing data..')
 
     if args.dataset == 'MNIST':
-        pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
+        if args.model_type == 'lenet':
+            pretrained_rep_net = LeNet5()
+        else:
+            pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
         optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('cifar'):
@@ -1191,7 +1195,10 @@ def main2(args, logger):
     start_epoch = 0
 
     if args.dataset == 'MNIST':
-        net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
+        if args.model_type == 'lenet':
+            net = LeNet5()
+        else:
+            net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
             if args.model_type == 'resnet18':
