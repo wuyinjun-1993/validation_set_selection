@@ -14,6 +14,7 @@ def parse_args(args=None):
         help='initialize the sample weights with a rectified gaussian')
 
     parser.add_argument('--all_layer', action='store_true', help='use GPU')
+    parser.add_argument('--get_representations', action='store_true', help='use GPU')
     parser.add_argument('--all_layer2', action='store_true', help='use GPU')
     parser.add_argument('--replace', action='store_true', help='use GPU')
     parser.add_argument('--all_layer_grad', action='store_true', help='use GPU')
@@ -80,6 +81,7 @@ def parse_args(args=None):
     parser.add_argument('--add_under_rep_samples', action='store_true', help='add under represented samples')
 
     parser.add_argument('--do_train', action='store_true', help='do training')
+    parser.add_argument('--finetune', action='store_true', help='finetune model on meta set')
     parser.add_argument('--active_learning', action='store_true', help='perform training with active learning')
     parser.add_argument('--uncertain_select', action='store_true', help='perform training with active learning')
     parser.add_argument('--certain_select', action='store_true', help='perform training with active learning')

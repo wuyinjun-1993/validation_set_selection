@@ -13,7 +13,7 @@ then
   noise_cmd="--flip_labels"
 elif [ ${noise_type} = "biased" ];
 then
-  noise_cmd="--flip_labels --biased_flip"
+  noise_cmd="--flip_labels --biased_flip --err_label_ratio ${err_param}"
 elif [ ${noise_type} = "imbalanced" ];
 then
   noise_cmd="--bias_classes --imb_factor ${err_param}"

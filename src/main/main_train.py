@@ -1173,6 +1173,22 @@ def main2(args, logger):
             gt_training_labels=torch.tensor(origin_labels) if args.active_learning else None,
             start_epoch=start_epoch
         )
+    elif args.finetune:
+        logger.info("starting finetuning")
+        basic_train(
+            metaloader,
+            validloader,
+            testloader,
+            criterion,
+            args,
+            net,
+            optimizer,
+            scheduler=scheduler,
+            heuristic=uncertainty_heuristic if args.active_learning else None,
+            warmup_scheduler=warmup_scheduler,
+            gt_training_labels=torch.tensor(origin_labels) if args.active_learning else None,
+            start_epoch=start_epoch
+        )
     else:
         logger.info("starting meta training")
         logger.info("meta dataset size::%d"%(len(metaloader.dataset)))
