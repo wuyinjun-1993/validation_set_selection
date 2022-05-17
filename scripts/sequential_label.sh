@@ -28,6 +28,9 @@ then
   # selection_cmd="--select_valid_set --cluster_method_three --cosin_dist --lr_decay --weight_by_norm --use_model_prov --model_prov_period 10 --replace"
   selection_cmd="--select_valid_set \
     --cluster_method_two \
+    --cluster_method_two_plus \
+    --not_rescale_features \
+    --weight_by_norm \
     --use_model_prov \
     --model_prov_period 10 \
     --replace \
@@ -37,6 +40,8 @@ elif [ ${valid_selection} = "ours2" ];
 then
   selection_cmd="--select_valid_set \
     --cluster_method_three \
+    --not_rescale_features \
+    --weight_by_norm \
     --use_model_prov \
     --model_prov_period 10 \
     --replace \
@@ -51,6 +56,9 @@ then
 elif [ ${valid_selection} = "random" ];
 then
   selection_cmd="--clustering_by_class --lr_decay"
+elif [ ${valid_selection} = "finetune" ];
+then
+  selection_cmd="--finetune --clustering_by_class --lr_decay"
 fi
 
 result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_${lr}_batchsize_128_basemodel/
@@ -71,7 +79,7 @@ do
   --use_pretrained_model \
   ${selection_cmd} \
   --nce-t 0.07 \
-  --nce-k 200 \
+  --nce-k 4096 \
   --data_dir ${data_dir} \
   --dataset ${dataset} \
   --valid_count ${valid_count} \
