@@ -166,9 +166,12 @@ class ResNet(nn.Module):
     out = self.features(x)
     return out
 
-  def feature_forward2(self, x, all_layer=False):
+  def feature_forward2(self, x, all_layer_grad_no_full_loss=False, labels=None):
     out = self.features(x)
     out2 = self.fc(out)
+    if all_layer_grad_no_full_loss:
+      out2 = out2 - torch.nn.functional.one_hot(labels, num_classes=out2.shape[1])
+
     grad_approx = torch.bmm(out.view(out.shape[0], out.shape[1], 1), out2.view(out2.shape[0], 1, out2.shape[1]))
     grad_approx = grad_approx.view(grad_approx.shape[0], -1)
 
