@@ -203,6 +203,8 @@ def cluster_per_class(
                     if new_unique_cluster_count >= unique_cluster_count:
                         break
                     unique_cluster_count = new_unique_cluster_count
+
+                unique_cluster_count = new_unique_cluster_count
                 # else:
                 #     cluster_assignment_file_name = os.path.join(args.save_path, "cluster_assignments")
 
