@@ -70,9 +70,7 @@ res_dir=$2
 
 echo Running warmup
 CUDA_VISIBLE_DEVICES=0 ./sequential_label.sh cifar100 imbalanced random 1 0.01 0.1 20 100 10030 ${data_dir} ${res_dir} True &
-CUDA_VISIBLE_DEVICES=1 ./sequential_label.sh cifar100 imbalanced random 1 0.01 0.1 20 100 10031 ${data_dir} ${res_dir} True &
 CUDA_VISIBLE_DEVICES=2 ./sequential_label.sh cifar100 imbalanced random 1 0.005 0.1 20 100 10032 ${data_dir} ${res_dir} True &
-CUDA_VISIBLE_DEVICES=3 ./sequential_label.sh cifar100 imbalanced random 1 0.005 0.1 20 100 10033 ${data_dir} ${res_dir} True &
 wait
 
 echo Running all of our methods
