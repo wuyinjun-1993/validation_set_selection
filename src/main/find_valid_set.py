@@ -1362,6 +1362,7 @@ def obtain_sampled_representations_cluster_method_three(sample_representation_ve
     sampled_sampled_col_ids = []
 
     for layer_idx in range(len(sample_representation_vec_ls)):
+        represetion_vec = sample_representation_vec_ls[layer_idx]
         sampled_col_ids = None
         if sampled_col_ids_ls is not None:
             sampled_col_ids = sampled_col_ids_ls[layer_idx]
