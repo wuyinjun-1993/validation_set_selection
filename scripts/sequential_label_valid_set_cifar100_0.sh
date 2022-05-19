@@ -27,7 +27,7 @@ valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 save_path_prefix=${save_path_root_dir}/rand_error_${err_label_ratio}_valid_select
 
 
-total_valid_sample_count=100
+total_valid_sample_count=1000
 
 export CUDA_VISIBLE_DEVICES=${gpu_ids}
 echo CUDA_VISIBLE_DEVICES::${CUDA_VISIBLE_DEVICES}
@@ -37,7 +37,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_three --cosin_dist --weight_by_norm --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
+add_valid_in_training_flag="--cluster_method_three --cosin_dist --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -65,7 +65,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_ratio ${valid_ratio_each_run} \
+  --valid_count ${valid_ratio_each_run} \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
@@ -96,7 +96,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_ratio ${valid_ratio_each_run} \
+  --valid_count ${valid_ratio_each_run} \
   --meta_lr 5 \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
@@ -142,7 +142,7 @@ do
     --nce-k 200 \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
-    --valid_ratio ${valid_ratio_each_run} \
+    --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     --flip_labels \
