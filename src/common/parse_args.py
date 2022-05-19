@@ -33,6 +33,7 @@ def parse_args(args=None):
     parser.add_argument('--full_model_out', action='store_true', help='use GPU')
     parser.add_argument('--cluster_method_two_sampling', action='store_true', help='use GPU')
     parser.add_argument('--cluster_method_two_sample_col_count', default=1000, type=int, help='capture model_prov')
+    parser.add_argument('--cluster_method_three_sample_col_count', default=1000, type=int, help='capture model_prov')
 
     parser.add_argument('--cluster_no_reweighting', action='store_true', help='use GPU')
     parser.add_argument('--low_data', action='store_true', help='low data application')
@@ -75,6 +76,7 @@ def parse_args(args=None):
     parser.add_argument('--resumed_training_epoch',  default=0, type=int, help='start from epoch')
 
     parser.add_argument('--cluster_method_three', action='store_true', help='cache_loss_per_epoch')
+    parser.add_argument('--cluster_method_three_sampling', action='store_true', help='cache_loss_per_epoch')
     parser.add_argument('--cosin_dist', action='store_true', help='use cosine distance for k-means clustering')
     parser.add_argument('--prev_save_path', default=None, type=str)
 
