@@ -22,6 +22,9 @@ then
 elif [ ${noise_type} = "imbalanced" ];
 then
   noise_cmd="--bias_classes --imb_factor ${err_param} --all_layer_grad_no_full_loss"
+elif [ ${noise_type} = "imbalanced_uniform" ];
+then
+  noise_cmd="--flip_labels --err_label_ratio 0.6 --bias_classes --imb_factor ${err_param}"
 fi
 
 if [ ${valid_selection} = "ours1" ];
@@ -111,7 +114,7 @@ do
    
   output_file_name=${result_dir}/master_log.txt
 
-  if [ $k -ge 2 ]
+  if [ ${warmup} != "True" ] && [ $k -ge 1 ]
   then
     ${exe_cmd} --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights > ${output_file_name} 2>&1
   else

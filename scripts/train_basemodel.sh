@@ -17,6 +17,9 @@ then
 elif [ ${noise_type} = "imbalanced" ];
 then
   noise_cmd="--bias_classes --imb_factor ${err_param}"
+elif [ ${noise_type} = "imbalanced_uniform" ];
+then
+  noise_cmd="--flip_labels --err_label_ratio 0.6 --bias_classes --imb_factor ${err_param}"
 fi
 
 result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_${lr}_batchsize_128_basemodel/
