@@ -11,6 +11,7 @@ valid_count=$8
 port=$9
 data_dir=${10}
 res_dir=${11}
+warmup=${12}
 
 if [ ${noise_type} = "uniform" ];
 then
@@ -33,6 +34,7 @@ then
     --cluster_method_two_sample_col_count 1000 \
     --not_rescale_features \
     --weight_by_norm \
+    --remove_empty_clusters \
     --use_model_prov \
     --model_prov_period 10 \
     --replace \
@@ -42,8 +44,11 @@ elif [ ${valid_selection} = "ours2" ];
 then
   selection_cmd="--select_valid_set \
     --cluster_method_three \
+    --cluster_method_three_sampling \
+    --cluster_method_three_sample_col_count 1000 \
     --not_rescale_features \
     --weight_by_norm \
+    --remove_empty_clusters \
     --use_model_prov \
     --model_prov_period 10 \
     --replace \
@@ -66,7 +71,12 @@ then
   selection_cmd="--glc_train --clustering_by_class --lr_decay"
 fi
 
-result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_${lr}_batchsize_128_basemodel/
+if [ ${warmup} = "True" ];
+then
+  result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_0.1_batchsize_128_basemodel/
+else
+  result_dir=${res_dir}/logs_${dataset}_random_${noise_type}_${err_param}_lr_${lr}_pretrained_select_$(expr ${valid_count} / 2)_1_1
+fi
 
 # Sequentially train the model using a selected "clean" set
 for (( k=1; k<=${num_iterations}; k++ ))
@@ -84,12 +94,12 @@ do
   --use_pretrained_model \
   ${selection_cmd} \
   --nce-t 0.07 \
-  --nce-k 4096 \
+  --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset} \
   --valid_count ${valid_count} \
+  --total_valid_sample_count ${valid_count} \
   --meta_lr ${meta_lr} \
-  --not_save_dataset \
   ${noise_cmd} \
   --save_path ${result_dir} \
   --prev_save_path ${prev_result_dir} \
@@ -103,7 +113,7 @@ do
 
   if [ $k -ge 2 ]
   then
-    ${exe_cmd} --load_cached_weights --cached_sample_weights_name cached_sample_weights > ${output_file_name} 2>&1
+    ${exe_cmd} --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights > ${output_file_name} 2>&1
   else
     ${exe_cmd} > ${output_file_name} 2>&1
   fi

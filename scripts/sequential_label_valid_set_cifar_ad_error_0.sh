@@ -3,7 +3,7 @@ trap "exit" INT
 
 
 
-err_label_ratio=0.6
+err_label_ratio=${14}
 
 dataset_name=$1
 data_dir=$2
@@ -19,15 +19,15 @@ batch_size=${11}
 test_batch_size=${12}
 epochs=${13}
 #cached_model_name=${14}
-add_valid_in_training_set=${14}
-lr_decay=${15}
+#add_valid_in_training_set=${14}
+#lr_decay=${15}
 
 valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 
 save_path_prefix=${save_path_root_dir}/biased_error_${err_label_ratio}_valid_select
 
 
-total_valid_sample_count=100
+total_valid_sample_count=50
 
 export CUDA_VISIBLE_DEVICES=${gpu_ids}
 echo CUDA_VISIBLE_DEVICES::${CUDA_VISIBLE_DEVICES}
@@ -37,7 +37,8 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_three --cosin_dist --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
+add_valid_in_training_flag="--cluster_method_two --cluster_method_two_plus --not_rescale_features --weight_by_norm  --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --cluster_method_two_sampling --remove_empty_clusters"
+
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -53,7 +54,7 @@ then
 fi
 
 echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
-cmd
+
 
 
 
@@ -72,10 +73,11 @@ exe_cmd="python -m torch.distributed.launch \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr 0.02 \
+  --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
-  --epochs ${epochs} \
+  --epochs 200 \
+  --lr_decay \
   --do_train"
 
 
@@ -85,25 +87,25 @@ output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_r
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
-
+#${exe_cmd} > ${output_file_name} 2>&1
+cmd
 
 exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
   main_train.py \
   --load_dataset \
-  --select_valid_set \
   --biased_flip \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_count ${valid_ratio_each_run} \
-  --meta_lr 5 \
+  --valid_count 10 \
+  --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
-  --prev_save_path ${save_path_prefix}_do_train/ \
+  --prev_save_path ${save_path_root_dir}/biased_error_${err_label_ratio}_warmup/ \
+  --continue_label \
   --cuda \
   --lr ${lr} \
   --batch_size ${batch_size} \

@@ -37,7 +37,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_two --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
+add_valid_in_training_flag=""
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -94,7 +94,7 @@ exe_cmd="python -m torch.distributed.launch \
   --master_port ${port_num} \
   main_train.py \
   --load_dataset \
-  --select_valid_set \
+  --certain_select \
   --biased_flip \
   --nce-k 200 \
   --data_dir ${data_dir} \
@@ -103,7 +103,7 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_seq_select_0/ \
+  --save_path ${save_path_prefix}_certain_select_0/ \
   --prev_save_path ${save_path_root_dir}/biased_error_0.6_warm_up/ \
   --continue_label \
   --cuda \
@@ -115,7 +115,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_valid_select_seq_select_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_certain_select_0.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -152,8 +152,8 @@ do
     --not_save_dataset \
     --flip_labels \
     --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_$k/ \
-    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
+    --save_path ${save_path_prefix}_certain_select_$k/ \
+    --prev_save_path ${save_path_prefix}_certain_select_$(( k - 1 ))/ \
     --cuda \
     --lr ${lr} \
     --batch_size ${batch_size} \
@@ -162,7 +162,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_valid_select_seq_select_$k.txt
+	output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_certain_select_$k.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	

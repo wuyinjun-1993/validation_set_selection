@@ -1061,7 +1061,8 @@ def main2(args, logger):
                 pretrained_rep_net = ResNet18(num_classes=10).cuda()
             else:    
                 pretrained_rep_net = resnet34(num_classes=10).cuda()
-            optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+            optimizer = torch.optim.SGD(pretrained_rep_net.parameters(),
+                    lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
         else:
             if args.model_type == 'resnet18':
                 pretrained_rep_net = ResNet18(num_classes=100).cuda()
