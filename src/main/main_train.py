@@ -26,6 +26,7 @@ from models.resnet3 import *
 from models.bert import *
 import collections
 from models.LeNet5 import *
+from models.TAVAAL import main_train_taaval
 
 cached_model_name="cached_model"
 pretrained_model_name="pretrained_model"
@@ -1294,6 +1295,14 @@ def main2(args, logger):
             warmup_scheduler=warmup_scheduler,
             gt_training_labels=torch.tensor(origin_labels) if args.active_learning else None,
             start_epoch=start_epoch
+        )
+    elif args.ta_vaal_train:
+        logger.info("starting TA-VAAL training")
+        main_train_taaval(
+            args,
+            metaloader.dataset,
+            trainloader.dataset,
+            testloader.dataset,
         )
     else:
         logger.info("starting meta training")

@@ -89,6 +89,7 @@ def parse_args(args=None):
     parser.add_argument('--do_train', action='store_true', help='do training')
     parser.add_argument('--glc_train', action='store_true', help='do glc training')
     parser.add_argument('--finetune', action='store_true', help='finetune model on meta set')
+    parser.add_argument('--ta_vaal_train', action='store_true', help='TA-VAAL model training')
     parser.add_argument('--active_learning', action='store_true', help='perform training with active learning')
     parser.add_argument('--uncertain_select', action='store_true', help='perform training with active learning')
     parser.add_argument('--certain_select', action='store_true', help='perform training with active learning')
