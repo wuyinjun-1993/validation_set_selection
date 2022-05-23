@@ -21,7 +21,7 @@ def test(test_loader, network, criterion, args, logger, prefix = "test"):
             if isinstance(criterion, torch.nn.L1Loss):
                 target = F.one_hot(target, num_classes=10)
                 output = F.softmax(output)
-            if len(output) > 0:
+            if type(output) is tuple:
                 output = output[0]
             test_loss += criterion(output, target).item()*target.shape[0]
             pred = output.data.max(1, keepdim=True)[1]
