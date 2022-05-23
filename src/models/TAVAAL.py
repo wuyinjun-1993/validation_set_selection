@@ -5,12 +5,15 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn.init as init
 import torch.optim.lr_scheduler as lr_scheduler
 from tqdm import tqdm
 import random
+from datasets.mnist import mnist_to_device
+import main.main_train
 
 MARGIN = 1.0
 WEIGHT = 1.0
@@ -388,8 +391,7 @@ def train(models, method, criterion, optimizers, schedulers, dataloaders,
     args.logger.info('>> Finished.')
 
 
-def test(models, method, dataloaders, mode='val'):
-    assert mode == 'val' or mode == 'test'
+def test(models, method, dataloader):
     models['backbone'].eval()
     if method == 'lloss':
         models['module'].eval()
@@ -397,7 +399,7 @@ def test(models, method, dataloaders, mode='val'):
     total = 0
     correct = 0
     with torch.no_grad():
-        for (_, inputs, labels) in dataloaders[mode]:
+        for (_, inputs, labels) in dataloader:
             with torch.cuda.device(CUDA_VISIBLE_DEVICES):
                 inputs = inputs.cuda()
                 labels = labels.cuda()
@@ -604,7 +606,7 @@ def query_samples(model, data_unlabeled, subset, labeled_set, cycle, args):
     return arg
 
 
-def main_train_taaval(args, data_train, data_test):
+def main_train_taaval(args, data_train, data_valid, data_test):
     method = 'TA-VAAL'
     args.logger.info("Dataset: %s"%args.dataset)
     args.logger.info("Method type:%s"%method)
@@ -616,26 +618,42 @@ def main_train_taaval(args, data_train, data_test):
         adden = 10
         no_train = len(data_train)
         args.logger.info('The entire datasize is {}'.format(len(data_train)))       
-        ADDENDUM = adden
         NUM_TRAIN = no_train
+        ADDENDUM = adden
         indices = list(range(NUM_TRAIN))
         random.shuffle(indices)
 
-        labeled_set = indices[:ADDENDUM]
-        unlabeled_set = [x for x in indices if x not in labeled_set]
+        # meta_set = indices[:ADDENDUM]
+        meta_set = torch.load(os.path.join(args.save_path,
+            "valid_dataset_ids")).tolist()
+        unlabeled_set = [x for x in indices if x not in meta_set]
 
+        meta_loader = DataLoader(
+            data_train,
+            batch_size=args.batch_size, 
+            sampler=SubsetRandomSampler(meta_set), 
+            pin_memory=True,
+            # drop_last=True,
+        )
         train_loader = DataLoader(
             data_train,
             batch_size=args.batch_size, 
-            sampler=SubsetRandomSampler(labeled_set), 
+            sampler=SubsetRandomSampler(unlabeled_set), 
+            pin_memory=True,
+            # drop_last=True,
+        )
+        valid_loader = DataLoader(
+            data_valid,
+            batch_size=args.batch_size, 
             pin_memory=True,
             # drop_last=True,
         )
         test_loader = DataLoader(data_test, batch_size=args.test_batch_size)
-        dataloaders = {'train': train_loader, 'test': test_loader}
+        dataloaders = {'meta': meta_loader, 'valid': valid_loader, 'train': train_loader, 'test': test_loader}
 
         for cycle in range(CYCLES):
             
+            args.logger.info("Meta set size: {}".format(len(meta_set)))
             # Randomly sample 10000 unlabeled data points
             random.shuffle(unlabeled_set)
             subset = unlabeled_set[:SUBSET]
@@ -677,19 +695,31 @@ def main_train_taaval(args, data_train, data_test):
             schedulers = {'backbone': sched_backbone, 'module': sched_module}
             
             # Training and testing
-            train(
-                models,
-                method,
+            prev_weights = None
+            main.main_train.meta_learning_model(
+                args,
+                args.logger,
+                DDP(models['backbone'], device_ids=[args.local_rank]),
+                optimizers['backbone'],
                 criterion,
-                optimizers,
-                schedulers,
-                dataloaders,
-                args.epochs,
-                EPOCHL,
-                args
+                criterion,
+                dataloaders['train'],
+                dataloaders['meta'],
+                dataloaders['valid'],
+                dataloaders['test'],
+                mnist_to_device,
+                scheduler=schedulers['backbone'],
+                cached_w_array=prev_weights,
+                target_id=None,
+                start_ep=0,
+                mile_stones_epochs=MILESTONES,
+                heuristic=None,
+                gt_training_labels=None,
             )
-            acc = test(models, method, dataloaders, mode='test')
-            args.logger.info('Trial {}/{} || Cycle {}/{} || Label set size {}: Test acc {}'.format(trial+1, TRIALS, cycle+1, CYCLES, len(labeled_set), acc))
+            acc = test(models, method, dataloaders['test'])
+            args.logger.info(
+                'Trial {}/{} || Cycle {}/{} || Label set size {}: Test acc {}'.format(
+                    trial+1, TRIALS, cycle+1, CYCLES, len(meta_set), acc))
             # np.array([method, trial+1, TRIALS, cycle+1, CYCLES, len(labeled_set), acc]).tofile(results, sep=" ")
 
 
@@ -702,7 +732,7 @@ def main_train_taaval(args, data_train, data_test):
                 models,
                 data_train,
                 subset, 
-                labeled_set,
+                meta_set,
                 cycle,
                 args,
             )
@@ -710,15 +740,15 @@ def main_train_taaval(args, data_train, data_test):
             # Update the labeled dataset and the unlabeled dataset, respectively
             new_list = list(torch.tensor(subset)[arg][:ADDENDUM].numpy())
             # print(len(new_list), min(new_list), max(new_list))
-            labeled_set += list(torch.tensor(subset)[arg][-ADDENDUM:].numpy())
+            meta_set += list(torch.tensor(subset)[arg][-ADDENDUM:].numpy())
             listd = list(torch.tensor(subset)[arg][:-ADDENDUM].numpy()) 
             unlabeled_set = listd + unlabeled_set[SUBSET:]
-            args.logger.info("{}, {}, {}".format(len(labeled_set),
-                min(labeled_set), max(labeled_set)))
+            args.logger.info("{}, {}, {}".format(len(meta_set),
+                min(meta_set), max(meta_set)))
             # Create a new dataloader for the updated labeled dataset
-            dataloaders['train'] = DataLoader(
+            dataloaders['meta'] = DataLoader(
                 data_train,
                 batch_size=args.batch_size, 
-                sampler=SubsetRandomSampler(labeled_set), 
+                sampler=SubsetRandomSampler(meta_set), 
                 pin_memory=True,
             )

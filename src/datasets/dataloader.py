@@ -380,7 +380,7 @@ def random_partition_train_valid_dataset0(criterion, optimizer, net, train_datas
 
     update_train_ids = rand_train_ids[valid_size:]
 
-    # torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
+    torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
     remaining_origin_labels = origin_labels[update_train_ids]
     return train_set, meta_set, remaining_origin_labels
@@ -424,7 +424,7 @@ def random_partition_train_valid_dataset0_by_class(criterion, optimizer, net, tr
 
     # update_train_ids = rand_train_ids[valid_size:]
 
-    # torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
+    torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
     remaining_origin_labels = origin_labels[update_train_ids]
     return train_set, meta_set, remaining_origin_labels

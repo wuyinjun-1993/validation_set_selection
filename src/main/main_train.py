@@ -26,7 +26,7 @@ from models.resnet3 import *
 from models.bert import *
 import collections
 from models.LeNet5 import *
-from models.TAVAAL import main_train_taaval
+import models.TAVAAL
 
 cached_model_name="cached_model"
 pretrained_model_name="pretrained_model"
@@ -81,9 +81,9 @@ def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls,
     torch.save(best_valid_acc_idx, os.path.join(args.save_path, "early_stopping_epoch"))
 
     if is_meta:
-        cache_sample_weights_given_epoch(best_valid_acc_idx)
+        cache_sample_weights_given_epoch(best_valid_acc_idx, args)
     else:
-        cache_sample_weights_given_epoch_basic_train(best_valid_acc_idx)
+        cache_sample_weights_given_epoch_basic_train(best_valid_acc_idx, args)
 
     return best_valid_acc_idx
 
@@ -146,7 +146,7 @@ def cache_sample_weights_for_min_loss_epoch(args, test_loss_ls):
     torch.save(best_model, os.path.join(args.save_path, cached_model_name))
 
 
-def cache_sample_weights_given_epoch(epoch):
+def cache_sample_weights_given_epoch(epoch, args):
     best_w_array = torch.load(os.path.join(args.save_path, 'sample_weights_' + str(epoch)))
     best_model = torch.load(os.path.join(args.save_path, 'refined_model_' + str(epoch)))
 
@@ -157,7 +157,7 @@ def cache_sample_weights_given_epoch(epoch):
     torch.save(best_model, os.path.join(args.save_path, pretrained_model_name))
 
 
-def cache_sample_weights_given_epoch_basic_train(epoch):
+def cache_sample_weights_given_epoch_basic_train(epoch, args):
     best_model = torch.load(os.path.join(args.save_path, 'model_' + str(epoch)))
     torch.save(best_model, os.path.join(args.save_path, cached_model_name))
     torch.save(best_model, os.path.join(args.save_path, pretrained_model_name))
@@ -333,6 +333,8 @@ def meta_learning_model(
                     criterion.reduction = 'none'
                 
                 meta_train_outputs = meta_model(inputs[1])
+                if type(meta_train_outputs) is tuple:
+                    meta_train_outputs = meta_train_outputs[0]
 
                 labels = inputs[2]
                 if isinstance(criterion, torch.nn.L1Loss):
@@ -362,6 +364,8 @@ def meta_learning_model(
                 
                 meta_out = meta_inputs[2]
                 model_out = meta_model(meta_inputs[1])
+                if type(model_out) is tuple:
+                    model_out = model_out[0]
                 if isinstance(meta_criterion, torch.nn.L1Loss):
                     meta_out = F.one_hot(meta_inputs[2],
                             num_classes=10)
@@ -414,6 +418,8 @@ def meta_learning_model(
                 criterion.reduction = 'none'
             
             model_out = model(inputs[1])
+            if type(model_out) is tuple:
+                model_out = model_out[0]
             labels = inputs[2]
             if isinstance(criterion, torch.nn.L1Loss):
                 labels = F.one_hot(inputs[2],
@@ -469,13 +475,14 @@ def meta_learning_model(
                 logger.info("training accuracy at epoch %d:%f"%(ep, train_pred_acc_rate))
                 if criterion is not None:
                     criterion.reduction = 'mean'
-                logger.info("valid performance at epoch %d"%(ep))
-                valid_loss, valid_acc = test(valid_loader, model, criterion, args, logger, "valid")
+                if len(valid_loader) > 0:
+                    logger.info("valid performance at epoch %d"%(ep))
+                    valid_loss, valid_acc = test(valid_loader, model, criterion, args, logger, "valid")
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
+                        valid_acc_ls, valid_loss, valid_acc, "valid")
+
                 logger.info("test performance at epoch %d"%(ep))
                 test_loss, test_acc = test(test_loader, model, criterion, args, logger, "test")
-
-                report_best_test_performance_so_far(logger, valid_loss_ls,
-                        valid_acc_ls, valid_loss, valid_acc, "valid")
                 report_best_test_performance_so_far(logger, test_loss_ls,
                         test_acc_ls, test_loss, test_acc, "test")
 
@@ -1298,9 +1305,10 @@ def main2(args, logger):
         )
     elif args.ta_vaal_train:
         logger.info("starting TA-VAAL training")
-        main_train_taaval(
+        models.TAVAAL.main_train_taaval(
             args,
             trainloader.dataset,
+            validloader.dataset,
             testloader.dataset,
         )
     else:
