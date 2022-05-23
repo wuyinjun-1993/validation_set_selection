@@ -1300,7 +1300,6 @@ def main2(args, logger):
         logger.info("starting TA-VAAL training")
         main_train_taaval(
             args,
-            metaloader.dataset,
             trainloader.dataset,
             testloader.dataset,
         )

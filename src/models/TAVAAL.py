@@ -16,10 +16,10 @@ MARGIN = 1.0
 WEIGHT = 1.0
 CUDA_VISIBLE_DEVICES = 0
 EPOCHL = 120
-SUBSET = 10000
+SUBSET = 1000
 MILESTONES = [160, 240]
-ADDENDUM = 1000
-EPOCHV = 100
+ADDENDUM = 10
+EPOCHV = 10
 
 
 class BasicBlock(nn.Module):
@@ -308,7 +308,7 @@ class Discriminator(nn.Module):
 
 def kaiming_init(m):
     if isinstance(m, (nn.Linear, nn.Conv2d)):
-        init.kaiming_normal(m.weight)
+        init.kaiming_normal_(m.weight)
         if m.bias is not None:
             m.bias.data.fill_(0)
     elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
@@ -340,7 +340,8 @@ def train_epoch(models, method, criterion, optimizers, dataloaders, epoch,
     models['module'].train()
 
     global iters
-    for data in tqdm(dataloaders['train'], leave=False, total=len(dataloaders['train'])):
+    for data in tqdm(dataloaders['train'], leave=False,
+            total=len(dataloaders['train'])):
         with torch.cuda.device(CUDA_VISIBLE_DEVICES):
             inputs = data[1].cuda()
             labels = data[2].cuda()
@@ -375,7 +376,7 @@ def train(models, method, criterion, optimizers, schedulers, dataloaders,
         num_epochs, epoch_loss, args):
     args.logger.info('>> Train a Model.')
     
-    for epoch in range(num_epochs):
+    for epoch in tqdm(range(num_epochs)):
 
         loss = train_epoch(models, method, criterion, optimizers, dataloaders,
                 epoch, epoch_loss, args)
@@ -582,7 +583,7 @@ def query_samples(model, data_unlabeled, subset, labeled_set, cycle, args):
     ranker = models['module']        
     all_preds, all_indices = [], []
 
-    for images, _, indices in unlabeled_loader:                       
+    for indices, images, _ in unlabeled_loader:                       
         images = images.cuda()
         with torch.no_grad():
             _,_,features = task_model(images)
@@ -612,7 +613,7 @@ def main_train_taaval(args, data_train, data_test):
     for trial in range(TRIALS):
         # Load training and testing dataset
         NO_CLASSES = 10
-        adden = 1000
+        adden = 10
         no_train = len(data_train)
         args.logger.info('The entire datasize is {}'.format(len(data_train)))       
         ADDENDUM = adden
@@ -712,7 +713,8 @@ def main_train_taaval(args, data_train, data_test):
             labeled_set += list(torch.tensor(subset)[arg][-ADDENDUM:].numpy())
             listd = list(torch.tensor(subset)[arg][:-ADDENDUM].numpy()) 
             unlabeled_set = listd + unlabeled_set[SUBSET:]
-            args.logger.info(len(labeled_set), min(labeled_set), max(labeled_set))
+            args.logger.info("{}, {}, {}".format(len(labeled_set),
+                min(labeled_set), max(labeled_set)))
             # Create a new dataloader for the updated labeled dataset
             dataloaders['train'] = DataLoader(
                 data_train,
