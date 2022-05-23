@@ -217,6 +217,7 @@ def meta_learning_model(
     heuristic=None,
     gt_training_labels=None,
 ):
+    logger.info("Meta set set: {}".format(len(meta_loader.dataset)))
     
     
     if args.cuda:

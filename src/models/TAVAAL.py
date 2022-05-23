@@ -14,12 +14,13 @@ from tqdm import tqdm
 import random
 from datasets.mnist import mnist_to_device
 import main.main_train
+from datasets.dataloader import dataset_wrapper
 
 MARGIN = 1.0
 WEIGHT = 1.0
 CUDA_VISIBLE_DEVICES = 0
 EPOCHL = 120
-SUBSET = 1000
+SUBSET = 10000
 MILESTONES = [160, 240]
 ADDENDUM = 10
 EPOCHV = 10
@@ -611,7 +612,7 @@ def main_train_taaval(args, data_train, data_valid, data_test):
     args.logger.info("Dataset: %s"%args.dataset)
     args.logger.info("Method type:%s"%method)
     CYCLES = 5
-    TRIALS = 5
+    TRIALS = 1
     for trial in range(TRIALS):
         # Load training and testing dataset
         NO_CLASSES = 10
@@ -628,10 +629,11 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             "valid_dataset_ids")).tolist()
         unlabeled_set = [x for x in indices if x not in meta_set]
 
+        data_meta = dataset_wrapper(np.copy(data_train.data[meta_set]),
+                np.copy(data_train.targets[meta_set]), data_train.transform)
         meta_loader = DataLoader(
-            data_train,
+            data_meta,
             batch_size=args.batch_size, 
-            sampler=SubsetRandomSampler(meta_set), 
             pin_memory=True,
             # drop_last=True,
         )
@@ -746,9 +748,10 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             args.logger.info("{}, {}, {}".format(len(meta_set),
                 min(meta_set), max(meta_set)))
             # Create a new dataloader for the updated labeled dataset
+            data_meta = dataset_wrapper(np.copy(data_train.data[meta_set]),
+                np.copy(data_train.targets[meta_set]), data_train.transform)
             dataloaders['meta'] = DataLoader(
                 data_train,
                 batch_size=args.batch_size, 
-                sampler=SubsetRandomSampler(meta_set), 
                 pin_memory=True,
             )
