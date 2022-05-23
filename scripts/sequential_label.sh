@@ -21,7 +21,7 @@ then
   noise_cmd="--flip_labels --biased_flip --err_label_ratio ${err_param}"
 elif [ ${noise_type} = "imbalanced" ];
 then
-  noise_cmd="--bias_classes --imb_factor ${err_param} --all_layer_grad_no_full_loss"
+  noise_cmd="--bias_classes --imb_factor ${err_param} --clustering_by_class --all_layer_grad_no_full_loss"
 elif [ ${noise_type} = "imbalanced_uniform" ];
 then
   noise_cmd="--flip_labels --err_label_ratio 0.6 --bias_classes --imb_factor ${err_param}"
@@ -59,22 +59,28 @@ then
     --lr_decay"
 elif [ ${valid_selection} = "uncertainty" ];
 then
-  selection_cmd="--uncertain_select --lr_decay --clustering_by_class"
+  selection_cmd="--uncertain_select --lr_decay"
 elif [ ${valid_selection} = "certainty" ];
 then
-  selection_cmd="--certain_select --lr_decay --clustering_by_class"
+  selection_cmd="--certain_select --lr_decay"
 elif [ ${valid_selection} = "random" ];
 then
-  selection_cmd="--clustering_by_class --lr_decay"
+  selection_cmd="--lr_decay"
 elif [ ${valid_selection} = "finetune" ];
 then
-  selection_cmd="--finetune --clustering_by_class --lr_decay"
+  selection_cmd="--finetune --lr_decay"
 elif [ ${valid_selection} = "glc" ];
 then
-  selection_cmd="--glc_train --clustering_by_class --lr_decay"
+  selection_cmd="--glc_train --lr_decay"
+elif [ ${valid_selection} = "TA-VAAL" ];
+then
+  selection_cmd="--ta_vaal_train --lr_decay"
 fi
 
 if [ ${warmup} = "True" ];
+then
+  result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_0.1_batchsize_128_basemodel/
+elif [ ${valid_selection} = "TA-VAAL" ];
 then
   result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_0.1_batchsize_128_basemodel/
 else
@@ -114,7 +120,7 @@ do
    
   output_file_name=${result_dir}/master_log.txt
 
-  if [ ${warmup} != "True" ] && [ $k -ge 1 ]
+  if [ ${warmup} != "True" ] && [ ${valid_selection} != "TA-VAAL" ] && [ $k -ge 1 ]
   then
     ${exe_cmd} --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights > ${output_file_name} 2>&1
   else
