@@ -15,130 +15,16 @@ import random
 from datasets.mnist import mnist_to_device
 import main.main_train
 from datasets.dataloader import dataset_wrapper
+from models.resnet3 import resnet34
 
 MARGIN = 1.0
 WEIGHT = 1.0
 CUDA_VISIBLE_DEVICES = 0
 EPOCHL = 120
 SUBSET = 10000
-MILESTONES = [160, 240]
+MILESTONES = [80, 90]
 ADDENDUM = 10
 EPOCHV = 10
-
-
-class BasicBlock(nn.Module):
-    expansion = 1
-
-    def __init__(self, in_planes, planes, stride=1):
-        super(BasicBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
-            )
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        out += self.shortcut(x)
-        out = F.relu(out)
-        return out
-
-class BasicBlock2(nn.Module):
-    expansion = 1
-
-    def __init__(self, in_planes, planes, stride=1):
-        super(BasicBlock2, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
-            )
-
-    def forward(self, x):
-        out = F.dropout(F.relu(self.bn1(self.conv1(x))), p=0.3, training=True)
-        out = F.dropout(self.bn2(self.conv2(out)), p=0.3, training=True)
-        out +=  self.shortcut(x)
-        out = F.relu(out)
-        return out
-
-
-class Bottleneck(nn.Module):
-    expansion = 4
-
-    def __init__(self, in_planes, planes, stride=1):
-        super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.conv3 = nn.Conv2d(planes, self.expansion*planes, kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(self.expansion*planes)
-
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
-            )
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = F.relu(self.bn2(self.conv2(out)))
-        out = self.bn3(self.conv3(out))
-        out += self.shortcut(x)
-        out = F.relu(out)
-        return out
-
-
-class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10):
-        super(ResNet, self).__init__()
-        self.in_planes = 64
-
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.linear = nn.Linear(512*block.expansion, num_classes)
-        # self.linear2 = nn.Linear(1000, num_classes)
-
-    def _make_layer(self, block, planes, num_blocks, stride):
-        strides = [stride] + [1]*(num_blocks-1)
-        layers = []
-        for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
-            self.in_planes = planes * block.expansion
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out1 = self.layer1(out)
-        out2 = self.layer2(out1)
-        out3 = self.layer3(out2)
-        out4 = self.layer4(out3)
-        out = F.avg_pool2d(out4, 4)
-        outf = out.view(out.size(0), -1)
-        # outl = self.linear(outf)
-        out = self.linear(outf)
-        return out, outf, [out1, out2, out3, out4]
-
-def ResNet18(num_classes = 10):
-    return ResNet(BasicBlock, [2,2,2,2], num_classes)
 
 
 class LossNet(nn.Module):
@@ -355,7 +241,7 @@ def train_epoch(models, method, criterion, optimizers, dataloaders, epoch,
         optimizers['backbone'].zero_grad()
         optimizers['module'].zero_grad()
 
-        scores, _, features = models['backbone'](inputs) 
+        scores, _, features = models['backbone'].forward_with_features(inputs) 
         target_loss = criterion(scores, labels)
 
         if epoch > epoch_loss:
@@ -405,7 +291,7 @@ def test(models, method, dataloader):
                 inputs = inputs.cuda()
                 labels = labels.cuda()
 
-            scores, _, _ = models['backbone'](inputs)
+            scores, _, _ = models['backbone'].forward_with_features(inputs)
             _, preds = torch.max(scores.data, 1)
             total += labels.size(0)
             correct += (preds == labels).sum().item()
@@ -662,8 +548,11 @@ def main_train_taaval(args, data_train, data_valid, data_test):
 
             # Model - create new instance for every cycle so that it resets
             with torch.cuda.device(CUDA_VISIBLE_DEVICES):
-                resnet = ResNet18(num_classes=NO_CLASSES).cuda()
+                resnet = resnet34(num_classes=NO_CLASSES).cuda()
                 loss_module = LossNet().cuda()
+
+            if args.use_pretrained_model:
+                resnet = main.main_train.load_checkpoint2(args, resnet)
 
             models = {'backbone': resnet, 'module': loss_module}
             torch.backends.cudnn.benchmark = True
@@ -755,3 +644,4 @@ def main_train_taaval(args, data_train, data_valid, data_test):
                 batch_size=args.batch_size, 
                 pin_memory=True,
             )
+            args.prev_save_path = args.save_path

@@ -943,7 +943,7 @@ def load_checkpoint(args, model):
 
 
 def load_checkpoint2(args, model):
-    logger.info('==> Loading cached model...')
+    args.logger.info('==> Loading cached model...')
     if args.prev_save_path is not None:
         cached_model_file_name = os.path.join(args.prev_save_path, cached_model_name)
         if os.path.exists(cached_model_file_name):
@@ -954,7 +954,7 @@ def load_checkpoint2(args, model):
                 model.load_state_dict(state)
             else:
                 model.load_state_dict(state.state_dict())
-            logger.info('==> Loading cached model successfully')
+            args.logger.info('==> Loading cached model successfully')
             del state
     return model
 

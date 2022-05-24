@@ -182,6 +182,18 @@ class ResNet(nn.Module):
     x = self.fc(x)
     return x
 
+  def forward_with_features(self, x):
+    x = self.layer0(x)
+    out1 = self.layer1(x)
+    out2 = self.layer2(out1)
+    out3 = self.layer3(out2)
+    out4 = self.layer4(out3)
+    spatial_size = x.size(2)
+    x = nn.functional.avg_pool2d(out4, spatial_size, 1)
+    outf = x.view(x.size(0), -1)
+    x = self.fc(outf)
+    return x, outf, [out1, out2, out3, out4]
+
 def resnet10(**kwargs):
     n_planes = [64, 128, 256, 512]
     return ResNet(BasicBlock, [1,1,1,1], n_planes, **kwargs)
