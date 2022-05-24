@@ -14,7 +14,7 @@ from tqdm import tqdm
 import random
 from datasets.mnist import mnist_to_device
 import main.main_train
-from datasets.dataloader import dataset_wrapper, experiment_tag
+from datasets.dataloader import dataset_wrapper, split_train_valid_set_by_ids
 from models.resnet3 import resnet34
 
 MARGIN = 1.0
@@ -443,18 +443,17 @@ def train_vaal(models, optimizers, labeled_dataloader, unlabeled_dataloader,
 
 
 # Select the indices of the unlablled data according to the methods
-def query_samples(model, data_unlabeled, subset, labeled_set, cycle, args):
+def query_samples(model, train_set, subset, meta_set, cycle, args):
     # Create unlabeled dataloader for the unlabeled subset
     unlabeled_loader = DataLoader(
-        data_unlabeled,
+        train_set,
         batch_size=args.batch_size, 
         sampler=SubsetSequentialSampler(subset), 
         pin_memory=True,
     )
     labeled_loader = DataLoader(
-        data_unlabeled,
+        meta_set,
         batch_size=args.batch_size, 
-        sampler=SubsetSequentialSampler(labeled_set), 
         pin_memory=True,
     )
     vae = VAE()
@@ -493,7 +492,7 @@ def query_samples(model, data_unlabeled, subset, labeled_set, cycle, args):
     return arg
 
 
-def main_train_taaval(args, data_train, data_valid, data_test):
+def main_train_taaval(args):
     method = 'TA-VAAL'
     args.logger.info("Dataset: %s"%args.dataset)
     args.logger.info("Method type:%s"%method)
@@ -505,45 +504,40 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             NO_CLASSES = 100
         else:
             NO_CLASSES = 10
+        train_set = torch.load(os.path.join(args.save_path, "cached_train_set"))
+
         adden = args.valid_count
-        no_train = len(data_train)
-        args.logger.info('The entire datasize is {}'.format(len(data_train)))       
+        no_train = len(train_set)
+        args.logger.info('The entire datasize is {}'.format(len(train_set)))       
         NUM_TRAIN = no_train
         ADDENDUM = adden
         indices = list(range(NUM_TRAIN))
         random.shuffle(indices)
 
-        # meta_set = indices[:ADDENDUM]
-        meta_set = torch.load(os.path.join(args.prev_save_path,
-            "valid_dataset_ids")).tolist()
-        unlabeled_set = [x for x in indices if x not in meta_set]
+        meta_set = torch.load(os.path.join(args.save_path, "cached_meta_set"))
+        valid_set = torch.load(os.path.join(args.save_path, "cached_valid_set"))
+        test_set = torch.load(os.path.join(args.save_path, "cached_test_set"))
 
-        trainset = torch.load(os.path.join(
-            args.data_dir,
-            experiment_tag(args) + "_bias_class_dataset"),
-        )
-        data_meta = dataset_wrapper(np.copy(trainset.data[meta_set]),
-                np.copy(trainset.targets[meta_set]), trainset.transform)
+        unlabeled_set = list(range(len(train_set)))
         meta_loader = DataLoader(
-            data_meta,
+            meta_set,
             batch_size=args.batch_size, 
             pin_memory=True,
             # drop_last=True,
         )
         train_loader = DataLoader(
-            trainset,
+            train_set,
             batch_size=args.batch_size, 
-            sampler=SubsetRandomSampler(unlabeled_set), 
             pin_memory=True,
             # drop_last=True,
         )
         valid_loader = DataLoader(
-            data_valid,
+            valid_set,
             batch_size=args.batch_size, 
             pin_memory=True,
             # drop_last=True,
         )
-        test_loader = DataLoader(data_test, batch_size=args.test_batch_size)
+        test_loader = DataLoader(test_set, batch_size=args.test_batch_size)
         dataloaders = {'meta': meta_loader, 'valid': valid_loader, 'train': train_loader, 'test': test_loader}
 
         for cycle in range(CYCLES):
@@ -629,7 +623,7 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             # Get the indices of the unlabeled samples to train on next cycle
             arg = query_samples(
                 models,
-                trainset,
+                train_set,
                 subset, 
                 meta_set,
                 cycle,
@@ -644,11 +638,22 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             unlabeled_set = listd + unlabeled_set[SUBSET:]
             args.logger.info("{}, {}, {}".format(len(meta_set),
                 min(meta_set), max(meta_set)))
+
             # Create a new dataloader for the updated labeled dataset
-            data_meta = dataset_wrapper(np.copy(trainset.data[meta_set]),
-                np.copy(trainset.targets[meta_set]), trainset.transform)
+            origin_labels = torch.load(os.path.join(args.save_path, "cached_train_origin_labels"))
+            train_set, meta_set = split_train_valid_set_by_ids(args, train_set,
+                    origin_labels, meta_set, unlabeled_set)
+
+            torch.save(meta_set, os.path.join(args.save_path, "cached_meta_set"))
+            torch.save(train_set, os.path.join(args.save_path, "cached_train_set"))
+
             dataloaders['meta'] = DataLoader(
-                data_meta,
+                meta_set,
+                batch_size=args.batch_size, 
+                pin_memory=True,
+            )
+            dataloaders['train'] = DataLoader(
+                train_set,
                 batch_size=args.batch_size, 
                 pin_memory=True,
             )

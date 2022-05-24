@@ -1308,9 +1308,6 @@ def main2(args, logger):
         logger.info("starting TA-VAAL training")
         models.TAVAAL.main_train_taaval(
             args,
-            trainloader.dataset,
-            validloader.dataset,
-            testloader.dataset,
         )
     else:
         logger.info("starting meta training")
