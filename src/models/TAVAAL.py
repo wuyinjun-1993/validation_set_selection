@@ -505,7 +505,7 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             NO_CLASSES = 100
         else:
             NO_CLASSES = 10
-        adden = args.valid_count - NO_CLASSES
+        adden = args.valid_count
         no_train = len(data_train)
         args.logger.info('The entire datasize is {}'.format(len(data_train)))       
         NUM_TRAIN = no_train

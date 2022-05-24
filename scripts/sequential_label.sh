@@ -55,6 +55,7 @@ then
     --cluster_method_three \
     --cluster_method_three_sampling \
     --cluster_method_three_sample_col_count 1000 \
+    --no_sample_weights_k_means \
     --not_rescale_features \
     --weight_by_norm \
     --remove_empty_clusters \
@@ -87,7 +88,13 @@ if [ ${warmup} = "True" ];
 then
   result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_0.1_batchsize_128_basemodel/
 else
-  result_dir=${res_dir}/logs_${dataset}_random_${noise_type}_${err_param}_lr_${lr}_pretrained_select_$(expr ${valid_count} / 2)_1_1
+  if [ ${dataset} = "cifar10" ];
+  then
+    warm_count=10
+  else
+    warm_count=100
+  fi
+  result_dir=${res_dir}/logs_${dataset}_random_${noise_type}_${err_param}_lr_${lr}_pretrained_select_${warm_count}_1_1
 fi
 
 # Sequentially train the model using a selected "clean" set
