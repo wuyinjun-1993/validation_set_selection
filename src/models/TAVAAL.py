@@ -589,8 +589,8 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             schedulers = {'backbone': sched_backbone, 'module': sched_module}
             
             # Training and testing
-            # prev_weights = None
             if cycle > 0:
+                prev_weights = None
                 main.main_train.meta_learning_model(
                     args,
                     args.logger,
