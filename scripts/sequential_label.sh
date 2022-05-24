@@ -21,10 +21,15 @@ then
   noise_cmd="--flip_labels --biased_flip --err_label_ratio ${err_param}"
 elif [ ${noise_type} = "imbalanced" ];
 then
-  noise_cmd="--bias_classes --imb_factor ${err_param} --clustering_by_class --all_layer_grad_no_full_loss"
+  noise_cmd="--bias_classes --imb_factor ${err_param} --all_layer_grad_no_full_loss"
 elif [ ${noise_type} = "imbalanced_uniform" ];
 then
   noise_cmd="--flip_labels --err_label_ratio 0.6 --bias_classes --imb_factor ${err_param}"
+fi
+
+if [ ${noise_type} = "imbalanced" ] && [ ${valid_selection} != "ours1" ] && [ ${valid_selection} != "ours2" ];
+then
+  noise_cmd+=" --clustering_by_class"
 fi
 
 if [ ${valid_selection} = "ours1" ];
@@ -35,6 +40,7 @@ then
     --cluster_method_two_plus \
     --cluster_method_two_sampling \
     --cluster_method_two_sample_col_count 1000 \
+    --no_sample_weights_k_means \
     --not_rescale_features \
     --weight_by_norm \
     --remove_empty_clusters \
