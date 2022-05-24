@@ -633,16 +633,16 @@ def main_train_taaval(args):
             # Update the labeled dataset and the unlabeled dataset, respectively
             new_list = list(torch.tensor(subset)[arg][:ADDENDUM].numpy())
             # print(len(new_list), min(new_list), max(new_list))
-            meta_set += list(torch.tensor(subset)[arg][-ADDENDUM:].numpy())
+            meta_set_ids = list(torch.tensor(subset)[arg][-ADDENDUM:].numpy())
             listd = list(torch.tensor(subset)[arg][:-ADDENDUM].numpy()) 
             unlabeled_set = listd + unlabeled_set[SUBSET:]
-            args.logger.info("{}, {}, {}".format(len(meta_set),
-                min(meta_set), max(meta_set)))
+            args.logger.info("Number of selected samples: {}".format(len(meta_set_ids)))
 
             # Create a new dataloader for the updated labeled dataset
             origin_labels = torch.load(os.path.join(args.save_path, "cached_train_origin_labels"))
-            train_set, meta_set = split_train_valid_set_by_ids(args, train_set,
-                    origin_labels, meta_set, unlabeled_set)
+            train_set, new_meta_set = split_train_valid_set_by_ids(args, train_set,
+                    origin_labels, meta_set_ids, unlabeled_set)
+            meta_set = meta_set.concat_validset(meta_set, new_meta_set)
 
             torch.save(meta_set, os.path.join(args.save_path, "cached_meta_set"))
             torch.save(train_set, os.path.join(args.save_path, "cached_train_set"))
