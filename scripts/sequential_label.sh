@@ -24,7 +24,7 @@ then
   noise_cmd="--bias_classes --imb_factor ${err_param} --all_layer_grad_no_full_loss"
 elif [ ${noise_type} = "imbalanced_uniform" ];
 then
-  noise_cmd="--flip_labels --err_label_ratio 0.6 --bias_classes --imb_factor ${err_param}"
+  noise_cmd="--flip_labels --err_label_ratio 0.4 --bias_classes --imb_factor ${err_param}"
 fi
 
 if [ ${noise_type} = "imbalanced" ] && [ ${valid_selection} != "ours1" ] && [ ${valid_selection} != "ours2" ];

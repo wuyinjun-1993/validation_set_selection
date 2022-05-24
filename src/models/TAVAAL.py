@@ -14,7 +14,7 @@ from tqdm import tqdm
 import random
 from datasets.mnist import mnist_to_device
 import main.main_train
-from datasets.dataloader import dataset_wrapper
+from datasets.dataloader import dataset_wrapper, experiment_tag
 from models.resnet3 import resnet34
 
 MARGIN = 1.0
@@ -518,8 +518,12 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             "valid_dataset_ids")).tolist()
         unlabeled_set = [x for x in indices if x not in meta_set]
 
-        data_meta = dataset_wrapper(np.copy(data_train.data[meta_set]),
-                np.copy(data_train.targets[meta_set]), data_train.transform)
+        trainset = torch.load(os.path.join(
+            args.data_dir,
+            experiment_tag(args) + "_bias_class_dataset"),
+        )
+        data_meta = dataset_wrapper(np.copy(trainset.data[meta_set]),
+                np.copy(trainset.targets[meta_set]), trainset.transform)
         meta_loader = DataLoader(
             data_meta,
             batch_size=args.batch_size, 
@@ -527,7 +531,7 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             # drop_last=True,
         )
         train_loader = DataLoader(
-            data_train,
+            trainset,
             batch_size=args.batch_size, 
             sampler=SubsetRandomSampler(unlabeled_set), 
             pin_memory=True,
@@ -625,7 +629,7 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             # Get the indices of the unlabeled samples to train on next cycle
             arg = query_samples(
                 models,
-                data_train,
+                trainset,
                 subset, 
                 meta_set,
                 cycle,
@@ -641,11 +645,10 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             args.logger.info("{}, {}, {}".format(len(meta_set),
                 min(meta_set), max(meta_set)))
             # Create a new dataloader for the updated labeled dataset
-            data_meta = dataset_wrapper(np.copy(data_train.data[meta_set]),
-                np.copy(data_train.targets[meta_set]), data_train.transform)
+            data_meta = dataset_wrapper(np.copy(trainset.data[meta_set]),
+                np.copy(trainset.targets[meta_set]), trainset.transform)
             dataloaders['meta'] = DataLoader(
                 data_meta,
                 batch_size=args.batch_size, 
                 pin_memory=True,
             )
-            args.prev_save_path = args.save_path
