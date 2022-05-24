@@ -497,12 +497,15 @@ def main_train_taaval(args, data_train, data_valid, data_test):
     method = 'TA-VAAL'
     args.logger.info("Dataset: %s"%args.dataset)
     args.logger.info("Method type:%s"%method)
-    CYCLES = 5
+    CYCLES = 1
     TRIALS = 1
     for trial in range(TRIALS):
         # Load training and testing dataset
-        NO_CLASSES = 10
-        adden = 10
+        if args.dataset == "cifar100":
+            NO_CLASSES = 100
+        else:
+            NO_CLASSES = 10
+        adden = args.valid_count - NO_CLASSES
         no_train = len(data_train)
         args.logger.info('The entire datasize is {}'.format(len(data_train)))       
         NUM_TRAIN = no_train
@@ -640,7 +643,7 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             data_meta = dataset_wrapper(np.copy(data_train.data[meta_set]),
                 np.copy(data_train.targets[meta_set]), data_train.transform)
             dataloaders['meta'] = DataLoader(
-                data_train,
+                data_meta,
                 batch_size=args.batch_size, 
                 pin_memory=True,
             )
