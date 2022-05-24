@@ -358,8 +358,8 @@ def train_vaal(models, optimizers, labeled_dataloader, unlabeled_dataloader,
             r_u_0 = torch.from_numpy(np.random.uniform(0, 1, size=(unlabeled_imgs.shape[0],1))).type(torch.FloatTensor).cuda()
         else:
             with torch.no_grad():
-                _,_,features_l = task_model(labeled_imgs)
-                _,_,feature_u = task_model(unlabeled_imgs)
+                _,_,features_l = task_model.forward_with_features(labeled_imgs)
+                _,_,feature_u = task_model.forward_with_features(unlabeled_imgs)
                 r_l = ranker(features_l)
                 r_u = ranker(feature_u)
         if iter_count == 0:
@@ -475,7 +475,7 @@ def query_samples(model, data_unlabeled, subset, labeled_set, cycle, args):
     for indices, images, _ in unlabeled_loader:                       
         images = images.cuda()
         with torch.no_grad():
-            _,_,features = task_model(images)
+            _,_,features = task_model.forward_with_features(images)
             r = ranker(features)
             _, _, mu, _ = vae(torch.sigmoid(r),images)
             preds = discriminator(r,mu)
@@ -497,7 +497,7 @@ def main_train_taaval(args, data_train, data_valid, data_test):
     method = 'TA-VAAL'
     args.logger.info("Dataset: %s"%args.dataset)
     args.logger.info("Method type:%s"%method)
-    CYCLES = 1
+    CYCLES = 2
     TRIALS = 1
     for trial in range(TRIALS):
         # Load training and testing dataset
@@ -514,7 +514,7 @@ def main_train_taaval(args, data_train, data_valid, data_test):
         random.shuffle(indices)
 
         # meta_set = indices[:ADDENDUM]
-        meta_set = torch.load(os.path.join(args.save_path,
+        meta_set = torch.load(os.path.join(args.prev_save_path,
             "valid_dataset_ids")).tolist()
         unlabeled_set = [x for x in indices if x not in meta_set]
 
@@ -589,27 +589,28 @@ def main_train_taaval(args, data_train, data_valid, data_test):
             schedulers = {'backbone': sched_backbone, 'module': sched_module}
             
             # Training and testing
-            prev_weights = None
-            main.main_train.meta_learning_model(
-                args,
-                args.logger,
-                DDP(models['backbone'], device_ids=[args.local_rank]),
-                optimizers['backbone'],
-                criterion,
-                criterion,
-                dataloaders['train'],
-                dataloaders['meta'],
-                dataloaders['valid'],
-                dataloaders['test'],
-                mnist_to_device,
-                scheduler=schedulers['backbone'],
-                cached_w_array=prev_weights,
-                target_id=None,
-                start_ep=0,
-                mile_stones_epochs=MILESTONES,
-                heuristic=None,
-                gt_training_labels=None,
-            )
+            # prev_weights = None
+            if cycle > 0:
+                main.main_train.meta_learning_model(
+                    args,
+                    args.logger,
+                    DDP(models['backbone'], device_ids=[args.local_rank]),
+                    optimizers['backbone'],
+                    criterion,
+                    criterion,
+                    dataloaders['train'],
+                    dataloaders['meta'],
+                    dataloaders['valid'],
+                    dataloaders['test'],
+                    mnist_to_device,
+                    scheduler=schedulers['backbone'],
+                    cached_w_array=prev_weights,
+                    target_id=None,
+                    start_ep=0,
+                    mile_stones_epochs=MILESTONES,
+                    heuristic=None,
+                    gt_training_labels=None,
+                )
             acc = test(models, method, dataloaders['test'])
             args.logger.info(
                 'Trial {}/{} || Cycle {}/{} || Label set size {}: Test acc {}'.format(

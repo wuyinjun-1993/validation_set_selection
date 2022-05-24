@@ -86,9 +86,6 @@ fi
 if [ ${warmup} = "True" ];
 then
   result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_0.1_batchsize_128_basemodel/
-elif [ ${valid_selection} = "TA-VAAL" ];
-then
-  result_dir=${res_dir}/logs_${dataset}_${noise_type}_${err_param}_lr_0.1_batchsize_128_basemodel/
 else
   result_dir=${res_dir}/logs_${dataset}_random_${noise_type}_${err_param}_lr_${lr}_pretrained_select_$(expr ${valid_count} / 2)_1_1
 fi
@@ -126,7 +123,7 @@ do
    
   output_file_name=${result_dir}/master_log.txt
 
-  if [ ${warmup} != "True" ] && [ ${valid_selection} != "TA-VAAL" ] && [ $k -ge 1 ]
+  if [ ${warmup} != "True" ]
   then
     ${exe_cmd} --continue_label --load_cached_weights --cached_sample_weights_name cached_sample_weights > ${output_file_name} 2>&1
   else

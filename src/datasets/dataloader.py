@@ -1299,20 +1299,23 @@ def get_dataloader_for_meta(
         if args.continue_label:
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
 
-        trainset, new_metaset, remaining_origin_labels = selection_method(
-            criterion,
-            optimizer,
-            pretrained_model,
-            trainset,
-            metaset,
-            args,
-            remaining_origin_labels,
-            cached_sample_weights=cached_sample_weights,
-        )
-        if args.continue_label:
-            metaset = metaset.concat_validset(metaset, new_metaset)
-        else:
-            metaset = new_metaset
+        if not args.ta_vaal_train:
+            trainset, new_metaset, remaining_origin_labels = selection_method(
+                criterion,
+                optimizer,
+                pretrained_model,
+                trainset,
+                metaset,
+                args,
+                remaining_origin_labels,
+                cached_sample_weights=cached_sample_weights,
+            )
+            if args.continue_label:
+                metaset = metaset.concat_validset(metaset, new_metaset)
+            else:
+                metaset = new_metaset
+
+        assert (metaset is not None), "Must use one of --continue_label or --ta_vaal_train"
 
         unique_labels_count = len(set(metaset.targets.tolist()))
         args.logger.info("unique label count in meta set::%d"%(unique_labels_count))

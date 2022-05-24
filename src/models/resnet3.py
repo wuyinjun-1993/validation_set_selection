@@ -188,7 +188,7 @@ class ResNet(nn.Module):
     out2 = self.layer2(out1)
     out3 = self.layer3(out2)
     out4 = self.layer4(out3)
-    spatial_size = x.size(2)
+    spatial_size = out4.size(2)
     x = nn.functional.avg_pool2d(out4, spatial_size, 1)
     outf = x.view(x.size(0), -1)
     x = self.fc(outf)
