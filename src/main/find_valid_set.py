@@ -1783,7 +1783,8 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
     # valid_sample_representation_ls = []
     # full_sample_representation_ls = []
     # full_sample_id_ls = []
-
+    if only_sample_representation:
+        return full_sample_representation_tensor
     # sample_representation_vec_ls = sample_representation_vec_ls_by_class[label]
     if args.cluster_no_reweighting:
         logging.info("no reweighting for k-means")
