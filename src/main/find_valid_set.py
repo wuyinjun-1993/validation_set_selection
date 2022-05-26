@@ -1389,7 +1389,7 @@ def obtain_sampled_representations_cluster_method_three(sample_representation_ve
 
     return sample_representation_vec_ls, sampled_col_ids_ls
 
-def obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = None, sampled_col_ids_ls = None, only_sample_representation = False):
+def obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = None, sampled_col_ids_ls = None):
     sample_representation_vec_ls = []
 
     sample_id_ls = []
@@ -1791,12 +1791,12 @@ def get_representations_last_layer(args, train_loader, criterion, optimizer, net
     else:
         return full_sample_representation_tensor, all_sample_ids, valid_sample_representation_vec_ls
 
-def get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = None, only_sample_representation = False):
+def get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = None):
 
-    sample_representation_vec_ls, sample_id_ls, valid_sample_representation_ls = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = validset, only_sample_representation = only_sample_representation)
+    sample_representation_vec_ls, sample_id_ls, valid_sample_representation_ls = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = validset)
     if args.use_model_prov:
         args.all_layer = True
-        sample_representation_vec_ls, valid_sample_representation_ls = get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, sample_representation_vec_ls, validset, valid_sample_representation_ls, only_sample_representation = only_sample_representation)
+        sample_representation_vec_ls, valid_sample_representation_ls = get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, sample_representation_vec_ls, validset, valid_sample_representation_ls)
 
 
     full_sample_representation_tensor = sample_representation_vec_ls
@@ -2317,7 +2317,7 @@ def get_representative_valid_ids2_4(train_dataset, criterion, optimizer, train_l
     # sample_id_ls_by_class = dict()
     full_sim_mat1 = None
 
-    full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = validset, only_sample_representation = only_sample_representation)
+    full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = validset)
 
     origin_X_ls_lenth = len(full_sample_representation_tensor)
 
