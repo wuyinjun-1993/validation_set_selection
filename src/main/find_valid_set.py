@@ -1177,7 +1177,7 @@ def print_norm_range_of_representations(args, sample_representation_vec_ls):
         args.logger.info("max norm of the representation:%f"%(max_norm))
         args.logger.info("min norm of the representation:%f"%(min_norm))
 
-def obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids = None):
+def obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids = None, origin_label = None):
     sample_representation_vec_ls = []
 
     sample_id_ls = []
@@ -1190,6 +1190,10 @@ def obtain_representations_last_layer_given_model(args, train_loader, net, crite
 
         if args.cuda:
             data, labels = train_loader.dataset.to_cuda(data, labels)
+        if origin_label is not None:
+            labels = torch.tensor(origin_label[sample_ids])
+            if args.cuda:
+                labels = labels.cuda()
             # labels = labels.cuda()
         if not args.cluster_method_two_plus:
             sample_representation = net.feature_forward(data, all_layer=False)
@@ -1385,7 +1389,7 @@ def obtain_sampled_representations_cluster_method_three(sample_representation_ve
 
     return sample_representation_vec_ls, sampled_col_ids_ls
 
-def obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = None, sampled_col_ids_ls = None):
+def obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = None, sampled_col_ids_ls = None, only_sample_representation = False):
     sample_representation_vec_ls = []
 
     sample_id_ls = []
@@ -1475,7 +1479,7 @@ def obtain_representations_last_layer_given_model2(train_dataset, args, train_lo
 
 
 
-def get_extra_representations_last_layer(args, train_loader, criterion, net, full_sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = None):
+def get_extra_representations_last_layer(args, train_loader, criterion, net, full_sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = None, full_sample_representation_vec_ls2 = None, valid_sample_representation_vec_ls2 = None, qualitiative = False, origin_label = None):
     
     start_epoch_id = 0
     if args.use_pretrained_model:
@@ -1490,6 +1494,23 @@ def get_extra_representations_last_layer(args, train_loader, criterion, net, ful
         else:
             full_valid_sample_representation_vec_ls = None
 
+    if origin_label is not None:
+        full_sample_representation_vec_ls2, full_sample_representation_vec_ls3 = full_sample_representation_vec_ls2
+        full_sample_representation_vec_ls3 = [full_sample_representation_vec_ls3]
+    else:
+        full_sample_representation_vec_ls3 = None
+
+    if full_sample_representation_vec_ls2 is not None:
+        full_sample_representation_vec_ls2 = [full_sample_representation_vec_ls2]
+    else:
+        full_sample_representation_vec_ls2 = None
+    if valid_sample_representation_vec_ls2 is not None:
+        full_valid_sample_representation_vec_ls2 = [valid_sample_representation_vec_ls2]
+    else:
+        full_valid_sample_representation_vec_ls2 = None
+
+    
+
     # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
     #     net = load_checkpoint_by_epoch(args, net, ep)
     max_net_prov_count = 5 
@@ -1503,20 +1524,49 @@ def get_extra_representations_last_layer(args, train_loader, criterion, net, ful
             continue
         optimizer, _=obtain_optimizer_scheduler(args, net, start_epoch = 0)
         sample_representation_vec_ls, _,sampled_col_ids = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
+        if qualitiative:
+            args.all_layer_grad_no_full_loss = True
+            sample_representation_vec_ls2, _,_ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+            if origin_label is not None:
+                sample_representation_vec_ls3, _,_ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids, origin_label = origin_label)
+            args.all_layer_grad_no_full_loss = False
 
         if validloader is not None:
             curr_valid_sample_representation_vec_ls, _,_ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+            if qualitiative:
+                args.all_layer_grad_no_full_loss = True
+                curr_valid_sample_representation_vec_ls2, _,_ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+                args.all_layer_grad_no_full_loss = False
 
         if args.all_layer or args.all_layer2:
             full_sample_representation_vec_ls.extend(sample_representation_vec_ls)
+            if full_sample_representation_vec_ls2 is not None:
+                full_sample_representation_vec_ls2.extend(sample_representation_vec_ls2)
+            if full_sample_representation_vec_ls3 is not None:
+                full_sample_representation_vec_ls3.extend(sample_representation_vec_ls3)
+            
             if validloader is not None:
                 full_valid_sample_representation_vec_ls.extend(curr_valid_sample_representation_vec_ls)
+                if full_valid_sample_representation_vec_ls2 is not None:
+                    full_valid_sample_representation_vec_ls2.extend(curr_valid_sample_representation_vec_ls2)
         else:
             full_sample_representation_vec_ls.append(sample_representation_vec_ls)
+            if full_sample_representation_vec_ls2 is not None:
+                full_sample_representation_vec_ls2.append(sample_representation_vec_ls2)
+            if full_sample_representation_vec_ls3 is not None:
+                    full_sample_representation_vec_ls3.append(sample_representation_vec_ls3)
             if validloader is not None:
                 full_valid_sample_representation_vec_ls.append(curr_valid_sample_representation_vec_ls)
+                if full_valid_sample_representation_vec_ls2 is not None:
+                    full_valid_sample_representation_vec_ls2.append(curr_valid_sample_representation_vec_ls2)
 
-    return full_sample_representation_vec_ls, full_valid_sample_representation_vec_ls
+    if not qualitiative:
+        return full_sample_representation_vec_ls, full_valid_sample_representation_vec_ls
+    else:
+        if origin_label is None:
+            return full_sample_representation_vec_ls, full_valid_sample_representation_vec_ls, full_sample_representation_vec_ls2, full_valid_sample_representation_vec_ls2
+        else:
+            return full_sample_representation_vec_ls, full_valid_sample_representation_vec_ls, (full_sample_representation_vec_ls2, full_sample_representation_vec_ls3), full_valid_sample_representation_vec_ls2
 
 
 def obtain_grad_last_layer(trainloader, args, net):
@@ -1648,13 +1698,28 @@ def get_extra_gradient_layer(args, train_loader, criterion, net, full_sample_rep
 
 
 
-def get_representations_last_layer(args, train_loader, criterion, optimizer, net, validset = None):
+def get_representations_last_layer(args, train_loader, criterion, optimizer, net, validset = None, qualitiative = False, origin_label = None):
 
     sample_representation_vec_ls, sample_id_ls, sampled_col_ids = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
-    
+    sample_representation_vec_ls2 = None
+    sample_representation_vec_ls3 = None
+    valid_sample_representation_vec_ls2 = None
+    if qualitiative:
+        args.all_layer_grad_no_full_loss = True
+        sample_representation_vec_ls2, sample_id_ls, _ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids = sampled_col_ids)
+        if origin_label is not None:
+            sample_representation_vec_ls3, _, _ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids = sampled_col_ids, origin_label = origin_label)
+            sample_representation_vec_ls2 = (sample_representation_vec_ls2, sample_representation_vec_ls3)
+
+        args.all_layer_grad_no_full_loss = False
+
     if validset is not None:
         validloader = torch.utils.data.DataLoader(validset, batch_size=args.batch_size, shuffle=True)
         valid_sample_representation_vec_ls, _, _ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+        if qualitiative:
+            args.all_layer_grad_no_full_loss = True
+            valid_sample_representation_vec_ls2, _, _ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+            args.all_layer_grad_no_full_loss = False
     else:
         validloader = None
         valid_sample_representation_vec_ls = None
@@ -1662,7 +1727,10 @@ def get_representations_last_layer(args, train_loader, criterion, optimizer, net
     
 
     if args.use_model_prov:
-        sample_representation_vec_ls, valid_sample_representation_vec_ls = get_extra_representations_last_layer(args, train_loader, criterion, net, sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = validloader)
+        if not qualitiative:
+            sample_representation_vec_ls, valid_sample_representation_vec_ls = get_extra_representations_last_layer(args, train_loader, criterion, net, sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = validloader, full_sample_representation_vec_ls2 = sample_representation_vec_ls2, valid_sample_representation_vec_ls2 = valid_sample_representation_vec_ls2, qualitiative = qualitiative)
+        else:
+            sample_representation_vec_ls, valid_sample_representation_vec_ls, sample_representation_vec_ls2, valid_sample_representation_vec_ls2 = get_extra_representations_last_layer(args, train_loader, criterion, net, sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = validloader, full_sample_representation_vec_ls2 = sample_representation_vec_ls2, valid_sample_representation_vec_ls2 = valid_sample_representation_vec_ls2, qualitiative = qualitiative, origin_label = origin_label)
     # sample_representation_vec_ls = []
 
     # sample_id_ls = []
@@ -1718,14 +1786,17 @@ def get_representations_last_layer(args, train_loader, criterion, optimizer, net
 
     all_sample_ids = torch.cat(sample_id_ls)
 
-    return full_sample_representation_tensor, all_sample_ids, valid_sample_representation_vec_ls
+    if qualitiative:
+        return (full_sample_representation_tensor, sample_representation_vec_ls2), all_sample_ids, (valid_sample_representation_vec_ls, valid_sample_representation_vec_ls2)
+    else:
+        return full_sample_representation_tensor, all_sample_ids, valid_sample_representation_vec_ls
 
-def get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = None):
+def get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = None, only_sample_representation = False):
 
-    sample_representation_vec_ls, sample_id_ls, valid_sample_representation_ls = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = validset)
+    sample_representation_vec_ls, sample_id_ls, valid_sample_representation_ls = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = validset, only_sample_representation = only_sample_representation)
     if args.use_model_prov:
         args.all_layer = True
-        sample_representation_vec_ls, valid_sample_representation_ls = get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, sample_representation_vec_ls, validset, valid_sample_representation_ls)
+        sample_representation_vec_ls, valid_sample_representation_ls = get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, sample_representation_vec_ls, validset, valid_sample_representation_ls, only_sample_representation = only_sample_representation)
 
 
     full_sample_representation_tensor = sample_representation_vec_ls
@@ -1734,7 +1805,7 @@ def get_representations_last_layer2(train_dataset, args, train_loader, criterion
 
     return full_sample_representation_tensor, all_sample_ids, valid_sample_representation_ls
 
-def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False, validset=None):
+def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False, validset=None, qualitiative = False, origin_label = None):
 
     if args.add_under_rep_samples:
         under_represent_count = int(valid_count/2)
@@ -1748,7 +1819,7 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
     # sample_id_ls_by_class = dict()
     full_sim_mat1 = None
     if not args.all_layer_grad:
-        full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer(args, train_loader, criterion, optimizer, net, validset = validset)
+        full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer(args, train_loader, criterion, optimizer, net, validset = validset, qualitiative=qualitiative, origin_label = origin_label)
     else:
 
         full_sample_representation_tensor, all_sample_ids = get_grad_by_example(args, train_loader, net, criterion, optimizer, vectorize_grad=True)
@@ -1765,6 +1836,10 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
 
 
         print()
+    
+    if qualitiative:
+        full_sample_representation_tensor, (full_sample_representation_tensor2, full_sample_representation_tensor3) = full_sample_representation_tensor
+        existing_valid_representation, existing_valid_representation2 = existing_valid_representation
 
     origin_X_ls_lenth = len(full_sample_representation_tensor)
 
@@ -1784,7 +1859,7 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
     # full_sample_representation_ls = []
     # full_sample_id_ls = []
     if only_sample_representation:
-        return full_sample_representation_tensor
+        return full_sample_representation_tensor, existing_valid_representation
     # sample_representation_vec_ls = sample_representation_vec_ls_by_class[label]
     if args.cluster_no_reweighting:
         logging.info("no reweighting for k-means")
@@ -1870,6 +1945,27 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
 
         # valid_ids = remaining_valid_ids
         # valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_local_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+
+        if qualitiative:
+            args.logger.info("obtain D values:")
+            full_distance0 = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor, valid_sample_representation_tensor, args.cuda, inner_prod=True, no_abs=True)
+            ratio = torch.abs(torch.sum(full_distance0, dim=1))/torch.sum(torch.abs(full_distance0),dim=1)
+            D_value = (ratio + 1)/(1-ratio)
+            min_D_value = torch.min(D_value).item()
+            quant_val = torch.quantile(D_value, q = 0.001).item()
+            final_ratio = (D_value - 1)/(D_value + 1)
+            args.logger.info("min D value::%f"%(min_D_value))
+            args.logger.info("0.1% quantile value::%f"%(quant_val))
+            # print(final_ratio)
+
+            args.logger.info("obtain D_0,D_1,D_2 values:")
+            valid_sample_representation_tensor2 = [full_sample_representation_tensor3[k][valid_ids] for k in range(len(full_sample_representation_tensor2))]
+            far_sample_representation_tensor2 = [full_sample_representation_tensor2[k][all_sample_ids] for k in range(len(full_sample_representation_tensor2))]
+
+            full_distance = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor, valid_sample_representation_tensor, args.cuda, inner_prod=True, no_abs=True, flatten = True)
+            full_distance2 = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor2, valid_sample_representation_tensor2, args.cuda, inner_prod=True, no_abs=True, flatten = True)
+            print()
+
 
     if not return_cluster_info:
         return valid_ids, valid_sample_representation_tensor
@@ -2082,7 +2178,7 @@ def determine_new_valid_ids(args, valid_ids, new_valid_representations, existing
 
 
 
-def compute_distance(args, cosine_dist, all_layer, full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda):
+def compute_distance(args, cosine_dist, all_layer, full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda, inner_prod=False, no_abs=False, flatten = False):
     if not cosine_dist:
         if not all_layer:
             existing_new_dists = pairwise_distance(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda)
@@ -2092,7 +2188,7 @@ def compute_distance(args, cosine_dist, all_layer, full_sample_representation_te
         if not all_layer:
             existing_new_dists = pairwise_cosine(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
         else:
-            existing_new_dists = pairwise_cosine_ls(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=False)
+            existing_new_dists = pairwise_cosine_ls(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=inner_prod, ls_idx_range=args.origin_X_ls_lenth, no_abs=no_abs, flatten = flatten)
     return existing_new_dists
 
 def obtain_farthest_training_samples(args, cosine_dist, all_layer, full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda):
@@ -2216,7 +2312,7 @@ def get_representative_valid_ids2_4(train_dataset, criterion, optimizer, train_l
     # sample_id_ls_by_class = dict()
     full_sim_mat1 = None
 
-    full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = validset)
+    full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = validset, only_sample_representation = only_sample_representation)
 
     origin_X_ls_lenth = len(full_sample_representation_tensor)
 
@@ -2225,7 +2321,7 @@ def get_representative_valid_ids2_4(train_dataset, criterion, optimizer, train_l
         full_sample_representation_tensor = scale_and_extend_data_vector(full_sample_representation_tensor)
 
     if only_sample_representation:
-        return full_sample_representation_tensor
+        return full_sample_representation_tensor, existing_valid_representation
 
 
 

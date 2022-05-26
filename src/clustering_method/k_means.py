@@ -1444,7 +1444,7 @@ def pairwise_cosine_full_by_sample_ids(full_cosin_sim, sample_ids_ls, is_cuda=Fa
 
 
 
-def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg = 'mean', ls_idx_range=-1, weight_by_norm=False, inner_prod = False, no_abs = False, full_inner_prod=False):
+def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg = 'mean', ls_idx_range=-1, weight_by_norm=False, inner_prod = False, no_abs = False, full_inner_prod=False, flatten = False):
 
     if ls_idx_range < 0:
         ls_idx_range = len(data1_ls)
@@ -1510,10 +1510,16 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg 
             # curr_cosine = curr_A_normalized * B_normalized    
             # curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1))
             # cosine_dis_ls.append(curr_cosine_dis)
-        total_cosin_ls = torch.sum(torch.stack(inner_prod_ls, dim = 1), dim=1)
+        if flatten:
+            total_cosin_ls = torch.stack(inner_prod_ls, dim = 1)
+        else:
+            total_cosin_ls = torch.sum(torch.stack(inner_prod_ls, dim = 1), dim=1)
 
         if inner_prod:
-            max_cosine_sim = torch.abs(total_cosin_ls)
+            if no_abs:
+                max_cosine_sim = total_cosin_ls
+            else:
+                max_cosine_sim = torch.abs(total_cosin_ls)
             A_max = max(A_max, torch.max(max_cosine_sim).detach().item())
             A_min = min(A_min, torch.min(max_cosine_sim).detach().item())
         else:
@@ -1544,12 +1550,12 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg 
             if not inner_prod:
                 final_cosine_dis = 1 - max_cosine_sim
             else:
-                final_cosine_dis = -max_cosine_sim
+                final_cosine_dis = max_cosine_sim
         full_dist_ls.append(final_cosine_dis)
 
     full_dist_tensor = torch.cat(full_dist_ls)
-    if inner_prod:
-        full_dist_tensor = (A_max + full_dist_tensor)/(A_max-A_min+0.0001)
+    # if inner_prod:
+    #     full_dist_tensor = (A_max + full_dist_tensor)/(A_max-A_min+0.0001)
 
     return full_dist_tensor
 
