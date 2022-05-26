@@ -1962,8 +1962,13 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
             valid_sample_representation_tensor2 = [full_sample_representation_tensor3[k][valid_ids] for k in range(len(full_sample_representation_tensor2))]
             far_sample_representation_tensor2 = [full_sample_representation_tensor2[k][all_sample_ids] for k in range(len(full_sample_representation_tensor2))]
 
-            full_distance = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor, valid_sample_representation_tensor, args.cuda, inner_prod=True, no_abs=True, flatten = True)
-            full_distance2 = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor2, valid_sample_representation_tensor2, args.cuda, inner_prod=True, no_abs=True, flatten = True)
+            full_distance = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor, valid_sample_representation_tensor, args.cuda)
+            full_distance2 = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor2, valid_sample_representation_tensor2, args.cuda)
+            cluster_centroid1 = torch.argmin(full_distance, dim=1)
+            cluster_centroid2 = torch.argmin(full_distance2, dim=1)
+            matched_cluster_centroid_count = torch.sum(cluster_centroid1 == cluster_centroid2)
+            total_sample_count = cluster_centroid1.shape[0]
+            args.logger.info("cluster centroid match count %d out of %d::"%(matched_cluster_centroid_count, total_sample_count))
             print()
 
 
