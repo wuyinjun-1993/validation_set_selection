@@ -1955,7 +1955,7 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
             quant_val = torch.quantile(D_value, q = 0.001).item()
             final_ratio = (D_value - 1)/(D_value + 1)
             args.logger.info("min D value::%f"%(min_D_value))
-            args.logger.info("0.1% quantile value::%f"%(quant_val))
+            args.logger.info("0.1%% quantile value::%f"%(quant_val))
             # print(final_ratio)
 
             args.logger.info("obtain D_0,D_1,D_2 values:")
