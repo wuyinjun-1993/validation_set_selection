@@ -12,9 +12,9 @@ import torch.nn.init as init
 import torch.optim.lr_scheduler as lr_scheduler
 from tqdm import tqdm
 import random
-from datasets.mnist import mnist_to_device
+from exp_datasets.mnist import mnist_to_device
 import main.main_train
-from datasets.dataloader import dataset_wrapper, split_train_valid_set_by_ids
+from exp_datasets.dataloader import dataset_wrapper, split_train_valid_set_by_ids
 from models.resnet3 import resnet34
 
 MARGIN = 1.0

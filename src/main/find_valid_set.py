@@ -5,7 +5,7 @@ import numpy as np
 
 import os,sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from datasets.mnist import *
+from exp_datasets.mnist import *
 from common.utils import *
 from main.helper_func import *
 from clustering_method.k_means import *

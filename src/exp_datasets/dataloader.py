@@ -6,7 +6,7 @@ import torch.backends.cudnn as cudnn
 
 import torchvision
 import torchvision.transforms as transforms
-import datasets
+import exp_datasets
 from torch.utils.data import Subset, Dataset, DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from PIL import ImageFilter
@@ -17,9 +17,9 @@ from PIL import Image
 import numpy
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from datasets.sst import *
-from datasets.imdb import *
-from datasets.trec import *
+from exp_datasets.sst import *
+from exp_datasets.imdb import *
+from exp_datasets.trec import *
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
 # process.
@@ -222,7 +222,7 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
             trainset.two_imgs=args.two_imgs
             trainset.three_imgs=args.three_imgs
         else:
-            trainset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+            trainset = exp_datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
 
@@ -230,7 +230,7 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
 
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
 
-        testset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
+        testset = exp_datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 4
         ndata = trainset.__len__()
@@ -242,44 +242,44 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
             trainset.two_imgs=args.two_imgs
             trainset.three_imgs=args.three_imgs
         else:
-            trainset = datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+            trainset = exp_datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
 
-        testset = datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=False, download=True, transform=transform_test)
+        testset = exp_datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=False, download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 4
         ndata = trainset.__len__()
 
     elif args.dataset == 'stl10':
-        trainset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train', download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        trainset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train', download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
 
-        testset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='test', download=True, transform=transform_test)
+        testset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='test', download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 7
         ndata = trainset.__len__()
 
     elif args.dataset == 'stl10-full':
-        trainset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train+unlabeled', download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        trainset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train+unlabeled', download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, 
                             pin_memory=False, sampler=train_sampler)
 
-        labeledTrainset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train', download=True, transform=transform_train, two_imgs=args.two_imgs)
+        labeledTrainset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train', download=True, transform=transform_train, two_imgs=args.two_imgs)
         labeledTrain_sampler = torch.utils.data.distributed.DistributedSampler(labeledTrainset)
         labeledTrainloader = torch.utils.data.DataLoader(labeledTrainset, batch_size=args.batch_size, shuffle=False, 
                             num_workers=2, pin_memory=False, sampler=labeledTrain_sampler)
-        testset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='test', download=True, transform=transform_test)
+        testset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='test', download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 7
         ndata = labeledTrainset.__len__()
 
     elif args.dataset == 'kitchen':
-        trainset = datasets.CIFARImageFolder(root=os.path.join(args.data_dir, 'Kitchen-HC/train'), train=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        trainset = exp_datasets.CIFARImageFolder(root=os.path.join(args.data_dir, 'Kitchen-HC/train'), train=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False)
-        testset = datasets.CIFARImageFolder(root=os.path.join(args.data_dir, 'Kitchen-HC/test'), train=False, transform=transform_test)
+        testset = exp_datasets.CIFARImageFolder(root=os.path.join(args.data_dir, 'Kitchen-HC/test'), train=False, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 4
         ndata = trainset.__len__()
@@ -1049,7 +1049,7 @@ def experiment_tag(args):
 
 def generate_class_biased_dataset(trainset, args, logger, testset, origin_labels):
     if not args.load_dataset:
-        imb_trainset = datasets.ImbalanceDataset(trainset, args.imb_factor)
+        imb_trainset = exp_datasets.ImbalanceDataset(trainset, args.imb_factor)
         trainset = trainset.get_subset_dataset(trainset, torch.nonzero(imb_trainset.mask).view(-1))
         origin_labels = origin_labels[imb_trainset.mask]
         logger.info(f"Total number of training samples: {trainset.data.shape[0]}")
