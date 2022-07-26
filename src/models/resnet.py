@@ -145,29 +145,37 @@ class ResNet(nn.Module):
         # out = self.linear(out)
         return out
 
-def ResNet18():
-    return ResNet(BasicBlock, [2, 2, 2, 2])
+    def feature_forward2(self, x, all_layer=False):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = F.avg_pool2d(out, 4)
+        out = out.view(out.size(0), -1)
+        
+        out2 = self.linear(out)
+        out = torch.cat([out, torch.ones((out.shape[0], 1))],dim=1)
+        grad_approx = torch.bmm(out.view(out.shape[0], out.shape[1], 1), out2.view(out2.shape[0], 1, out2.shape[1]))
+        grad_approx = grad_approx.view(grad_approx.shape[0], -1)
+
+        return grad_approx
+
+def ResNet18(num_classes=10):
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes=num_classes)
 
 
-def ResNet34():
-    return ResNet(BasicBlock, [3, 4, 6, 3])
+def ResNet34(num_classes=10):
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes)
 
 
-def ResNet50():
-    return ResNet(Bottleneck, [3, 4, 6, 3])
+def ResNet50(num_classes=10):
+    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes)
 
 
-def ResNet101():
-    return ResNet(Bottleneck, [3, 4, 23, 3])
+def ResNet101(num_classes=10):
+    return ResNet(Bottleneck, [3, 4, 23, 3], num_classes=num_classes)
 
 
-def ResNet152():
-    return ResNet(Bottleneck, [3, 8, 36, 3])
-
-
-# def test():
-#     net = ResNet18()
-#     y = net(torch.randn(1, 3, 32, 32))
-#     print(y.size())
-
-# test()
+def ResNet152(num_classes=10):
+    return ResNet(Bottleneck, [3, 8, 36, 3], num_classes = num_classes)

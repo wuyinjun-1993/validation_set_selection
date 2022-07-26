@@ -79,9 +79,9 @@ exe_cmd="python -m torch.distributed.launch \
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_0.txt
 
 
-# echo "${exe_cmd} > ${output_file_name}"
-# 
-# ${exe_cmd} > ${output_file_name} 2>&1
+echo "${exe_cmd} > ${output_file_name}"
+
+${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
@@ -109,9 +109,9 @@ exe_cmd="python -m torch.distributed.launch \
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0.txt
 
-# echo "${exe_cmd} > ${output_file_name}"
-# 
-# ${exe_cmd} > ${output_file_name} 2>&1 
+echo "${exe_cmd} > ${output_file_name}"
+
+${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 

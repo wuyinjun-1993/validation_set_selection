@@ -91,6 +91,18 @@ class DNN_three_layers(nn.Module):
         
         # return F.log_softmax(x, dim=1)
 
+    def feature_forward2(self, x, all_layer_grad_no_full_loss=False, labels=None):
+        out = F.relu(self.fc1(x.view(x.shape[0],-1)))
+        out = F.relu(self.fc2(out))
+        out2 = self.fc3(out)
+        # if all_layer_grad_no_full_loss:
+        #     out2 = out2 - F.one_hot(labels, num_classes=out2.shape[1])
+
+        grad_approx = torch.bmm(out.view(out.shape[0], out.shape[1], 1), out2.view(out2.shape[0], 1, out2.shape[1]))
+        grad_approx = grad_approx.view(grad_approx.shape[0], -1)
+
+        return grad_approx
+
     def obtain_gradient_last_full_layer(self, sample_representation_last_layer, target, criterion, is_cuda = False):
         output = self.fc3(sample_representation_last_layer)
         loss = criterion(output, target)

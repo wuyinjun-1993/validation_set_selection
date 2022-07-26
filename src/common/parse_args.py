@@ -9,26 +9,40 @@ def parse_args(args=None):
 
     parser.add_argument('--cuda', action='store_true', help='use GPU')
     parser.add_argument('--biased_flip', action='store_true', help='use GPU')
+    parser.add_argument('--noisy_valid', action='store_true', help='use the noisy labels in the validation set')
+    parser.add_argument('--w_rectified_gaussian_init', action='store_true',
+        help='initialize the sample weights with a rectified gaussian')
 
     parser.add_argument('--all_layer', action='store_true', help='use GPU')
+    parser.add_argument('--get_representations', action='store_true', help='use GPU')
     parser.add_argument('--all_layer2', action='store_true', help='use GPU')
+    parser.add_argument('--replace', action='store_true', help='use GPU')
     parser.add_argument('--all_layer_grad', action='store_true', help='use GPU')
     parser.add_argument('--all_layer_grad_greedy', action='store_true', help='use GPU')
     parser.add_argument('--all_layer_grad_no_full_loss', action='store_true', help='use GPU')
     parser.add_argument('--weight_by_norm', action='store_true', help='use GPU')
-    
+    parser.add_argument('--warm', type=int, default=1, help='warm up training phase')
+
     parser.add_argument('--grad_layer_depth', default=1, type=int, help='capture model_prov')
+    parser.add_argument('--model_type', default="resnet34", type=str, help='capture model_prov')
     # sampled_param_count
 
     parser.add_argument('--sampled_param_count', default=0, type=int, help='capture model_prov')
     parser.add_argument('--all_layer_sim_agg', default="mean", type=str, help='capture model_prov')
 
     parser.add_argument('--full_model_out', action='store_true', help='use GPU')
+    parser.add_argument('--cluster_method_two_sampling', action='store_true', help='use GPU')
+    parser.add_argument('--cluster_method_two_sample_col_count', default=1000, type=int, help='capture model_prov')
+    parser.add_argument('--cluster_method_three_sample_col_count', default=1000, type=int, help='capture model_prov')
 
     parser.add_argument('--cluster_no_reweighting', action='store_true', help='use GPU')
+    parser.add_argument('--low_data', action='store_true', help='low data application')
+    parser.add_argument('--low_data_num_samples_per_class', default=40, type=int, help='Create class bias')
+
     parser.add_argument('--flip_labels', action='store_true', help='flip labels')
     parser.add_argument('--adversarial_flip', action='store_true', help='flip labels')
     parser.add_argument('--bias_classes', action='store_true', help='Create class bias')
+    parser.add_argument('--imb_factor', default=1.0, type=float, help='Create class bias')
     parser.add_argument('--l1_loss', action='store_true', help='Use the L1 loss for the basic learning step')
     parser.add_argument('--soft_bootstrapping_loss', action='store_true', help='Use the Bootstrapping loss for the basic learning step')
     parser.add_argument('--hard_bootstrapping_loss', action='store_true', help='Use the Bootstrapping loss for the basic learning step')
@@ -37,22 +51,48 @@ def parse_args(args=None):
     parser.add_argument('--continue_label', action='store_true', help='load dataset')
     parser.add_argument('--use_model_prov', action='store_true', help='capture model_prov')
     parser.add_argument('--model_prov_period', default=20, type=int, help='capture model_prov')
+    parser.add_argument('--valid_count', default=None, type=int, help='capture model_prov')
+    parser.add_argument('--qualitiative', action='store_true', help='load dataset')
 
+    parser.add_argument('--total_valid_sample_count', default=-1, type=int, help='capture model_prov')
+    parser.add_argument('--k_means_lr', default=0.0001, type=float, help='capture model_prov')
+    parser.add_argument('--k_means_bz', default=128, type=int, help='capture model_prov')
+    parser.add_argument('--k_means_epochs', default=200, type=int, help='capture model_prov')
+
+    parser.add_argument('--inner_prod', action='store_true', help='not save dataset')
+    parser.add_argument('--rand_init', action='store_true', help='not save dataset')
+    parser.add_argument('--not_rescale_features', action='store_true', help='not save dataset')
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
+    parser.add_argument('--clustering_by_class', action='store_true', help='not save dataset')
+
     parser.add_argument('--select_valid_set', action='store_true', help='select valid set')
     parser.add_argument('--include_valid_set_in_training', action='store_true', help='select valid set')
     parser.add_argument('--cluster_method_two', action='store_true', help='select valid set')
+    parser.add_argument('--cluster_method_two_plus', action='store_true', help='select valid set')
+
     parser.add_argument('--init_cluster_by_confident', action='store_true', help='select valid set')
     parser.add_argument('--resume_meta_train', action='store_true', help='resume meta training')
+    parser.add_argument('--resume_train', action='store_true', help='resume training')
+    parser.add_argument('--resumed_training_epoch',  default=0, type=int, help='start from epoch')
+
     parser.add_argument('--cluster_method_three', action='store_true', help='cache_loss_per_epoch')
+    parser.add_argument('--cluster_method_three_sampling', action='store_true', help='cache_loss_per_epoch')
     parser.add_argument('--cosin_dist', action='store_true', help='use cosine distance for k-means clustering')
     parser.add_argument('--prev_save_path', default=None, type=str)
 
     parser.add_argument('--unsup_rep', action='store_true', help='unsupervised representation usage')
+    parser.add_argument('--no_sample_weights_k_means', action='store_true', help='unsupervised representation usage')
+    parser.add_argument('--remove_empty_clusters', action='store_true', help='unsupervised representation usage')
 
     parser.add_argument('--add_under_rep_samples', action='store_true', help='add under represented samples')
 
     parser.add_argument('--do_train', action='store_true', help='do training')
+    parser.add_argument('--glc_train', action='store_true', help='do glc training')
+    parser.add_argument('--finetune', action='store_true', help='finetune model on meta set')
+    parser.add_argument('--ta_vaal_train', action='store_true', help='TA-VAAL model training')
+    parser.add_argument('--active_learning', action='store_true', help='perform training with active learning')
+    parser.add_argument('--uncertain_select', action='store_true', help='perform training with active learning')
+    parser.add_argument('--certain_select', action='store_true', help='perform training with active learning')
     parser.add_argument('--load_cached_weights', action='store_true', help='load_cached_weights')
     parser.add_argument('--lr_decay', action='store_true', help='load_cached_weights')
 

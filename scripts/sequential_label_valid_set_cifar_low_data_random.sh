@@ -3,7 +3,7 @@ trap "exit" INT
 
 
 
-err_label_ratio=0.6
+err_label_ratio=45
 
 dataset_name=$1
 data_dir=$2
@@ -24,10 +24,10 @@ lr_decay=${15}
 
 valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 
-save_path_prefix=${save_path_root_dir}/rand_error_${err_label_ratio}_valid_select
+save_path_prefix=${save_path_root_dir}/low_data_${err_label_ratio}_valid_select
 
 
-total_valid_sample_count=100
+total_valid_sample_count=20
 
 export CUDA_VISIBLE_DEVICES=${gpu_ids}
 echo CUDA_VISIBLE_DEVICES::${CUDA_VISIBLE_DEVICES}
@@ -37,8 +37,8 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_two --cluster_method_two_plus --not_rescale_features --weight_by_norm  --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --cluster_method_two_sampling"
-lr_decay_flag="--use_pretrained_model --lr_decay"
+add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count}"
+lr_decay_flag="--use_pretrained_model"
 
 <<cmd
 if (( add_valid_in_training_set == true ))
@@ -67,19 +67,18 @@ exe_cmd="python -m torch.distributed.launch \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
   --meta_lr ${meta_lr} \
-  --flip_labels \
-  --err_label_ratio ${err_label_ratio} \
+  --low_data \
+  --low_data_num_samples_per_class ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr 0.1 \
+  --lr 0.02 \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
-  --epochs 150 \
-  --lr_decay \
+  --epochs ${epochs} \
   --do_train"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_low_data_${err_label_ratio}_do_train_0.txt
 
 
 echo "${exe_cmd} > ${output_file_name}"
@@ -93,15 +92,14 @@ exe_cmd="python -m torch.distributed.launch \
   --master_port ${port_num} \
   main_train.py \
   --load_dataset \
-  --select_valid_set \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
-  --meta_lr ${meta_lr} \
-  --flip_labels \
-  --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_seq_select_0/ \
+  --meta_lr 5 \
+  --low_data \
+  --low_data_num_samples_per_class ${err_label_ratio} \
+  --save_path ${save_path_prefix}_rand_select_0/ \
   --prev_save_path ${save_path_prefix}_do_train/ \
   --cuda \
   --lr ${lr} \
@@ -112,7 +110,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_all_rand.txt
+output_file_name=${output_dir}/output_${dataset_name}_low_data_${err_label_ratio}_rand_select_0.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -135,7 +133,6 @@ do
     --master_port ${port_num} \
     main_train.py \
     --load_dataset \
-    --select_valid_set \
     --continue_label \
     --load_cached_weights \
     --cached_sample_weights_name cached_sample_weights \
@@ -146,10 +143,10 @@ do
     --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
-    --flip_labels \
-    --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_$k/ \
-    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
+    --low_data \
+    --low_data_num_samples_per_class ${err_label_ratio} \
+    --save_path ${save_path_prefix}_rand_select_$k/ \
+    --prev_save_path ${save_path_prefix}_rand_select_$(( k - 1 ))/ \
     --cuda \
     --lr ${lr} \
     --batch_size ${batch_size} \
@@ -158,7 +155,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_$k.txt
+	output_file_name=${output_dir}/output_${dataset_name}_low_data_${err_label_ratio}_rand_seq_select_$k.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	

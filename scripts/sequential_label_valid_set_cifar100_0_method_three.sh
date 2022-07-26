@@ -27,7 +27,7 @@ valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 save_path_prefix=${save_path_root_dir}/rand_error_${err_label_ratio}_valid_select
 
 
-total_valid_sample_count=100
+total_valid_sample_count=200
 
 export CUDA_VISIBLE_DEVICES=${gpu_ids}
 echo CUDA_VISIBLE_DEVICES::${CUDA_VISIBLE_DEVICES}
@@ -37,7 +37,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_two --cluster_method_two_plus --not_rescale_features --weight_by_norm  --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --cluster_method_two_sampling"
+add_valid_in_training_flag="--cluster_method_three --not_rescale_features --weight_by_norm  --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --remove_empty_clusters"
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -71,12 +71,13 @@ exe_cmd="python -m torch.distributed.launch \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr 0.1 \
+  --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
-  --epochs 150 \
-  --lr_decay \
-  --do_train"
+  --epochs ${epochs} \
+  --do_train \
+  --lr_decay
+"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_0.txt
@@ -101,9 +102,10 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_seq_select_0/ \
-  --prev_save_path ${save_path_prefix}_do_train/ \
+  --save_path ${save_path_prefix}_seq_select_0_method_three/ \
+  --prev_save_path ${save_path_root_dir}/rand_error_0.6_warm_up/\
   --cuda \
+  --continue_label \
   --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
@@ -112,7 +114,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_all_rand.txt
+output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_method_three.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -148,8 +150,8 @@ do
     --not_save_dataset \
     --flip_labels \
     --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_$k/ \
-    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
+    --save_path ${save_path_prefix}_seq_select_${k}_method_three/ \
+    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))_method_three/ \
     --cuda \
     --lr ${lr} \
     --batch_size ${batch_size} \
@@ -158,7 +160,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_$k.txt
+	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_${k}_method_three.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	

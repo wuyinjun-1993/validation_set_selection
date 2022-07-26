@@ -8,30 +8,28 @@ class ImbalanceDataset(Dataset):
     class bias.
     """
 
-    def __init__(self, unbiased_dataset):
+    def __init__(self, unbiased_dataset, imb_factor):
         # 1. Get number of classes from the labels.
         assert hasattr(unbiased_dataset, 'targets'), \
             "Unbiased dataset must have a `targets` attribute"
 
-        self.dataset = unbiased_dataset
-        orig_numpy = False
-        if type(self.dataset.targets) is numpy.ndarray:
-            self.dataset.targets = torch.from_numpy(self.dataset.targets)
-            orig_numpy = True
+        if type(unbiased_dataset.targets) is numpy.ndarray:
+            unbiased_dataset.targets = torch.from_numpy(unbiased_dataset.targets)
 
-        classes = torch.unique(self.dataset.targets)
+        classes = torch.unique(unbiased_dataset.targets)
         num_classes = classes.shape[0]
 
         # 2. Get average number of samples per class
-        samples_per_class = self.dataset.targets.shape[0] / num_classes
+        samples_per_class = unbiased_dataset.targets.shape[0] / num_classes
 
         # 3. Delete samples from each class based on some bias
-        num_select = samples_per_class
-        self.mask = torch.zeros(self.dataset.targets.shape[0], dtype=torch.bool)
-        for cls in classes:
-            idx = torch.nonzero(self.dataset.targets == cls)[:int(num_select)]
+        self.mask = torch.zeros(unbiased_dataset.targets.shape[0], dtype=torch.bool)
+        for cls in range(num_classes):
+            num_select = samples_per_class * (imb_factor**(cls / (num_classes - 1.0)))
+            all_cls_idx = torch.nonzero(unbiased_dataset.targets == cls)
+            shuffle = torch.randperm(len(all_cls_idx))
+            idx = all_cls_idx[shuffle][:int(num_select)]
             self.mask[idx] = True
-            num_select *= 0.5
 
         # self.dataset.targets = self.dataset.targets[self.mask]
         # if orig_numpy:

@@ -259,6 +259,28 @@ class sst_dataset(Dataset):
         
         return (input_ids.cuda(), input_mask.cuda(), segment_ids.cuda()), targets.cuda()
 
+
+    @staticmethod
+    def subsampling_dataset_by_class(dataset, num_per_class=45):
+        label_set = torch.unique(dataset.targets)
+
+        full_sel_sample_ids = []
+        for label in label_set:
+            sample_ids_with_curr_labels = torch.nonzero((dataset.targets == label)).reshape(-1)
+
+            random_sample_ids_with_curr_labels = torch.randperm(len(sample_ids_with_curr_labels))
+
+            selected_sample_ids_with_curr_labels = random_sample_ids_with_curr_labels[0:num_per_class]
+
+            full_sel_sample_ids.append(selected_sample_ids_with_curr_labels)
+
+        full_sel_sample_ids_tensor = torch.cat(full_sel_sample_ids)
+        
+        # if type(dataset.data) is numpy.ndarray:
+        #     return dataset.get_subset_dataset(dataset, full_sel_sample_ids_tensor.numpy())
+        # else:
+        return dataset.get_subset_dataset(dataset, full_sel_sample_ids_tensor)
+
 class SST5Processor(DatasetProcessor):
     """Processor for the SST-5 data set."""
     # def __init__(self, data_path):
@@ -315,16 +337,16 @@ class SST5Processor(DatasetProcessor):
                 label=data.label))
         return examples
 
-def create_train_valid_test_set(sstprocess, label_list, tokenizer):
+def create_train_valid_test_set(sstprocess, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH):
     train_examples = sstprocess.get_train_examples()
     valid_examples = sstprocess.get_dev_examples()
     test_examples = sstprocess.get_test_examples()
-    train_dataset = sst_make_dataset(train_examples, label_list, tokenizer)
-    valid_dataset = sst_make_dataset(valid_examples, label_list, tokenizer)
-    test_dataset = sst_make_dataset(test_examples, label_list, tokenizer)
+    train_dataset = sst_make_dataset(train_examples, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH)
+    valid_dataset = sst_make_dataset(valid_examples, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH)
+    test_dataset = sst_make_dataset(test_examples, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH)
     return train_dataset, valid_dataset, test_dataset
 
-def sst_make_dataset(examples, label_list, tokenizer):
+def sst_make_dataset(examples, label_list, tokenizer, MAX_SEQ_LENGTH = MAX_SEQ_LENGTH):
     all_features = _convert_examples_to_features(
         examples=examples,
         label_list=label_list,

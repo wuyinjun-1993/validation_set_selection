@@ -108,14 +108,14 @@ def rand_sample_parameter(net, sampled_layer_count = 5, sampled_param_count = 10
     return selected_param_layer_ls, selected_sampled_param_id_by_layer_ls
 
 
-def biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_layer_count = 5, sampled_param_count = 1000, include_last_layer = True):
+def biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_layer_count = 5, sampled_param_count = 1000, include_last_layer = True, replace=False):
     prob_ls = avg_grad_norm_by_layer/torch.sum(avg_grad_norm_by_layer)
 
     net_param_ls = list(net.parameters())
 
     all_layer_id_ls = np.array(list(range(len(net_param_ls))))
 
-    selected_layer_id_ls = np.random.choice(all_layer_id_ls, size = sampled_layer_count, replace = False, p = prob_ls.numpy())
+    selected_layer_id_ls = np.random.choice(all_layer_id_ls, size = sampled_layer_count, replace = replace, p = prob_ls.numpy())
     print(selected_layer_id_ls)
 
     selected_layer_param_ls = [net_param_ls[k] for k in selected_layer_id_ls]
@@ -338,6 +338,7 @@ def load_checkpoint_by_epoch(args, model, epoch):
             cached_model_file_name = os.path.join(args.prev_save_path, cached_model_name)
 
         if not os.path.exists(cached_model_file_name):
+            args.logger.warning("Could not find cached model: %s"%(cached_model_file_name))
             return None
             
         state = torch.load(cached_model_file_name, map_location=torch.device("cpu"))

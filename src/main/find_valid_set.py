@@ -44,56 +44,189 @@ def find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance
     s_score_ls = []
     for k in range(5, 100, 5):
         cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_ls, num_clusters=k, distance=distance, is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=None, all_layer = all_layer)
+            X=sample_representation_vec_ls, num_clusters=k, distance=distance, is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=None, all_layer = all_layer, rand_init=args.rand_init)
         s_score2 = calculate_silhouette_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, is_cuda=is_cuda, distance = distance, sample_weights = sample_weights)
         logging.info("s score for cluste count %d: %f" %(k, s_score2))
         s_score_ls.append(s_score2)
 
     print(s_score_ls)
 
-def cluster_per_class(args, sample_representation_vec_ls, sample_id_ls, full_sim_mat = None, valid_count_per_class = 10, num_clusters = 4, sample_weights = None, existing_cluster_centroids = None, cosin_distance = False, is_cuda = False, all_layer = False, return_cluster_info = False):
-    
-    if num_clusters > 0:
+def handle_outliers(args, sample_ids, sample_representation_vec_ls, valid_sample_representation_tensor, sample_weights=None, threshold=0.8):
+    dis = compute_distance(args, args.cosin_dist, True, sample_representation_vec_ls, valid_sample_representation_tensor, args.cuda)
+    outlier_ids = torch.nonzero(torch.min(dis, dim=1)[0] > threshold).view(-1)
+    if len(outlier_ids) > 0:
+        subset_outlier = [sample_representation_vec_ls[k][outlier_ids] for k in range(len(sample_representation_vec_ls))]
+        subset_outlier_sample_ids = sample_ids[outlier_ids]
+        sub_sample_weights = None
+        if sample_weights is not None:
+            sub_sample_weights = sample_weights[outlier_ids]
 
-        if args.full_model_out:
-            cluster_ids_x, cluster_centers = kmeans(
-                X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cross', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
-
+        if args.valid_count > valid_sample_representation_tensor[0].shape[0]:
+            extra_cluster_count = args.valid_count - valid_sample_representation_tensor[0].shape[0]
         else:
-            if not cosin_distance:
-                cluster_ids_x, cluster_centers = kmeans(
-                    X=sample_representation_vec_ls, num_clusters=num_clusters, distance='euclidean', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
+            return None, None
+        
+        extra_valid_ids, extra_valid_sample_representation_tensor = cluster_per_class(args, subset_outlier, subset_outlier_sample_ids, valid_count_per_class = extra_cluster_count, num_clusters = extra_cluster_count, sample_weights=sub_sample_weights, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, existing_cluster_centroids = None, handles_outlier=False)  
+            # do_cluster(args, extra_cluster, subset_outlier, args.cuda, args.cosin_dist, sub_sample_weights, None, all_layer = True)
 
 
-                # distance = 'euclidean'
-                # test_s_scores(sample_representation_vec_ls, cluster_ids_x, cluster_centers, num_clusters, distance = 'euclidean')
-            else:
-                # if not args.all_layer_grad:
-                cluster_ids_x, cluster_centers = kmeans(
-                    X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, agg_sim_array=args.all_layer_sim_agg, weight_by_norm=args.weight_by_norm)
-            # else:
-            #     cluster_assignment_file_name = os.path.join(args.save_path, "cluster_assignments")
 
-            #     sim_mat_file_name = os.path.join(args.save_path, "full_similarity_mat")
-            #     if not (os.path.exists(cluster_assignment_file_name) and os.path.exists(sim_mat_file_name)):
-            #         cluster_ids_x, full_x_cosin_sim = kmeans_cosin(
-            #             X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, full_x_cosin_sim=full_sim_mat)
+        return extra_valid_ids, extra_valid_sample_representation_tensor
+    else:
+        return None, None
 
-            #         torch.save(cluster_ids_x, cluster_assignment_file_name)
-            #         torch.save(full_x_cosin_sim, sim_mat_file_name)
-            #     else:
-            #         cluster_ids_x = torch.load(cluster_assignment_file_name)
-            #         full_x_cosin_sim = torch.load(sim_mat_file_name)
-            # distance = 'cosine'
+
+def handle_outliers2(args, sample_ids, sample_representation_vec_ls, valid_sample_representation_tensor, sample_weights=None, threshold=0.8):
+    if args.valid_count <= valid_sample_representation_tensor[0].shape[0]:
+        return None, None
+    
+    dis = compute_distance(args, args.cosin_dist, True, sample_representation_vec_ls, valid_sample_representation_tensor, args.cuda)
+    outlier_ids = torch.nonzero(torch.min(dis, dim=1)[0] > threshold).view(-1)
+
+    full_extra_valid_ids = None
+
+    full_extra_valid_sample_representation_tensor_ls = None
+    
+    while len(outlier_ids) > 0:
+        subset_outlier = [sample_representation_vec_ls[k][outlier_ids] for k in range(len(sample_representation_vec_ls))]
+        subset_outlier_sample_ids = sample_ids[outlier_ids]
+        sub_sample_weights = None
+        if sample_weights is not None:
+            sub_sample_weights = sample_weights[outlier_ids]
+
+        if full_extra_valid_sample_representation_tensor_ls is not None:
+            if args.valid_count > full_extra_valid_sample_representation_tensor_ls[0].shape[0]:
+                extra_cluster_count = args.valid_count - full_extra_valid_sample_representation_tensor_ls[0].shape[0]
+        else:
+            extra_cluster_count = args.valid_count - valid_sample_representation_tensor[0].shape[0]
+        # else:
+        #     return None, None
+        
+        extra_valid_ids, extra_valid_sample_representation_tensor = cluster_per_class(args, subset_outlier, subset_outlier_sample_ids, valid_count_per_class = extra_cluster_count, num_clusters = extra_cluster_count, sample_weights=sub_sample_weights, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, existing_cluster_centroids = None, handles_outlier=False)  
+            # do_cluster(args, extra_cluster, subset_outlier, args.cuda, args.cosin_dist, sub_sample_weights, None, all_layer = True)
+        if full_extra_valid_ids is None:
+            full_extra_valid_ids = extra_valid_ids
+            full_extra_valid_sample_representation_tensor_ls = extra_valid_sample_representation_tensor
+        else:
+            full_extra_valid_ids = torch.cat([full_extra_valid_ids.view(-1), extra_valid_ids.view(-1)])
+            full_extra_valid_sample_representation_tensor_ls = [torch.cat([full_extra_valid_sample_representation_tensor_ls[k], extra_valid_sample_representation_tensor[k]]) for k in range(len(extra_valid_sample_representation_tensor))]
+
+        if len(full_extra_valid_ids) + valid_sample_representation_tensor[0].shape[0] >= args.valid_count:
+            break
+
+        full_extra_dis = compute_distance(args, args.cosin_dist, True, sample_representation_vec_ls, full_extra_valid_sample_representation_tensor_ls, args.cuda)
+        full_dis = torch.cat([full_extra_dis, dis], dim=1)
+        outlier_ids = torch.nonzero(torch.min(full_dis, dim=1)[0] > threshold).view(-1)
+
+
+
+    return full_extra_valid_ids, full_extra_valid_sample_representation_tensor_ls
+    # else:
+    #     return None, None
+
+
+def do_cluster(args, num_clusters, sample_representation_vec_ls, is_cuda, cosin_distance, sample_weights, existing_cluster_centroids = None, all_layer = False):
+    if args.full_model_out:
+        dist_metric = 'cross'
+    elif cosin_distance:
+        dist_metric = 'cosine'
+    else:
+        dist_metric = 'euclidean'
+
+    cluster_ids_x, cluster_centers = kmeans(
+        X=sample_representation_vec_ls,
+        num_clusters=num_clusters,
+        distance=dist_metric,
+        is_cuda=is_cuda,
+        sample_weights=sample_weights,
+        existing_cluster_mean_ls=existing_cluster_centroids,
+        all_layer=all_layer,
+        agg_sim_array=args.all_layer_sim_agg,
+        weight_by_norm=args.weight_by_norm,
+        k_means_bz=args.k_means_bz,
+        k_means_lr=args.k_means_lr,
+        k_means_epochs=args.k_means_epochs,
+        inner_prod=args.inner_prod,
+        origin_X_ls_lenth = args.origin_X_ls_lenth,
+        rand_init=args.rand_init
+        # no_abs_cluster_sim = args.no_abs_cluster_sim
+    )
+    return cluster_ids_x, cluster_centers
+
+
+def cluster_per_class(
+    args,
+    sample_representation_vec_ls,
+    sample_id_ls,
+    full_sim_mat=None,
+    valid_count_per_class=10,
+    num_clusters=4,
+    sample_weights=None,
+    existing_cluster_centroids=None,
+    cosin_distance=False,
+    is_cuda=False,
+    all_layer=False,
+    return_cluster_info=False,
+    handles_outlier=False
+):
+    if num_clusters > 0:
+        cluster_ids_x, cluster_centers = do_cluster(
+            args,
+            num_clusters,
+            sample_representation_vec_ls,
+            is_cuda,
+            cosin_distance,
+            sample_weights,
+            existing_cluster_centroids=existing_cluster_centroids,
+            all_layer=all_layer,
+        )
+
+        unique_cluster_count = len(cluster_ids_x.unique())
+        args.logger.info("cluster count before and after:(%d,%d)"%(num_clusters, unique_cluster_count))
+        if args.remove_empty_clusters:
+            if unique_cluster_count < num_clusters:
+                while(True):
+                    cluster_ids_x, cluster_centers = do_cluster(
+                        args,
+                        unique_cluster_count,
+                        sample_representation_vec_ls,
+                        is_cuda,
+                        cosin_distance,
+                        sample_weights,
+                        existing_cluster_centroids=existing_cluster_centroids,
+                        all_layer=all_layer,
+                    )
+
+                    new_unique_cluster_count = len(cluster_ids_x.unique())
+                    args.logger.info("cluster count before and after:(%d,%d)"%(unique_cluster_count, new_unique_cluster_count))
+
+                    if new_unique_cluster_count >= unique_cluster_count:
+                        break
+                    unique_cluster_count = new_unique_cluster_count
+
+                unique_cluster_count = new_unique_cluster_count
+                # else:
+                #     cluster_assignment_file_name = os.path.join(args.save_path, "cluster_assignments")
+
+                #     sim_mat_file_name = os.path.join(args.save_path, "full_similarity_mat")
+                #     if not (os.path.exists(cluster_assignment_file_name) and os.path.exists(sim_mat_file_name)):
+                #         cluster_ids_x, full_x_cosin_sim = kmeans_cosin(
+                #             X=sample_representation_vec_ls, num_clusters=num_clusters, distance='cosine', is_cuda=is_cuda, sample_weights=sample_weights, existing_cluster_mean_ls=existing_cluster_centroids, all_layer=all_layer, full_x_cosin_sim=full_sim_mat)
+
+                #         torch.save(cluster_ids_x, cluster_assignment_file_name)
+                #         torch.save(full_x_cosin_sim, sim_mat_file_name)
+                #     else:
+                #         cluster_ids_x = torch.load(cluster_assignment_file_name)
+                #         full_x_cosin_sim = torch.load(sim_mat_file_name)
+                # distance = 'cosine'
 
         if return_cluster_info:
             return cluster_ids_x, cluster_centers
 
+    elif not cosin_distance:
+        find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance = 'euclidean', all_layer = all_layer)
     else:
-        if not cosin_distance:
-            find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance = 'euclidean', all_layer = all_layer)
-        else:
-            find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance = 'cosine', all_layer = all_layer)
+        find_best_cluster_num(sample_representation_vec_ls, sample_weights, distance = 'cosine', all_layer = all_layer)
 
 
     
@@ -132,17 +265,17 @@ def cluster_per_class(args, sample_representation_vec_ls, sample_id_ls, full_sim
     full_representative_representation_ls = None
     dist_to_cluster_centroid_ls = []
     dist_to_other_cluster_centroid_ls = []
+    args.logger.info("unique cluster count::%d"%(unique_cluster_count))
 
-
-    for cluster_id in range(num_clusters):
+    for cluster_id in range(unique_cluster_count):
         # curr_cluster_center = cluster_centers[cluster_id]
 
         cluster_dist_ls = []
 
         min_cluster_distance = 0
         min_sample_id = -1
-        if torch.sum(cluster_ids_x == cluster_id).item() <= 0:
-            continue
+        # if torch.sum(cluster_ids_x == cluster_id).item() <= 0:
+        #     continue
 
         # if args.all_layer_grad:
         #     curr_sample_ids = torch.nonzero(cluster_ids_x == cluster_id).view(-1)
@@ -162,39 +295,69 @@ def cluster_per_class(args, sample_representation_vec_ls, sample_id_ls, full_sim
             # for idx in range(num_clusters):
 
         if not all_layer:        
-            curr_cluster_sample_representation = sample_representation_vec_ls[cluster_ids_x == cluster_id].view(torch.sum(cluster_ids_x == cluster_id), -1)
+            # curr_cluster_sample_representation = sample_representation_vec_ls[cluster_ids_x == cluster_id].view(
+            #     torch.sum(cluster_ids_x == cluster_id), -1,
+            # )
+
+            curr_cluster_sample_representation = sample_representation_vec_ls
 
             if is_cuda:
                 curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
             
-            cluster_dist_ls_tensor = pairwise_distance_function(curr_cluster_sample_representation, cluster_centers[cluster_id].view(1,-1), is_cuda = is_cuda)
+            cluster_dist_ls_tensor = pairwise_distance_function(
+                curr_cluster_sample_representation,
+                cluster_centers[cluster_id].view(1,-1),
+                is_cuda=is_cuda,
+                weight_by_norm=args.weight_by_norm,
+                inner_prod=args.inner_prod,
+                ls_idx_range=args.origin_X_ls_lenth,
+                full_inner_prod=False
+            )
             
-            if args.weight_by_norm:
-                cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, cluster_centers[cluster_id].view(1,-1), all_layer)
+            # if args.weight_by_norm:
+            #     cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, cluster_centers[cluster_id].view(1,-1), all_layer)
             cluster_dist_ls_tensor = cluster_dist_ls_tensor.view(-1)
 
             sorted_dist_tensor, sorted_sample_idx_tensor = torch.sort(cluster_dist_ls_tensor, descending=False)
 
             selected_count = int(valid_count_per_class/num_clusters)
+            args.logger.info("Validation samples to select: %s"%(selected_count))
 
-            representive_id_ls.append(sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+            # representive_id_ls.append(
+            #     sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+            representive_id_ls.append(
+                sample_id_ls[sorted_sample_idx_tensor[0:selected_count]].cpu())
         
-            representive_representation_ls.append(sample_representation_vec_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+            # representive_representation_ls.append(
+            #     sample_representation_vec_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+
+            representive_representation_ls.append(
+                sample_representation_vec_ls[sorted_sample_idx_tensor[0:selected_count]].cpu())
     
         else:
             curr_cluster_sample_representation_ls = []
             curr_cluster_center_ls = []
             for arr_idx in range(len(sample_representation_vec_ls)):
-                curr_cluster_sample_representation = sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id].view(torch.sum(cluster_ids_x == cluster_id), -1)
+                # curr_cluster_sample_representation = sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id].view(torch.sum(cluster_ids_x == cluster_id), -1)
+                curr_cluster_sample_representation = sample_representation_vec_ls[arr_idx]
                 curr_cluster_center = cluster_centers[arr_idx][cluster_id].view(1,-1)
                 curr_cluster_center_ls.append(curr_cluster_center)
                 if is_cuda:
                     curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
                 curr_cluster_sample_representation_ls.append(curr_cluster_sample_representation)
-            cluster_dist_ls_tensor = pairwise_distance_function(curr_cluster_sample_representation_ls, curr_cluster_center_ls, is_cuda = is_cuda)
 
-            if args.weight_by_norm:
-                cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, curr_cluster_center_ls,all_layer)
+            cluster_dist_ls_tensor = pairwise_distance_function(
+                curr_cluster_sample_representation_ls,
+                curr_cluster_center_ls,
+                is_cuda=is_cuda,
+                weight_by_norm=args.weight_by_norm,
+                inner_prod=args.inner_prod,
+                ls_idx_range=args.origin_X_ls_lenth,
+                full_inner_prod=False
+            )
+
+            # if args.weight_by_norm:
+            #     cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, curr_cluster_center_ls,all_layer)
 
             cluster_dist_ls_tensor = cluster_dist_ls_tensor.view(-1)
 
@@ -202,13 +365,17 @@ def cluster_per_class(args, sample_representation_vec_ls, sample_id_ls, full_sim
 
             selected_count = int(valid_count_per_class/num_clusters)
 
-            representive_id_ls.append(sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+            # representive_id_ls.append(sample_id_ls[cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+            representive_id_ls.append(sample_id_ls[sorted_sample_idx_tensor[0:selected_count]].cpu())
 
             curr_representive_represetation = []
 
             for arr_idx in range(len(sample_representation_vec_ls)):
 
-                curr_representive_represetation.append(sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+                # curr_representive_represetation.append(
+                #     sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id][sorted_sample_idx_tensor[0:selected_count]].cpu())
+                curr_representive_represetation.append(
+                    sample_representation_vec_ls[arr_idx][sorted_sample_idx_tensor[0:selected_count]].cpu())
 
             representive_representation_ls.append(curr_representive_represetation)
 
@@ -225,10 +392,20 @@ def cluster_per_class(args, sample_representation_vec_ls, sample_id_ls, full_sim
                 else:
                     res_representative_representation_ls[idx1] = torch.cat([res_representative_representation_ls[idx1], representive_representation_ls[idx2][idx1]])
 
+        valid_ids, valid_sample_representation_tensor =  torch.cat(representive_id_ls), res_representative_representation_ls
+
+        if handles_outlier:
+
+            extra_valid_ids, extra_valid_sample_representation_tensor = handle_outliers2(args, sample_id_ls, sample_representation_vec_ls, res_representative_representation_ls, sample_weights)
+
+            if extra_valid_ids is not None and extra_valid_sample_representation_tensor is not None:
+                valid_ids = torch.cat([valid_ids.view(-1), extra_valid_ids.view(-1)])
+
+                valid_sample_representation_tensor = [torch.cat([valid_sample_representation_tensor[k], extra_valid_sample_representation_tensor[k]]) for k in range(len(extra_valid_sample_representation_tensor))]
 
 
 
-        return torch.cat(representive_id_ls), res_representative_representation_ls
+        return valid_ids, valid_sample_representation_tensor
 
 def cluster_per_class_on_grad_vec(args, net, train_loader, criterion, sample_representation_vec_ls, sample_id_ls, valid_count_per_class = 10, num_clusters = 4, sample_weights = None, existing_cluster_centroids = None, cosin_distance = False, is_cuda = False, all_layer = False, return_cluster_info = False):
     
@@ -1000,7 +1177,7 @@ def print_norm_range_of_representations(args, sample_representation_vec_ls):
         args.logger.info("max norm of the representation:%f"%(max_norm))
         args.logger.info("min norm of the representation:%f"%(min_norm))
 
-def obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer):
+def obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids = None, origin_label = None):
     sample_representation_vec_ls = []
 
     sample_id_ls = []
@@ -1013,11 +1190,16 @@ def obtain_representations_last_layer_given_model(args, train_loader, net, crite
 
         if args.cuda:
             data, labels = train_loader.dataset.to_cuda(data, labels)
+        if origin_label is not None:
+            labels = torch.tensor(origin_label[sample_ids])
+            if args.cuda:
+                labels = labels.cuda()
             # labels = labels.cuda()
-        if not args.full_model_out:
+        if not args.cluster_method_two_plus:
             sample_representation = net.feature_forward(data, all_layer=False)
         else:
-            sample_representation = F.softmax(net.forward(data),dim=1)
+            # sample_representation = F.softmax(net.forward(data),dim=1)
+            sample_representation = net.feature_forward2(data, all_layer_grad_no_full_loss=args.all_layer_grad_no_full_loss, labels = labels)
 
         if not args.all_layer and not args.all_layer2:
             sample_representation_vec_ls.append(sample_representation.detach().cpu())
@@ -1068,8 +1250,20 @@ def obtain_representations_last_layer_given_model(args, train_loader, net, crite
         return sample_representation_vec_ls, sample_id_ls
     else:
         sample_representation_vec_ls = torch.cat(sample_representation_vec_ls)
+        if args.cluster_method_two_sampling:
+            if sampled_col_ids is not None:
+                sample_representation_vec_ls = sample_representation_vec_ls[:, sampled_col_ids]
+            else:
+                if args.cluster_method_two_sample_col_count >= sample_representation_vec_ls.shape[1]:
+                    sampled_col_ids = torch.tensor(list(range(sample_representation_vec_ls.shape[1])))
+                else:
+                    sampled_col_ids = np.random.choice(sample_representation_vec_ls.shape[1], size = args.cluster_method_two_sample_col_count, replace=False)
+                    sampled_col_ids = torch.from_numpy(sampled_col_ids)
+
+                sample_representation_vec_ls = sample_representation_vec_ls[:, sampled_col_ids]
+        
         print_norm_range_of_representations(args, sample_representation_vec_ls)
-        return sample_representation_vec_ls, sample_id_ls
+        return sample_representation_vec_ls, sample_id_ls, sampled_col_ids
 
 
 def obtain_class_wise_gradient(class_digit, output, net, optimizer):
@@ -1136,9 +1330,66 @@ def obtain_norms_for_each_layer(args, train_dataset, net, criterion, optimizer):
     full_net_grad_norm_ls = full_net_grad_norm_ls/len(train_loader.dataset)
     return full_net_grad_norm_ls, net_param_count_ls
         
+def obtain_representations_for_validset(valid_set, args, net, criterion, optimizer, sampled_net_param_layer_ls, sampled_layer_sqrt_prob_ls, sampled_col_ids_ls = None):
+    validloader = torch.utils.data.DataLoader(valid_set, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
+    sample_representation_vec_ls = []
+    for batch_id, (_, data, labels) in tqdm(enumerate(validloader)):
+    
+        if args.cuda:
+            data, labels = validloader.dataset.to_cuda(data, labels)
+            # labels = labels.cuda()
+        # if not args.full_model_out:
+        output = net.forward(data)
+        # else:
+        #     sample_representation = F.softmax(net.forward(data),dim=1)
+
+        # if not args.all_layer and not args.all_layer2:
+        #     sample_representation_vec_ls.append(sample_representation.detach().cpu())
+        vec_grad_by_example_ls = []
+        vec_grad_by_example_ls = get_grad_by_example_per_batch2(args, labels, output, net, criterion, optimizer, vec_grad_by_example_ls, sampled_net_param_layer_ls, sampled_layer_sqrt_prob_ls, merge_grad = True)
+
+        if batch_id == 0:
+            # sample_representation_vec_ls.append(sample_representation.detach().cpu())
+            sample_representation_vec_ls.extend(vec_grad_by_example_ls)
+        else:
+
+            # sample_representation_vec_ls[0] = torch.cat([sample_representation_vec_ls[0], sample_representation.detach().cpu()])
+            for sample_arr_id in range(len(sample_representation_vec_ls)):
+                sample_representation_vec_ls[sample_arr_id] = torch.cat([sample_representation_vec_ls[sample_arr_id].detach().cpu(), vec_grad_by_example_ls[sample_arr_id].detach().cpu()])
 
 
-def obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer):
+    return sample_representation_vec_ls
+
+
+def obtain_sampled_representations_cluster_method_three(sample_representation_vec_ls, args, sampled_col_ids_ls = None):
+    sampled_sample_representation_vec_ls = []
+    sampled_sampled_col_ids = []
+
+    for layer_idx in range(len(sample_representation_vec_ls)):
+        represetion_vec = sample_representation_vec_ls[layer_idx]
+        sampled_col_ids = None
+        if sampled_col_ids_ls is not None:
+            sampled_col_ids = sampled_col_ids_ls[layer_idx]
+
+        if sampled_col_ids is not None:
+            represetion_vec = represetion_vec[:, sampled_col_ids]
+        else:
+            if args.cluster_method_three_sample_col_count >= represetion_vec.shape[1]:
+                sampled_col_ids = torch.tensor(list(range(represetion_vec.shape[1])))
+            else:
+                sampled_col_ids = np.random.choice(represetion_vec.shape[1], size = args.cluster_method_three_sample_col_count, replace=False)
+                sampled_col_ids = torch.from_numpy(sampled_col_ids)
+
+            represetion_vec = represetion_vec[:, sampled_col_ids]
+
+        sampled_sample_representation_vec_ls.append(represetion_vec)
+        sampled_sampled_col_ids.append(sampled_col_ids)
+    sample_representation_vec_ls = sampled_sample_representation_vec_ls
+    sampled_col_ids_ls  = sampled_sampled_col_ids
+
+    return sample_representation_vec_ls, sampled_col_ids_ls
+
+def obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = None, sampled_col_ids_ls = None):
     sample_representation_vec_ls = []
 
     sample_id_ls = []
@@ -1147,7 +1398,7 @@ def obtain_representations_last_layer_given_model2(train_dataset, args, train_lo
         # all_sample_representations = [None]*len(train_loader.dataset)
     grad_norm_by_layer_ls, net_param_count_ls = obtain_norms_for_each_layer(args, train_dataset, net, criterion, optimizer)
     avg_grad_norm_by_layer = grad_norm_by_layer_ls/torch.tensor(net_param_count_ls)
-    sampled_net_param_layer_ls,sampled_layer_sqrt_prob_ls = biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_param_count = args.sampled_param_count, include_last_layer = True)
+    sampled_net_param_layer_ls,sampled_layer_sqrt_prob_ls = biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_param_count = args.sampled_param_count, include_last_layer = True, replace=args.replace)
 
     for batch_id, (sample_ids, data, labels) in tqdm(enumerate(train_loader)):
 
@@ -1210,7 +1461,17 @@ def obtain_representations_last_layer_given_model2(train_dataset, args, train_lo
         sample_id_ls.append(sample_ids)
     # if args.all_layer or args.all_layer2:
     print_norm_range_of_representations(args, sample_representation_vec_ls)
-    return sample_representation_vec_ls, sample_id_ls
+    valid_sample_representation_ls = None
+
+    if args.cluster_method_three_sampling:
+        sample_representation_vec_ls, sampled_col_ids_ls =  obtain_sampled_representations_cluster_method_three(sample_representation_vec_ls, args, sampled_col_ids_ls = sampled_col_ids_ls)
+
+    if validset is not None:
+        valid_sample_representation_ls = obtain_representations_for_validset(validset, args, net, criterion, optimizer, sampled_net_param_layer_ls, sampled_layer_sqrt_prob_ls, sampled_col_ids_ls)
+        if args.cluster_method_three_sampling:
+            valid_sample_representation_ls, _ =  obtain_sampled_representations_cluster_method_three(valid_sample_representation_ls, args, sampled_col_ids_ls = sampled_col_ids_ls)
+
+    return sample_representation_vec_ls, sample_id_ls, valid_sample_representation_ls
     # else:
     #     sample_representation_vec_ls = torch.cat(sample_representation_vec_ls)
     #     print_norm_range_of_representations(args, sample_representation_vec_ls)
@@ -1218,7 +1479,7 @@ def obtain_representations_last_layer_given_model2(train_dataset, args, train_lo
 
 
 
-def get_extra_representations_last_layer(args, train_loader, criterion, net, full_sample_representation_vec_ls):
+def get_extra_representations_last_layer(args, train_loader, criterion, net, full_sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = None, full_sample_representation_vec_ls2 = None, valid_sample_representation_vec_ls2 = None, qualitiative = False, origin_label = None):
     
     start_epoch_id = 0
     if args.use_pretrained_model:
@@ -1228,45 +1489,181 @@ def get_extra_representations_last_layer(args, train_loader, criterion, net, ful
         # start_epoch_id = int(args.epochs/2)
     if not args.all_layer and not args.all_layer2:
         full_sample_representation_vec_ls = [full_sample_representation_vec_ls]
+        if validloader is not None:
+            full_valid_sample_representation_vec_ls = [valid_sample_representation_vec_ls]
+        else:
+            full_valid_sample_representation_vec_ls = None
 
-    for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+    if origin_label is not None:
+        full_sample_representation_vec_ls2, full_sample_representation_vec_ls3 = full_sample_representation_vec_ls2
+        full_sample_representation_vec_ls3 = [full_sample_representation_vec_ls3]
+    else:
+        full_sample_representation_vec_ls3 = None
+
+    if full_sample_representation_vec_ls2 is not None:
+        full_sample_representation_vec_ls2 = [full_sample_representation_vec_ls2]
+    else:
+        full_sample_representation_vec_ls2 = None
+    if valid_sample_representation_vec_ls2 is not None:
+        full_valid_sample_representation_vec_ls2 = [valid_sample_representation_vec_ls2]
+    else:
+        full_valid_sample_representation_vec_ls2 = None
+
+    
+
+    # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+    #     net = load_checkpoint_by_epoch(args, net, ep)
+    max_net_prov_count = 5 
+    for k in range(0, max_net_prov_count):
+    # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+        ep = start_epoch_id + k*args.model_prov_period
+        # if epoch_count > 5:
+        #     break
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:
             continue
         optimizer, _=obtain_optimizer_scheduler(args, net, start_epoch = 0)
-        sample_representation_vec_ls, _ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
+        sample_representation_vec_ls, _,sampled_col_ids = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
+        if qualitiative:
+            args.all_layer_grad_no_full_loss = True
+            sample_representation_vec_ls2, _,_ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+            if origin_label is not None:
+                sample_representation_vec_ls3, _,_ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids, origin_label = origin_label)
+            args.all_layer_grad_no_full_loss = False
+
+        if validloader is not None:
+            curr_valid_sample_representation_vec_ls, _,_ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+            if qualitiative:
+                args.all_layer_grad_no_full_loss = True
+                curr_valid_sample_representation_vec_ls2, _,_ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+                args.all_layer_grad_no_full_loss = False
 
         if args.all_layer or args.all_layer2:
             full_sample_representation_vec_ls.extend(sample_representation_vec_ls)
+            if full_sample_representation_vec_ls2 is not None:
+                full_sample_representation_vec_ls2.extend(sample_representation_vec_ls2)
+            if full_sample_representation_vec_ls3 is not None:
+                full_sample_representation_vec_ls3.extend(sample_representation_vec_ls3)
+            
+            if validloader is not None:
+                full_valid_sample_representation_vec_ls.extend(curr_valid_sample_representation_vec_ls)
+                if full_valid_sample_representation_vec_ls2 is not None:
+                    full_valid_sample_representation_vec_ls2.extend(curr_valid_sample_representation_vec_ls2)
         else:
             full_sample_representation_vec_ls.append(sample_representation_vec_ls)
+            if full_sample_representation_vec_ls2 is not None:
+                full_sample_representation_vec_ls2.append(sample_representation_vec_ls2)
+            if full_sample_representation_vec_ls3 is not None:
+                    full_sample_representation_vec_ls3.append(sample_representation_vec_ls3)
+            if validloader is not None:
+                full_valid_sample_representation_vec_ls.append(curr_valid_sample_representation_vec_ls)
+                if full_valid_sample_representation_vec_ls2 is not None:
+                    full_valid_sample_representation_vec_ls2.append(curr_valid_sample_representation_vec_ls2)
 
-    return full_sample_representation_vec_ls
+    if not qualitiative:
+        return full_sample_representation_vec_ls, full_valid_sample_representation_vec_ls
+    else:
+        if origin_label is None:
+            return full_sample_representation_vec_ls, full_valid_sample_representation_vec_ls, full_sample_representation_vec_ls2, full_valid_sample_representation_vec_ls2
+        else:
+            return full_sample_representation_vec_ls, full_valid_sample_representation_vec_ls, (full_sample_representation_vec_ls2, full_sample_representation_vec_ls3), full_valid_sample_representation_vec_ls2
 
-def get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, full_sample_representation_vec_ls):
+
+def obtain_grad_last_layer(trainloader, args, net):
+    output_probs_ls = []
+
+    output_origin_probs_ls = []
+
+    for batch_id, (sample_ids, data, labels) in tqdm(enumerate(trainloader)):
+
+        if args.cuda:
+            data, labels = trainloader.dataset.to_cuda(data, labels)
+
+        output_probs = F.softmax(net.forward(data),dim=1)
+
+        label_info = F.one_hot(labels.view(-1), num_classes=output_probs.shape[1])
+
+        output_probs_ls.append((output_probs.detach() - label_info).cpu())
+
+        output_origin_probs_ls.append(output_probs.detach().cpu())
+
+    output_probs_tensor = torch.cat(output_probs_ls)
+
+    output_origin_probs_tensor = torch.cat(output_origin_probs_ls)
+
+    return output_probs_tensor, output_origin_probs_tensor
+
+def get_extra_output_prob_ls(args, train_loader, net, full_output_probs_tensor_ls, full_output_origin_probs_tensor_ls):
     
     start_epoch_id = 0
     if args.use_pretrained_model:
         start_epoch_id = torch.load(os.path.join(args.prev_save_path, "early_stopping_epoch"))
+        # start_epoch_id += 1
+    args.logger.info("extra representation starting from epoch %d"%(start_epoch_id))
+
+        # start_epoch_id = int(args.epochs/2)
+    # if not args.all_layer and not args.all_layer2:
+    #     full_output_probs_tensor_ls = [full_output_probs_tensor_ls]
+    #     full_output_origin_probs_tensor_ls = [full_output_origin_probs_tensor_ls]
+    #     if full_valid_sample_representation_vec_ls is not None:
+    #         full_valid_sample_representation_vec_ls = [full_valid_sample_representation_vec_ls]
+
+    epoch_count = 0
+    max_net_prov_count = 5 
+    for k in range(0, max_net_prov_count):
+    # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+        ep = start_epoch_id + k*args.model_prov_period
+        # if epoch_count > 5:
+        #     break
+        net = load_checkpoint_by_epoch(args, net, ep)
+        if net is None:
+            continue
+
+
+        output_probs_tensor, output_origin_probs_tensor = obtain_grad_last_layer(train_loader, args, net)
+        full_output_probs_tensor_ls.append(output_probs_tensor)
+        full_output_origin_probs_tensor_ls.append(output_origin_probs_tensor)
+
+
+def get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, full_sample_representation_vec_ls, validset = None, full_valid_sample_representation_vec_ls = None):
+    
+    start_epoch_id = 0
+    if args.use_pretrained_model:
+        start_epoch_id = torch.load(os.path.join(args.prev_save_path, "early_stopping_epoch"))
+        # start_epoch_id += 1
     args.logger.info("extra representation starting from epoch %d"%(start_epoch_id))
 
         # start_epoch_id = int(args.epochs/2)
     if not args.all_layer and not args.all_layer2:
         full_sample_representation_vec_ls = [full_sample_representation_vec_ls]
+        if full_valid_sample_representation_vec_ls is not None:
+            full_valid_sample_representation_vec_ls = [full_valid_sample_representation_vec_ls]
 
-    for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+    epoch_count = 0
+    max_net_prov_count = 5 
+    for k in range(0, max_net_prov_count):
+    # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+        ep = start_epoch_id + k*args.model_prov_period
+        # if epoch_count > 5:
+        #     break
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:
             continue
         optimizer, _=obtain_optimizer_scheduler(args, net, start_epoch = 0)
-        sample_representation_vec_ls, _ = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer)
+        sample_representation_vec_ls, _, curr_valid_sample_representation_ls  = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = validset)
 
         if args.all_layer or args.all_layer2:
             full_sample_representation_vec_ls.extend(sample_representation_vec_ls)
+            if full_valid_sample_representation_vec_ls is not None:
+                full_valid_sample_representation_vec_ls.extend(curr_valid_sample_representation_ls)
         else:
             full_sample_representation_vec_ls.append(sample_representation_vec_ls)
+            if full_valid_sample_representation_vec_ls is not None:
+                full_valid_sample_representation_vec_ls.append(curr_valid_sample_representation_ls)
 
-    return full_sample_representation_vec_ls
+        epoch_count += 1
+
+    return full_sample_representation_vec_ls, full_valid_sample_representation_vec_ls
 
 def get_extra_gradient_layer(args, train_loader, criterion, net, full_sample_representation_vec_ls):
     
@@ -1278,7 +1675,11 @@ def get_extra_gradient_layer(args, train_loader, criterion, net, full_sample_rep
         # start_epoch_id = int(args.epochs/2)
     
 
-    for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+    # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+    max_net_prov_count = 5 
+    for k in range(0, max_net_prov_count):
+    # for ep in range(start_epoch_id, args.epochs, args.model_prov_period):
+        ep = start_epoch_id + k*args.model_prov_period
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:
             continue
@@ -1297,11 +1698,39 @@ def get_extra_gradient_layer(args, train_loader, criterion, net, full_sample_rep
 
 
 
-def get_representations_last_layer(args, train_loader, criterion, optimizer, net):
+def get_representations_last_layer(args, train_loader, criterion, optimizer, net, validset = None, qualitiative = False, origin_label = None):
 
-    sample_representation_vec_ls, sample_id_ls = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
+    sample_representation_vec_ls, sample_id_ls, sampled_col_ids = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer)
+    sample_representation_vec_ls2 = None
+    sample_representation_vec_ls3 = None
+    valid_sample_representation_vec_ls2 = None
+    if qualitiative:
+        args.all_layer_grad_no_full_loss = True
+        sample_representation_vec_ls2, sample_id_ls, _ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids = sampled_col_ids)
+        if origin_label is not None:
+            sample_representation_vec_ls3, _, _ = obtain_representations_last_layer_given_model(args, train_loader, net, criterion, optimizer, sampled_col_ids = sampled_col_ids, origin_label = origin_label)
+            sample_representation_vec_ls2 = (sample_representation_vec_ls2, sample_representation_vec_ls3)
+
+        args.all_layer_grad_no_full_loss = False
+
+    if validset is not None:
+        validloader = torch.utils.data.DataLoader(validset, batch_size=args.batch_size, shuffle=True)
+        valid_sample_representation_vec_ls, _, _ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+        if qualitiative:
+            args.all_layer_grad_no_full_loss = True
+            valid_sample_representation_vec_ls2, _, _ = obtain_representations_last_layer_given_model(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+            args.all_layer_grad_no_full_loss = False
+    else:
+        validloader = None
+        valid_sample_representation_vec_ls = None
+
+    
+
     if args.use_model_prov:
-        sample_representation_vec_ls = get_extra_representations_last_layer(args, train_loader, criterion, net, sample_representation_vec_ls)
+        if not qualitiative:
+            sample_representation_vec_ls, valid_sample_representation_vec_ls = get_extra_representations_last_layer(args, train_loader, criterion, net, sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = validloader, full_sample_representation_vec_ls2 = sample_representation_vec_ls2, valid_sample_representation_vec_ls2 = valid_sample_representation_vec_ls2, qualitiative = qualitiative)
+        else:
+            sample_representation_vec_ls, valid_sample_representation_vec_ls, sample_representation_vec_ls2, valid_sample_representation_vec_ls2 = get_extra_representations_last_layer(args, train_loader, criterion, net, sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = validloader, full_sample_representation_vec_ls2 = sample_representation_vec_ls2, valid_sample_representation_vec_ls2 = valid_sample_representation_vec_ls2, qualitiative = qualitiative, origin_label = origin_label)
     # sample_representation_vec_ls = []
 
     # sample_id_ls = []
@@ -1357,23 +1786,26 @@ def get_representations_last_layer(args, train_loader, criterion, optimizer, net
 
     all_sample_ids = torch.cat(sample_id_ls)
 
-    return full_sample_representation_tensor, all_sample_ids
+    if qualitiative:
+        return (full_sample_representation_tensor, sample_representation_vec_ls2), all_sample_ids, (valid_sample_representation_vec_ls, valid_sample_representation_vec_ls2)
+    else:
+        return full_sample_representation_tensor, all_sample_ids, valid_sample_representation_vec_ls
 
-def get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net):
+def get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = None):
 
-    sample_representation_vec_ls, sample_id_ls = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer)
+    sample_representation_vec_ls, sample_id_ls, valid_sample_representation_ls = obtain_representations_last_layer_given_model2(train_dataset, args, train_loader, net, criterion, optimizer, validset = validset)
     if args.use_model_prov:
         args.all_layer = True
-        sample_representation_vec_ls = get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, sample_representation_vec_ls)
+        sample_representation_vec_ls, valid_sample_representation_ls = get_extra_representations_last_layer2(train_dataset, args, train_loader, criterion, net, sample_representation_vec_ls, validset, valid_sample_representation_ls)
 
 
     full_sample_representation_tensor = sample_representation_vec_ls
 
     all_sample_ids = torch.cat(sample_id_ls)
 
-    return full_sample_representation_tensor, all_sample_ids
+    return full_sample_representation_tensor, all_sample_ids, valid_sample_representation_ls
 
-def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False):
+def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False, validset=None, qualitiative = False, origin_label = None):
 
     if args.add_under_rep_samples:
         under_represent_count = int(valid_count/2)
@@ -1387,7 +1819,7 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
     # sample_id_ls_by_class = dict()
     full_sim_mat1 = None
     if not args.all_layer_grad:
-        full_sample_representation_tensor, all_sample_ids = get_representations_last_layer(args, train_loader, criterion, optimizer, net)
+        full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer(args, train_loader, criterion, optimizer, net, validset = validset, qualitiative=qualitiative, origin_label = origin_label)
     else:
 
         full_sample_representation_tensor, all_sample_ids = get_grad_by_example(args, train_loader, net, criterion, optimizer, vectorize_grad=True)
@@ -1404,73 +1836,383 @@ def get_representative_valid_ids2(criterion, optimizer, train_loader, args, net,
 
 
         print()
+    
+    if qualitiative:
+        full_sample_representation_tensor, (full_sample_representation_tensor2, full_sample_representation_tensor3) = full_sample_representation_tensor
+        existing_valid_representation, existing_valid_representation2 = existing_valid_representation
+
+    origin_X_ls_lenth = len(full_sample_representation_tensor)
+
+    if args.get_representations:
+        torch.save(full_sample_representation_tensor, os.path.join(args.save_path,
+            "sample_representation"))
+
+    args.origin_X_ls_lenth = origin_X_ls_lenth
+    if not args.not_rescale_features:
+        full_sample_representation_tensor = scale_and_extend_data_vector(full_sample_representation_tensor)
+
+    # args.origin_X_ls_lenth = origin_X_ls_lenth
+
+    # full_sample_representation_tensor = scale_and_extend_data_vector(full_sample_representation_tensor)
     # valid_ids_ls = []
     # valid_sample_representation_ls = []
     # full_sample_representation_ls = []
     # full_sample_id_ls = []
-
+    if only_sample_representation:
+        return full_sample_representation_tensor, existing_valid_representation
     # sample_representation_vec_ls = sample_representation_vec_ls_by_class[label]
-
-    if args.all_layer_grad_greedy:
-        # full_sim_mat1 = get_grad_prod(args, full_sample_representation_tensor)
-        valid_ids = select_samples_with_greedy_algorithm(full_sim_mat1, main_represent_count)
-        valid_sample_representation_tensor = None
-        return valid_ids, valid_sample_representation_tensor
-    else:
-        if only_sample_representation:
-            return full_sample_representation_tensor
-
-
-
-        if args.cluster_no_reweighting:
-            logging.info("no reweighting for k-means")
-            cached_sample_weights = None
-
-        
+    if args.cluster_no_reweighting:
+        logging.info("no reweighting for k-means")
+        cached_sample_weights = None
+    # extra_valid_ids, extra_valid_sample_representation_tensor = None, None
+    if existing_valid_representation is None:
         if cached_sample_weights is not None:
-            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=args.all_layer | args.all_layer2 | args.use_model_prov, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info)  
+            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+            # if args.inner_prod:
+            #     extra_valid_ids, extra_valid_sample_representation_tensor = handle_outliers(args, all_sample_ids, full_sample_representation_tensor, valid_sample_representation_tensor, cached_sample_weights[all_sample_ids])
         else:
-            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=args.all_layer | args.all_layer2| args.use_model_prov, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info)  
-        
+            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+        #     if args.inner_prod:
+        #         extra_valid_ids, extra_valid_sample_representation_tensor = handle_outliers(args, all_sample_ids, full_sample_representation_tensor, valid_sample_representation_tensor)
+        # if extra_valid_ids is not None and extra_valid_sample_representation_tensor is not None:
+        #     valid_ids = torch.cat([valid_ids.view(-1), extra_valid_ids.view(-1)])
+
+        #     valid_sample_representation_tensor = [torch.cat([valid_sample_representation_tensor[k], extra_valid_sample_representation_tensor[k]]) for k in range(len(extra_valid_sample_representation_tensor))]
+        far_sample_representation_tensor = full_sample_representation_tensor
+    # while len(valid_ids) < main_represent_count:
+    #     far_sample_representation_tensor, far_sample_ids = obtain_farthest_training_samples(args, args.cosin_dist, True, far_sample_representation_tensor, valid_sample_representation_tensor, args.cuda)
+    #     all_sample_ids = all_sample_ids[far_sample_ids]
+
+    #     curr_representation_count = valid_count - len(valid_ids)
+    #     if cached_sample_weights is not None:
+    #         new_valid_ids, new_valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = curr_representation_count, num_clusters = curr_representation_count, sample_weights=cached_sample_weights[far_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
+    #     else:
+    #         new_valid_ids, new_valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = curr_representation_count, num_clusters = curr_representation_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
 
 
-        # for label in sample_representation_vec_ls_by_class:
-        #     sample_representation_vec_ls_by_class[label] = torch.stack(sample_representation_vec_ls_by_class[label])
+    #     uncovered_valid_ids, uncovered_valid_sample_ids, _ = get_uncovered_new_valid_ids(args, new_valid_ids, new_valid_sample_representation_tensor, valid_sample_representation_tensor, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
         
+    #     args.logger.info("new valid sample count::%d"%(len(uncovered_valid_sample_ids)))
+    #     if len(uncovered_valid_sample_ids) > 0:
+    #         uncovered_valid_sample_representations = [new_valid_sample_representation_tensor[k][uncovered_valid_ids] for k in range(len(new_valid_sample_representation_tensor))]
+    #         full_dists = compute_distance(args, args.cosin_dist, True, full_sample_representation_tensor, valid_sample_representation_tensor, args.cuda)
+    #         print(full_dists[uncovered_valid_sample_ids])
+    #         valid_ids = torch.cat([uncovered_valid_sample_ids, valid_ids])
+    #         valid_sample_representation_tensor = [torch.cat([valid_sample_representation_tensor[k], uncovered_valid_sample_representations[k]]) for k in range(len(valid_sample_representation_tensor))]
+    # print()
+    # if existing_valid_representation is not None:
+    #     uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+    #     valid_ids = uncovered_valid_sample_ids
+    #     valid_sample_representation_tensor = [valid_sample_representation_tensor[k][uncovered_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+    
+
+    # if existing_valid_representation is not None:
+    else:
+        # remaining_valid_ids, remaining_local_valid_ids = determine_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, len(valid_ids), cosine_dist=args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        # full_dists = compute_distance(args, args.cosin_dist, True, full_sample_representation_tensor, existing_valid_representation, args.cuda)
+        # cluster_max_radius = torch.max(torch.min(full_dists, dim = 1)[0])/2
+        
+        # uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cluster_max_radius, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)# get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        far_sample_representation_tensor = full_sample_representation_tensor
+        # while len(remaining_valid_ids) <= 0:
             
 
-        #     sample_id_ls = torch.tensor(sample_id_ls_by_class[label])
-
-        #     curr_cached_sample_weights = None
-        #     if cached_sample_weights is not None:
-        #         curr_cached_sample_weights = cached_sample_weights[sample_id_ls]
-
-        #     if existing_valid_representation is not None and existing_valid_set is not None:
-        #         valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights, existing_cluster_centroids=existing_valid_representation[existing_valid_set.targets == label])    
-
-        #     else:
-        #         valid_ids, valid_sample_representation = cluster_per_class(sample_representation_vec_ls, sample_id_ls, valid_count_per_class = int(main_represent_count/len(sample_representation_vec_ls_by_class)), num_clusters = int(main_represent_count/len(sample_representation_vec_ls_by_class)), sample_weights=curr_cached_sample_weights)
-
-        #     valid_ids_ls.append(valid_ids)
-        #     valid_sample_representation_ls.append(valid_sample_representation)
-        #     full_sample_representation_ls.append(sample_representation_vec_ls)
-        #     full_sample_id_ls.append(sample_id_ls.view(-1))
-        
-        # valid_ids = torch.cat(valid_ids_ls)
-        # valid_sample_representation_tensor = torch.cat(valid_sample_representation_ls)
-        # under_represent_count = valid_count - len(valid_ids)
-        # if under_represent_count > 0 and args.add_under_rep_samples:
-        #     # under_represent_valid_ids = obtain_most_under_represent_samples(under_represent_count, torch.cat(full_sample_representation_ls), torch.cat(full_sample_id_ls), torch.cat(valid_sample_representation_ls))
-        #     # under_represent_valid_ids = random_obtain_other_samples(under_represent_count, torch.cat(full_sample_id_ls), valid_ids)
-        #     under_represent_valid_ids = get_boundary_valid_ids0(train_loader, net, args, under_represent_count, valid_ids)
-        #     valid_ids = torch.cat([valid_ids.view(-1), under_represent_valid_ids.view(-1)])
-        if not return_cluster_info:
-            return valid_ids, valid_sample_representation_tensor
+        far_sample_representation_tensor, far_sample_ids = obtain_farthest_training_samples(args, args.cosin_dist, True, far_sample_representation_tensor, existing_valid_representation, args.cuda)
+        all_sample_ids = all_sample_ids[far_sample_ids]
+        main_represent_count = valid_count - existing_valid_representation[0].shape[0]
+        if args.no_sample_weights_k_means:
+            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
         else:
-            return valid_ids, valid_sample_representation_tensor, full_sample_representation_tensor
+            if cached_sample_weights is not None:
+                valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+            else:
+                valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+
+        curr_total_valid_count = len(valid_ids) + existing_valid_representation[0].shape[0]
+        # if curr_total_valid_count
+        if args.total_valid_sample_count > 0 and args.total_valid_sample_count < curr_total_valid_count:
+            remaining_valid_ids, remaining_valid_sample_ids, _ = get_uncovered_new_valid_ids2(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, args.total_valid_sample_count- existing_valid_representation[0].shape[0], cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+            valid_ids = remaining_valid_sample_ids
+            valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+
+        #     selected_sample_ids = sorted_min_sample_ids[0:args.total_valid_sample_count - existing_valid_count]
+        # else:
+        #     selected_sample_ids = sorted_min_sample_ids[0:valid_count - existing_valid_count]
+
+            # uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cluster_max_radius, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)#get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        #     remaining_valid_ids, remaining_local_valid_ids = determine_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, len(valid_ids), cosine_dist=args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        #     print()
+
+        # valid_ids = remaining_valid_ids
+        # valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_local_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+
+        if qualitiative:
+            args.logger.info("obtain D values:")
+            full_distance0 = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor, valid_sample_representation_tensor, args.cuda, inner_prod=True, no_abs=True)
+            ratio = torch.abs(torch.sum(full_distance0, dim=1))/torch.sum(torch.abs(full_distance0),dim=1)
+            D_value = (ratio + 1)/(1-ratio)
+            min_D_value = torch.min(D_value).item()
+            quant_val = torch.quantile(D_value, q = 0.001).item()
+            final_ratio = (D_value - 1)/(D_value + 1)
+            args.logger.info("min D value::%f"%(min_D_value))
+            args.logger.info("0.1%% quantile value::%f"%(quant_val))
+            # print(final_ratio)
+
+            args.logger.info("obtain D_0,D_1,D_2 values:")
+            valid_sample_representation_tensor2 = [full_sample_representation_tensor3[k][valid_ids] for k in range(len(full_sample_representation_tensor2))]
+            far_sample_representation_tensor2 = [full_sample_representation_tensor2[k][all_sample_ids] for k in range(len(full_sample_representation_tensor2))]
+
+            full_distance = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor, valid_sample_representation_tensor, args.cuda)
+            full_distance2 = compute_distance(args, args.cosin_dist, True, far_sample_representation_tensor2, valid_sample_representation_tensor2, args.cuda)
+            cluster_centroid1 = torch.argmin(full_distance, dim=1)
+            cluster_centroid2 = torch.argmin(full_distance2, dim=1)
+            matched_cluster_centroid_count = torch.sum(cluster_centroid1 == cluster_centroid2)
+            total_sample_count = cluster_centroid1.shape[0]
+            args.logger.info("cluster centroid match count %d out of %d::"%(matched_cluster_centroid_count, total_sample_count))
+            print()
 
 
-def get_representative_valid_ids2_3(train_dataset, criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False):
+    if not return_cluster_info:
+        return valid_ids, valid_sample_representation_tensor
+    else:
+        return valid_ids, valid_sample_representation_tensor, full_sample_representation_tensor
+
+    # if args.all_layer_grad_greedy:
+    #     # full_sim_mat1 = get_grad_prod(args, full_sample_representation_tensor)
+    #     valid_ids = select_samples_with_greedy_algorithm(full_sim_mat1, main_represent_count)
+    #     valid_sample_representation_tensor = None
+    #     return valid_ids, valid_sample_representation_tensor
+    # else:
+    #     if only_sample_representation:
+    #         return full_sample_representation_tensor
+
+
+
+    #     if args.cluster_no_reweighting:
+    #         logging.info("no reweighting for k-means")
+    #         cached_sample_weights = None
+
+    
+    # if cached_sample_weights is not None:
+    #     valid_ids, valid_sample_representation_tensor = cluster_per_class(
+    #         args,
+    #         full_sample_representation_tensor,
+    #         all_sample_ids,
+    #         valid_count_per_class=main_represent_count,
+    #         num_clusters=main_represent_count,
+    #         sample_weights=cached_sample_weights[all_sample_ids],
+    #         cosin_distance=args.cosin_dist,
+    #         is_cuda=args.cuda,
+    #         all_layer=args.all_layer | args.all_layer2 | args.use_model_prov,
+    #         full_sim_mat=full_sim_mat1,
+    #         return_cluster_info=return_cluster_info,
+    #     )  
+    # else:
+    #     valid_ids, valid_sample_representation_tensor = cluster_per_class(
+    #         args,
+    #         full_sample_representation_tensor,
+    #         all_sample_ids,
+    #         valid_count_per_class=main_represent_count,
+    #         num_clusters=main_represent_count,
+    #         sample_weights=None,
+    #         cosin_distance=args.cosin_dist,
+    #         is_cuda=args.cuda,
+    #         all_layer=args.all_layer | args.all_layer2 | args.use_model_prov,
+    #         full_sim_mat=full_sim_mat1,
+    #         return_cluster_info=return_cluster_info,
+    #     )  
+
+    # if not return_cluster_info:
+    #     return valid_ids, valid_sample_representation_tensor
+    # else:
+    #     return valid_ids, valid_sample_representation_tensor, full_sample_representation_tensor
+
+
+def get_uncovered_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representations, cluster_max_radius, cosine_dist = False, all_layer = False, is_cuda = False):
+    
+    existing_valid_count = 0
+    if all_layer:
+        existing_valid_count = existing_valid_representations[0].shape[0]
+        valid_count = new_valid_representations[0].shape[0]
+    else:
+        existing_valid_count = existing_valid_representations.shape[0]
+        valid_count = new_valid_representations.shape[0]
+    if not args.all_layer_grad:
+
+        if not cosine_dist:
+            if not all_layer:
+                existing_new_dists = pairwise_distance(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
+            else:
+                existing_new_dists = pairwise_distance_ls(new_valid_representations, existing_valid_representations , is_cuda=is_cuda)
+        else:
+            if not all_layer:
+                existing_new_dists = pairwise_cosine(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
+            else:
+                existing_new_dists = pairwise_cosine_ls(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=False)
+    
+    else:
+        existing_new_dists = pairwise_cosine2(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
+
+    uncovered_new_valid_ids = torch.nonzero(torch.sum(existing_new_dists > cluster_max_radius, dim = 1) >= existing_new_dists.shape[1])
+    uncovered_new_valid_ids = uncovered_new_valid_ids.view(-1)
+    # nearset_new_valid_distance,nearest_covered_new_valid_ids = torch.min(existing_new_dists, dim = 0)
+    # nearest_covered_new_valid_ids = nearest_covered_new_valid_ids.unique()
+    # uncovered_new_valid_ids = set(list(range(valid_count))).difference(set(nearest_covered_new_valid_ids.tolist()))
+    # uncovered_new_valid_ids = torch.tensor(list(uncovered_new_valid_ids))
+    if len(uncovered_new_valid_ids) <= 0:
+        return [], [], existing_new_dists
+    else:
+        return uncovered_new_valid_ids, valid_ids[uncovered_new_valid_ids], existing_new_dists
+
+
+
+def get_uncovered_new_valid_ids2(args, valid_ids, new_valid_representations, existing_valid_representations, selected_count, cosine_dist = False, all_layer = False, is_cuda = False):
+
+    if not args.all_layer_grad:
+
+        if not cosine_dist:
+            if not all_layer:
+                existing_new_dists = pairwise_distance(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
+            else:
+                existing_new_dists = pairwise_distance_ls(new_valid_representations, existing_valid_representations , is_cuda=is_cuda)
+        else:
+            if not all_layer:
+                existing_new_dists = pairwise_cosine(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
+            else:
+                existing_new_dists = pairwise_cosine_ls(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth,full_inner_prod=False)
+    
+    else:
+        existing_new_dists = pairwise_cosine2(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
+
+    min_new_valid_to_existing_dist = torch.min(existing_new_dists, dim = 1)[0]
+
+    _, sorted_sample_ids = torch.sort(min_new_valid_to_existing_dist, descending=True)
+
+    uncovered_new_valid_ids = sorted_sample_ids[0:selected_count]
+
+    # uncovered_new_valid_ids = torch.nonzero(torch.sum(existing_new_dists > cluster_max_radius, dim = 1) >= existing_new_dists.shape[1])
+    # uncovered_new_valid_ids = uncovered_new_valid_ids.view(-1)
+    # nearset_new_valid_distance,nearest_covered_new_valid_ids = torch.min(existing_new_dists, dim = 0)
+    # nearest_covered_new_valid_ids = nearest_covered_new_valid_ids.unique()
+    # uncovered_new_valid_ids = set(list(range(valid_count))).difference(set(nearest_covered_new_valid_ids.tolist()))
+    # uncovered_new_valid_ids = torch.tensor(list(uncovered_new_valid_ids))
+    if len(uncovered_new_valid_ids) <= 0:
+        return [], [], existing_new_dists
+    else:
+        return uncovered_new_valid_ids, valid_ids[uncovered_new_valid_ids], existing_new_dists
+
+def determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representations, valid_count, cosine_dist = False, all_layer = False, is_cuda = False):
+    existing_valid_count = 0
+    if all_layer:
+        existing_valid_count = existing_valid_representations[0].shape[0]
+    else:
+        existing_valid_count = existing_valid_representations.shape[0]
+
+    if existing_valid_count > valid_count:
+        return [],[]
+    if not args.all_layer_grad:
+
+        if not cosine_dist:
+            if not all_layer:
+                existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+            else:
+                existing_new_dists = pairwise_distance_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+        else:
+            if not all_layer:
+                existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
+            else:
+                existing_new_dists = pairwise_cosine_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=False)
+    
+    else:
+        existing_new_dists = pairwise_cosine2(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+
+
+    nearset_new_valid_distance,_ = torch.min(existing_new_dists, dim = 0)
+
+    sorted_min_distance, sorted_min_sample_ids = torch.sort(nearset_new_valid_distance, descending=True)
+
+    if args.total_valid_sample_count > 0 and args.total_valid_sample_count < valid_count:
+        selected_sample_ids = sorted_min_sample_ids[0:args.total_valid_sample_count - existing_valid_count]
+    else:
+        selected_sample_ids = sorted_min_sample_ids[0:valid_count - existing_valid_count]
+
+    remaining_valid_ids = valid_ids[selected_sample_ids]
+
+
+    return remaining_valid_ids, selected_sample_ids
+
+# def get_uncovered_new_valid_ids2(args, valid_ids, new_valid_representations, existing_valid_representations, cluster_max_radius, cosine_dist = False, all_layer = False, is_cuda = False):
+    
+#     existing_valid_count = 0
+#     if all_layer:
+#         existing_valid_count = existing_valid_representations[0].shape[0]
+#         valid_count = new_valid_representations[0].shape[0]
+#     else:
+#         existing_valid_count = existing_valid_representations.shape[0]
+#         valid_count = new_valid_representations.shape[0]
+#     if not args.all_layer_grad:
+
+#         if not cosine_dist:
+#             if not all_layer:
+#                 existing_new_dists = pairwise_distance(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+#             else:
+#                 existing_new_dists = pairwise_distance_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+#         else:
+#             if not all_layer:
+#                 existing_new_dists = pairwise_cosine(existing_valid_representations, new_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
+#             else:
+#                 existing_new_dists = pairwise_cosine_ls(existing_valid_representations, new_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
+    
+#     else:
+#         existing_new_dists = pairwise_cosine2(existing_valid_representations, new_valid_representations, is_cuda=is_cuda)
+
+
+#     torch.min(existing_new_dists, dim = 0)
+
+#     uncovered_new_valid_ids = torch.nonzero(torch.sum(existing_new_dists > cluster_max_radius, dim = 1) >= existing_new_dists.shape[1])
+#     uncovered_new_valid_ids = uncovered_new_valid_ids.view(-1)
+#     # nearset_new_valid_distance,nearest_covered_new_valid_ids = torch.min(existing_new_dists, dim = 0)
+#     # nearest_covered_new_valid_ids = nearest_covered_new_valid_ids.unique()
+#     # uncovered_new_valid_ids = set(list(range(valid_count))).difference(set(nearest_covered_new_valid_ids.tolist()))
+#     # uncovered_new_valid_ids = torch.tensor(list(uncovered_new_valid_ids))
+#     if len(uncovered_new_valid_ids) <= 0:
+#         return [], [], existing_new_dists
+#     else:
+#         return uncovered_new_valid_ids, valid_ids[uncovered_new_valid_ids], existing_new_dists
+
+
+
+
+def compute_distance(args, cosine_dist, all_layer, full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda, inner_prod=False, no_abs=False, flatten = False):
+    if not cosine_dist:
+        if not all_layer:
+            existing_new_dists = pairwise_distance(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda)
+        else:
+            existing_new_dists = pairwise_distance_ls(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda)
+    else:
+        if not all_layer:
+            existing_new_dists = pairwise_cosine(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
+        else:
+            existing_new_dists = pairwise_cosine_ls(full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=inner_prod, ls_idx_range=args.origin_X_ls_lenth, no_abs=no_abs, flatten = flatten)
+    return existing_new_dists
+
+def obtain_farthest_training_samples(args, cosine_dist, all_layer, full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda):
+    
+    existing_new_dists = compute_distance(args, cosine_dist, all_layer, full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda)
+
+    min_dist_per_sample = torch.min(existing_new_dists, dim = 1)[0]
+
+    _, sorted_dist_sample_ids = torch.sort(min_dist_per_sample, descending = True)
+
+    far_sample_count = int(len(sorted_dist_sample_ids)/2)
+
+    far_sample_ids = sorted_dist_sample_ids[0:far_sample_count]
+
+    return [full_sample_representation_tensor[k][far_sample_ids] for k in range(len(full_sample_representation_tensor))], far_sample_ids
+
+
+
+def get_representative_valid_ids2_3(train_dataset, criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, validset = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False):
 
     if args.add_under_rep_samples:
         under_represent_count = int(valid_count/2)
@@ -1484,7 +2226,7 @@ def get_representative_valid_ids2_3(train_dataset, criterion, optimizer, train_l
     # sample_id_ls_by_class = dict()
     full_sim_mat1 = None
 
-    full_sample_representation_tensor, all_sample_ids = get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net)
+    full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = validset)
 
     
     if only_sample_representation:
@@ -1498,15 +2240,186 @@ def get_representative_valid_ids2_3(train_dataset, criterion, optimizer, train_l
 
     
     if cached_sample_weights is not None:
-        valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info)  
+        valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
     else:
-        valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info)  
+        valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
     
+
+    far_sample_representation_tensor = full_sample_representation_tensor
+    full_dists = compute_distance(args, args.cosin_dist, True, full_sample_representation_tensor, valid_sample_representation_tensor, args.cuda)
+    cluster_max_radius = torch.max(torch.min(full_dists, dim = 1)[0])/3*2
+    
+    while len(valid_ids) < main_represent_count - 1:
+        far_sample_representation_tensor, far_sample_ids = obtain_farthest_training_samples(args, args.cosin_dist, True, far_sample_representation_tensor, valid_sample_representation_tensor, args.cuda)
+        all_sample_ids = all_sample_ids[far_sample_ids]
+
+        curr_representation_count = valid_count - len(valid_ids)
+        if cached_sample_weights is not None:
+            new_valid_ids, new_valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = curr_representation_count, num_clusters = curr_representation_count, sample_weights=cached_sample_weights[far_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
+        else:
+            new_valid_ids, new_valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = curr_representation_count, num_clusters = curr_representation_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
+
+
+        uncovered_valid_ids, uncovered_valid_sample_ids, existing_new_dists = get_uncovered_new_valid_ids(args, new_valid_ids, new_valid_sample_representation_tensor, valid_sample_representation_tensor, cluster_max_radius, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        
+        args.logger.info("new valid sample count::%d + %d"%(len(uncovered_valid_sample_ids), len(valid_ids)))
+        if len(uncovered_valid_sample_ids) > 0:
+            uncovered_valid_sample_representations = [new_valid_sample_representation_tensor[k][uncovered_valid_ids] for k in range(len(new_valid_sample_representation_tensor))]
+            
+            print(torch.norm(full_dists[uncovered_valid_sample_ids] - existing_new_dists[uncovered_valid_ids, 0:full_dists.shape[1]]))
+            valid_ids = torch.cat([uncovered_valid_sample_ids, valid_ids])
+            valid_sample_representation_tensor = [torch.cat([valid_sample_representation_tensor[k], uncovered_valid_sample_representations[k]]) for k in range(len(valid_sample_representation_tensor))]
+    print()
+    
+    # if existing_valid_representation is not None:
+    #     uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, existing_valid_representation, valid_sample_representation_tensor, cluster_max_radius,  cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+    #     valid_ids = uncovered_valid_sample_ids
+    #     valid_sample_representation_tensor = [valid_sample_representation_tensor[k][uncovered_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+
+    # if existing_valid_representation is not None:
+    #     uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+    #     far_sample_representation_tensor = full_sample_representation_tensor
+    #     while len(uncovered_valid_ids) <= 0:
+            
+
+    #         far_sample_representation_tensor, far_sample_ids = obtain_farthest_training_samples(args, args.cosin_dist, True, far_sample_representation_tensor, existing_valid_representation, args.cuda)
+    #         all_sample_ids = all_sample_ids[far_sample_ids]
+    #         main_represent_count = valid_count - existing_valid_representation[0].shape[0]
+    #         if cached_sample_weights is not None:
+    #             valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
+    #         else:
+    #             valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
+
+    #         uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+
+    #         print()
+
+    #     valid_ids = uncovered_valid_sample_ids
+    #     valid_sample_representation_tensor = [valid_sample_representation_tensor[k][uncovered_valid_ids] for k in range(len(valid_sample_representation_tensor))]
 
     if not return_cluster_info:
         return valid_ids, valid_sample_representation_tensor
     else:
         return valid_ids, valid_sample_representation_tensor, full_sample_representation_tensor
+
+
+def get_representative_valid_ids2_4(train_dataset, criterion, optimizer, train_loader, args, net, valid_count, cached_sample_weights = None, validset = None, existing_valid_set = None, return_cluster_info = False, only_sample_representation = False):
+    
+    if args.add_under_rep_samples:
+        under_represent_count = int(valid_count/2)
+        main_represent_count = valid_count - under_represent_count
+    else:
+        under_represent_count = 0
+        main_represent_count = valid_count
+
+
+    # sample_representation_vec_ls_by_class = dict()
+    # sample_id_ls_by_class = dict()
+    full_sim_mat1 = None
+
+    full_sample_representation_tensor, all_sample_ids, existing_valid_representation = get_representations_last_layer2(train_dataset, args, train_loader, criterion, optimizer, net, validset = validset)
+
+    origin_X_ls_lenth = len(full_sample_representation_tensor)
+
+    args.origin_X_ls_lenth = origin_X_ls_lenth
+    if not args.not_rescale_features:
+        full_sample_representation_tensor = scale_and_extend_data_vector(full_sample_representation_tensor)
+
+    if only_sample_representation:
+        return full_sample_representation_tensor, existing_valid_representation
+
+
+
+    if args.cluster_no_reweighting:
+        logging.info("no reweighting for k-means")
+        cached_sample_weights = None
+    # extra_valid_ids, extra_valid_sample_representation_tensor = None, None
+    if existing_valid_representation is None:
+        if cached_sample_weights is not None:
+            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+            # if args.inner_prod:
+            #     extra_valid_ids, extra_valid_sample_representation_tensor = handle_outliers(args, all_sample_ids, full_sample_representation_tensor, valid_sample_representation_tensor, cached_sample_weights[all_sample_ids])
+        else:
+            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, full_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+        #     if args.inner_prod:
+        #         extra_valid_ids, extra_valid_sample_representation_tensor = handle_outliers(args, all_sample_ids, full_sample_representation_tensor, valid_sample_representation_tensor)
+        # if extra_valid_ids is not None and extra_valid_sample_representation_tensor is not None:
+        #     valid_ids = torch.cat([valid_ids.view(-1), extra_valid_ids.view(-1)])
+
+        #     valid_sample_representation_tensor = [torch.cat([valid_sample_representation_tensor[k], extra_valid_sample_representation_tensor[k]]) for k in range(len(extra_valid_sample_representation_tensor))]
+        far_sample_representation_tensor = full_sample_representation_tensor
+    # while len(valid_ids) < main_represent_count:
+    #     far_sample_representation_tensor, far_sample_ids = obtain_farthest_training_samples(args, args.cosin_dist, True, far_sample_representation_tensor, valid_sample_representation_tensor, args.cuda)
+    #     all_sample_ids = all_sample_ids[far_sample_ids]
+
+    #     curr_representation_count = valid_count - len(valid_ids)
+    #     if cached_sample_weights is not None:
+    #         new_valid_ids, new_valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = curr_representation_count, num_clusters = curr_representation_count, sample_weights=cached_sample_weights[far_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
+    #     else:
+    #         new_valid_ids, new_valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = curr_representation_count, num_clusters = curr_representation_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None)  
+
+
+    #     uncovered_valid_ids, uncovered_valid_sample_ids, _ = get_uncovered_new_valid_ids(args, new_valid_ids, new_valid_sample_representation_tensor, valid_sample_representation_tensor, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        
+    #     args.logger.info("new valid sample count::%d"%(len(uncovered_valid_sample_ids)))
+    #     if len(uncovered_valid_sample_ids) > 0:
+    #         uncovered_valid_sample_representations = [new_valid_sample_representation_tensor[k][uncovered_valid_ids] for k in range(len(new_valid_sample_representation_tensor))]
+    #         full_dists = compute_distance(args, args.cosin_dist, True, full_sample_representation_tensor, valid_sample_representation_tensor, args.cuda)
+    #         print(full_dists[uncovered_valid_sample_ids])
+    #         valid_ids = torch.cat([uncovered_valid_sample_ids, valid_ids])
+    #         valid_sample_representation_tensor = [torch.cat([valid_sample_representation_tensor[k], uncovered_valid_sample_representations[k]]) for k in range(len(valid_sample_representation_tensor))]
+    # print()
+    # if existing_valid_representation is not None:
+    #     uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+    #     valid_ids = uncovered_valid_sample_ids
+    #     valid_sample_representation_tensor = [valid_sample_representation_tensor[k][uncovered_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+    
+
+    # if existing_valid_representation is not None:
+    else:
+        # remaining_valid_ids, remaining_local_valid_ids = determine_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, len(valid_ids), cosine_dist=args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        # full_dists = compute_distance(args, args.cosin_dist, True, full_sample_representation_tensor, existing_valid_representation, args.cuda)
+        # cluster_max_radius = torch.max(torch.min(full_dists, dim = 1)[0])/2
+        
+        # uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cluster_max_radius, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)# get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        far_sample_representation_tensor = full_sample_representation_tensor
+        # while len(remaining_valid_ids) <= 0:
+            
+
+        far_sample_representation_tensor, far_sample_ids = obtain_farthest_training_samples(args, args.cosin_dist, True, far_sample_representation_tensor, existing_valid_representation, args.cuda)
+        all_sample_ids = all_sample_ids[far_sample_ids]
+        main_represent_count = valid_count - existing_valid_representation[0].shape[0]
+        if args.no_sample_weights_k_means:
+            valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+        else:
+            if cached_sample_weights is not None:
+                valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+            else:
+                valid_ids, valid_sample_representation_tensor = cluster_per_class(args, far_sample_representation_tensor, all_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=args.cosin_dist, is_cuda=args.cuda, all_layer=True, full_sim_mat=full_sim_mat1, return_cluster_info = return_cluster_info, existing_cluster_centroids = None, handles_outlier=False)  
+
+        curr_total_valid_count = len(valid_ids) + existing_valid_representation[0].shape[0]
+        # if curr_total_valid_count
+        if args.total_valid_sample_count > 0 and args.total_valid_sample_count < curr_total_valid_count:
+            remaining_valid_ids, remaining_valid_sample_ids, _ = get_uncovered_new_valid_ids2(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, args.total_valid_sample_count- existing_valid_representation[0].shape[0], cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+            valid_ids = remaining_valid_sample_ids
+            valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+
+        #     selected_sample_ids = sorted_min_sample_ids[0:args.total_valid_sample_count - existing_valid_count]
+        # else:
+        #     selected_sample_ids = sorted_min_sample_ids[0:valid_count - existing_valid_count]
+
+            # uncovered_valid_ids, uncovered_valid_sample_ids, max_existing_to_valid_dist = get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cluster_max_radius, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)#get_uncovered_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, cosine_dist = args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        #     remaining_valid_ids, remaining_local_valid_ids = determine_new_valid_ids(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, len(valid_ids), cosine_dist=args.cosin_dist, all_layer = True, is_cuda = args.cuda)
+        #     print()
+
+        # valid_ids = remaining_valid_ids
+        # valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_local_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+
+    if not return_cluster_info:
+        return valid_ids, valid_sample_representation_tensor
+    else:
+        return valid_ids, valid_sample_representation_tensor, full_sample_representation_tensor
+
 
 def get_representative_valid_ids3(train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None):
 
@@ -1549,10 +2462,10 @@ def get_representative_valid_ids3(train_loader, args, net, valid_count, cached_s
 
     if not args.cosin_dist:
         cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='euclidean', is_cuda=args.cuda, sample_weights=sample_weights, all_layer=args.all_layer)
+            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='euclidean', is_cuda=args.cuda, sample_weights=sample_weights, all_layer=args.all_layer, rand_init=args.rand_init)
     else:
         cluster_ids_x, cluster_centers = kmeans(
-            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='cosine', is_cuda=args.cuda, sample_weights=sample_weights, all_layer=args.all_layer)
+            X=sample_representation_vec_tensor, num_clusters=num_clusters, distance='cosine', is_cuda=args.cuda, sample_weights=sample_weights, all_layer=args.all_layer, rand_init=args.rand_init)
 
 
     if not args.cosin_dist:

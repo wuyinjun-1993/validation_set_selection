@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from tqdm import tqdm
+import sys
 
 
 def initialize(X, num_clusters, all_layer = False):
@@ -193,13 +194,63 @@ def select_samples_by_ls(X, selected, is_cuda):
     
     return selected_X
 
-def update_centroid_by_ls(selected, initial_state, selected_sample_weights, index):
+def solve_k_mean_centroids(selected, initial_state, selected_sample_weights, index, pairwise_distance_function, selected_sample_norm = None, iter = 1000, learning_rate = 0.001, batch_size = 100, is_gpu=False):
+    curr_state = [initial_state[k][index].unsqueeze(0) for k in range(len(initial_state))]
+
+    for k in range(len(curr_state)):
+        curr_state[k].requires_grad = True
+        if is_gpu:
+            curr_state[k] = curr_state[k].cuda()
+    
+    for i in range(iter):
+        if len(selected[0]) >=batch_size:
+            sub_sample_ids = np.random.choice(len(selected[0]), batch_size, replace = False)
+        else:
+            sub_sample_ids = np.array(list(range(len(selected[0]))))
+        sub_sample_ids = torch.from_numpy(sub_sample_ids)
+        sub_selected = [selected[k][sub_sample_ids] for k in range(len(selected))]
+        sub_sample_weights = None
+        if selected_sample_weights is not None:
+            sub_sample_weights = selected_sample_weights[sub_sample_ids]
+        if is_gpu:
+            sub_selected = [sub_selected[k].cuda() for k in range(len(sub_selected))]
+        
+        # if all_layer:
+        dis = pairwise_distance_function(sub_selected, curr_state, is_gpu, inner_prod= True)
+
+        if sub_sample_weights is not None:
+            full_dis = torch.sum(dis.view(-1)**2*sub_sample_weights.view(-1))/torch.sum(sub_sample_weights)
+        else:
+            full_dis = torch.mean(dis**2)
+        curr_state_grad = torch.autograd.grad(full_dis, curr_state)
+        if i % 100 == 0:
+            print("grad norm::", sum([curr_state_grad[k].norm()**2 for k in range(len(curr_state_grad))]))
+
+        curr_state = [curr_state[k] - learning_rate*curr_state_grad[k] for k in range(len(curr_state))]
+
+
+    for k in range(len(initial_state)):
+        curr_state[k] = curr_state[k].detach().cpu()
+        # curr_state[k].requires_grad = False
+        # curr_state[k] = curr_state[k].cpu()
+        initial_state[k][index] = curr_state[k]
+        # initial_state[k].requires_grad = True
+
+    return initial_state
+
+def update_centroid_by_ls(selected, initial_state, selected_sample_weights, index, selected_sample_norm = None):
     if selected_sample_weights is None:
         for k in range(len(initial_state)):
-            initial_state[k][index] = selected[k].mean(dim=0)
+            if selected_sample_norm is None:
+                initial_state[k][index] = selected[k].mean(dim=0)
+            else:
+                initial_state[k][index] = selected[k].sum(dim=0)/torch.sum(selected_sample_norm)
     else:
         for k in range(len(initial_state)):
-            initial_state[k][index] = torch.sum(selected[k]*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
+            if selected_sample_norm is None:
+                initial_state[k][index] = torch.sum(selected[k]*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
+            else:
+                initial_state[k][index] = torch.sum(selected[k]*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights.view(-1)*selected_sample_norm.view(-1))
         # initial_state[index] = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
 
 
@@ -218,9 +269,10 @@ def print_cluster_dist_info(dist):
 
     print("max dist sample to assigned cluster mean::", torch.max(min_dist_values).item())
 
-    second_min_cluster_dist, second_min_cluster_ids = torch.topk(dist, k = 2, largest=False)
+    if dist.shape[1] >= 2:
+        second_min_cluster_dist, second_min_cluster_ids = torch.topk(dist, k = 2, largest=False)
 
-    print("min dist sample to other cluster mean::", torch.min(second_min_cluster_dist[:,1]).item())
+        print("min dist sample to other cluster mean::", torch.min(second_min_cluster_dist[:,1]).item())
 
 
 def rescale_dist_by_cluster_mean_norm(dist, cluster_mean_ls, all_layer = False):
@@ -235,6 +287,87 @@ def rescale_dist_by_cluster_mean_norm(dist, cluster_mean_ls, all_layer = False):
 
     return dist
 
+
+def kmeans_init(data, num_clusters, distance, all_layer,is_cuda, weight_by_norm = False, inner_prod = False, ls_idx_range=None):
+    centroids = []
+    
+    if not all_layer:
+        num_samples = data.shape[0]
+        rand_sampled_id = np.random.randint(
+            data.shape[0])
+        centroids.append(data[rand_sampled_id, :])
+    else:
+        num_samples = data[0].shape[0]
+        rand_sampled_id = np.random.randint(
+            data[0].shape[0])
+        centroids.extend([data[k][rand_sampled_id:rand_sampled_id+1, :] for k in range(len(data))])
+    # plot(data, np.array(centroids))
+  
+    ## compute remaining k - 1 centroids
+    for c_id in range(num_clusters - 1):
+         
+        ## initialize a list to store distances of data
+        ## points from nearest centroid
+        # dist = []
+        if all_layer:
+            full_dist = distance(data, centroids,is_cuda, weight_by_norm=weight_by_norm, inner_prod= inner_prod, ls_idx_range=ls_idx_range)
+        else:
+            full_dist = distance(data, centroids,is_cuda, weight_by_norm=weight_by_norm)
+
+
+        # full_dist = distance(data, centroids, is_cuda, weight_by_norm = weight_by_norm, inner_prod = inner_prod, ls_idx_range = ls_idx_range)
+        dist = torch.min(full_dist, dim = 1)[0]
+        # for i in range(num_samples):
+        #     if not all_layer:
+        #         point = data[i, :]
+        #     else:
+        #         point =[data[s_id][i, :] for s_id in range(len(data))]
+        #     d = sys.maxsize
+
+            
+        #     ## compute distance of 'point' from each of the previously
+        #     ## selected centroid and store the minimum distance
+        #     for j in range(len(centroids)):
+        #         temp_dist = distance(point, centroids[j])
+        #         d = min(d, temp_dist)
+        #     dist.append(d)
+             
+        # ## select data point with maximum distance as our next centroid
+        # dist = np.array(dist)
+        max_dis_sample_id = torch.argmax(dist)
+        if not all_layer:
+            next_centroid = data[max_dis_sample_id, :]
+            centroids.append(next_centroid)
+        else:
+            next_centroid = [data[k][max_dis_sample_id:max_dis_sample_id+1, :] for k in range(len(data))]
+            centroids = [torch.cat([centroids[k],next_centroid[k]]) for k in range(len(next_centroid))]
+
+
+        dist = []
+        # plot(data, np.array(centroids))
+    if not all_layer:
+        return torch.stack(centroids, dim=0)
+    else:
+        return centroids
+   
+def scale_and_extend_data_vector(X):
+    X_norms = torch.sqrt(torch.stack([torch.norm(X[k],dim=1).view(-1)**2 for k in range(len(X))], dim =1))
+    X_max_norm = torch.max(X_norms)*2
+
+    scaled_X = [X[k]/X_max_norm for k in range(len(X))]
+
+    scaled_X_norms = torch.sum(torch.stack([torch.norm(scaled_X[k],dim=1).view(-1)**2 for k in range(len(scaled_X))], dim =1),dim=1)
+
+    extend_X = []
+
+    for l in range(1,10):
+        extend_X.append((0.5-scaled_X_norms**(l)).unsqueeze(1))
+
+    scaled_X.extend(extend_X)
+
+    return scaled_X
+
+
 def kmeans(
         # args,
         X,
@@ -244,10 +377,16 @@ def kmeans(
         is_cuda=False,
         sample_weights = None,
         existing_cluster_mean_ls = None,
-        total_iter_count=1000,
+        total_iter_count=200,
         all_layer = False,
         agg_sim_array = 'mean',
-        weight_by_norm = False
+        weight_by_norm = False,
+        inner_prod = False,
+        k_means_lr = 0.001,
+        k_means_epochs = 100,
+        k_means_bz = 128,
+        origin_X_ls_lenth = -1,
+        rand_init = False
 ):
     """
     perform kmeans
@@ -268,7 +407,6 @@ def kmeans(
             pairwise_distance_function = pairwise_distance
         else:
             pairwise_distance_function = pairwise_distance_ls
-
     elif distance == 'cosine':
         if not all_layer:
             pairwise_distance_function = pairwise_cosine
@@ -289,6 +427,8 @@ def kmeans(
         for idx in range(len(X)):
             X[idx] = X[idx].float()
 
+    
+
     if weight_by_norm:
         if not all_layer:
             sample_norm_ls = torch.norm(X,dim=1)
@@ -301,11 +441,11 @@ def kmeans(
     if sample_weights is not None:
         curr_sample_weights = sample_weights.clone()
 
-    if weight_by_norm:
-        if curr_sample_weights is None:
-            curr_sample_weights = sample_norm_ls.clone()
-        else:
-            curr_sample_weights = (sample_norm_ls*sample_weights).clone()
+    # if weight_by_norm:
+    #     if curr_sample_weights is None:
+    #         curr_sample_weights = sample_norm_ls.clone()
+    #     else:
+    #         curr_sample_weights = (sample_norm_ls*sample_weights).clone()
     # transfer to device
     # if args.cuda:
     #     X = X.cuda()
@@ -313,7 +453,10 @@ def kmeans(
     #     X = X.cuda()
 
     # initialize
-    initial_state = initialize(X, num_clusters, all_layer = all_layer)
+    if rand_init:
+        initial_state = initialize(X, num_clusters, all_layer = all_layer)
+    else:
+        initial_state = kmeans_init(X, num_clusters, pairwise_distance_function, all_layer, is_cuda, weight_by_norm=weight_by_norm, inner_prod=inner_prod, ls_idx_range=origin_X_ls_lenth)
     if is_cuda:
         if not all_layer:
             initial_state = initial_state.cuda()
@@ -332,12 +475,12 @@ def kmeans(
             full_centroid_state = torch.cat([existing_cluster_mean_ls, full_centroid_state], dim = 0)
 
         if all_layer:
-            dis = pairwise_distance_function(X, full_centroid_state,is_cuda, agg = agg_sim_array)
+            dis = pairwise_distance_function(X, full_centroid_state,is_cuda, agg = agg_sim_array, weight_by_norm=weight_by_norm, inner_prod= inner_prod, ls_idx_range=origin_X_ls_lenth)
         else:
-            dis = pairwise_distance_function(X, full_centroid_state,is_cuda)
+            dis = pairwise_distance_function(X, full_centroid_state,is_cuda, weight_by_norm=weight_by_norm)
 
-        if weight_by_norm:
-            dis = rescale_dist_by_cluster_mean_norm(dis, full_centroid_state, all_layer)
+        # if weight_by_norm:
+        #     dis = rescale_dist_by_cluster_mean_norm(dis, full_centroid_state, all_layer)
 
         choice_cluster = torch.argmin(dis, dim=1)
 
@@ -349,7 +492,13 @@ def kmeans(
         
 
         for index in range(num_clusters):
-            selected = torch.nonzero(choice_cluster == index).squeeze()
+            selected = torch.nonzero(choice_cluster == index).view(-1)
+            selected_sample_norm = None
+            if sample_norm_ls is not None:
+                selected_sample_norm = sample_norm_ls[selected]
+
+                if is_cuda:
+                    selected_sample_norm = selected_sample_norm.cuda()
             if torch.sum(choice_cluster == index) <= 0:
                 continue
 
@@ -364,24 +513,37 @@ def kmeans(
 
                 if is_cuda:
                     selected_sample_weights = selected_sample_weights.cuda()
-            # selected = torch.index_select(X, 0, selected)
-            if not all_layer:
-                selected = X[selected]
-                if is_cuda:
-                    selected = selected.cuda()
 
-                if selected_sample_weights is None:
-                    selected_state = selected.mean(dim=0)
-                else:
-                    selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
-                if is_cuda:
-                    selected_state = selected_state.cuda()
-
-                initial_state[index] = selected_state
-            else:
+            if inner_prod:
                 selected = select_samples_by_ls(X, selected, is_cuda)
-            
-                update_centroid_by_ls(selected, initial_state, selected_sample_weights, index)
+                initial_state = solve_k_mean_centroids(selected, initial_state, selected_sample_weights, index, pairwise_distance_function, selected_sample_norm = selected_sample_norm, iter = k_means_epochs, learning_rate = k_means_lr, batch_size = k_means_bz, is_gpu=is_cuda)
+            else:
+                # selected = torch.index_select(X, 0, selected)
+                if not all_layer:
+                    selected = X[selected]
+                    if is_cuda:
+                        selected = selected.cuda()
+                        if selected_sample_weights is not None:
+                            selected_sample_weights = selected_sample_weights.cuda()
+
+                    if selected_sample_weights is None:
+                        if selected_sample_norm is None:
+                            selected_state = selected.mean(dim=0)
+                        else:
+                            selected_state = selected.sum(dim=0)/torch.sum(selected_sample_norm)
+                    else:
+                        if selected_sample_norm is None:
+                            selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
+                        else:
+                            selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights.view(-1)*selected_sample_norm.view(-1))
+                    if is_cuda:
+                        selected_state = selected_state.cuda()
+
+                    initial_state[index] = selected_state
+                else:
+                    selected = select_samples_by_ls(X, selected, is_cuda)
+                
+                    update_centroid_by_ls(selected, initial_state, selected_sample_weights, index, selected_sample_norm)
             
 
         if not all_layer:
@@ -407,6 +569,13 @@ def kmeans(
             break
     
     print_cluster_dist_info(dis)
+    
+    if all_layer:
+        no_abs_dis = pairwise_distance_function(X, full_centroid_state,is_cuda, agg = agg_sim_array, weight_by_norm=weight_by_norm, inner_prod= inner_prod, ls_idx_range=origin_X_ls_lenth, no_abs = True)
+    else:
+        no_abs_dis = pairwise_distance_function(X, full_centroid_state,is_cuda, weight_by_norm=weight_by_norm, no_abs = True)
+
+
     if not all_layer:
         return choice_cluster.cpu(), initial_state.cpu()
     else:
@@ -948,7 +1117,8 @@ def pairwise_distance_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, a
 
     return full_dist_tensor
 
-def pairwise_distance(data1, data2, is_cuda=False, batch_size = 128):
+def pairwise_distance(data1, data2, is_cuda=False, batch_size = 128,
+        weight_by_norm=False):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     if is_cuda:
@@ -982,7 +1152,7 @@ def pairwise_distance(data1, data2, is_cuda=False, batch_size = 128):
     return dis
 
 
-def pairwise_cosine(data1, data2, is_cuda=False,  batch_size = 128):
+def pairwise_cosine(data1, data2, is_cuda=False,  batch_size = 128, weight_by_norm = False):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     if is_cuda:
@@ -1005,14 +1175,55 @@ def pairwise_cosine(data1, data2, is_cuda=False,  batch_size = 128):
         if is_cuda:
             curr_A = curr_A.cuda()
         curr_A_normalized = curr_A / curr_A.norm(dim=-1, keepdim=True)
-        B_normalized = B / B.norm(dim=-1, keepdim=True)
-        curr_cosine = curr_A_normalized * B_normalized    
+        if not weight_by_norm:
+            B_normalized = B / B.norm(dim=-1, keepdim=True)
+            curr_cosine = curr_A_normalized * B_normalized    
+        else:
+            curr_cosine = curr_A_normalized * B
         curr_cosine_dis = 1 - torch.abs(curr_cosine.sum(dim=-1)).squeeze(1)
         full_dist_ls.append(curr_cosine_dis)
 
     full_dist_tensor = torch.cat(full_dist_ls)
 
     return full_dist_tensor
+
+
+def pairwise_cosine_no_abs(data1, data2, is_cuda=False,  batch_size = 128, weight_by_norm = False):
+    # transfer to device
+    # data1, data2 = data1.to(device), data2.to(device)
+    if is_cuda:
+        data2 = data2.cuda()
+
+    # N*1*M
+    A = data1.unsqueeze(dim=1)
+
+    # 1*N*M
+    B = data2.unsqueeze(dim=0)
+
+    full_dist_ls = []
+
+    for start_id in range(0, A.shape[0], batch_size):
+        end_id = start_id + batch_size
+        if end_id > A.shape[0]:
+            end_id = A.shape[0]
+
+        curr_A = A[start_id: end_id]
+        if is_cuda:
+            curr_A = curr_A.cuda()
+        curr_A_normalized = curr_A / curr_A.norm(dim=-1, keepdim=True)
+        if not weight_by_norm:
+            B_normalized = B / B.norm(dim=-1, keepdim=True)
+            curr_cosine = curr_A_normalized * B_normalized    
+        else:
+            curr_cosine = curr_A_normalized * B
+        curr_cosine_dis =  - curr_cosine.sum(dim=-1).squeeze(1)
+        full_dist_ls.append(curr_cosine_dis)
+
+    full_dist_tensor = torch.cat(full_dist_ls)
+
+    return full_dist_tensor
+
+
 
 
 def pairwise_cross_prod(data1, data2, is_cuda=False,  batch_size = 128):
@@ -1233,7 +1444,123 @@ def pairwise_cosine_full_by_sample_ids(full_cosin_sim, sample_ids_ls, is_cuda=Fa
 
 
 
-def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg = 'mean'):
+def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg = 'mean', ls_idx_range=-1, weight_by_norm=False, inner_prod = False, no_abs = False, full_inner_prod=False, flatten = False):
+
+    if ls_idx_range < 0:
+        ls_idx_range = len(data1_ls)
+    # transfer to device
+    # data1, data2 = data1.to(device), data2.to(device)
+    B_ls = []
+    vec_norm_ls2 = []
+    for idx in range(ls_idx_range):
+        data2 = data2_ls[idx].unsqueeze(dim=0)
+        if is_cuda:
+            data2 = data2.cuda()
+        B_ls.append(data2)
+        vec_norm_ls2.append(data2.norm(dim=-1)**2)
+
+    A_ls = []
+    for idx in range(ls_idx_range):
+        data1 = data1_ls[idx].unsqueeze(dim=1)
+        A_ls.append(data1)
+
+    # A_norm_ls = torch.sum(torch.cat([(data1_ls[k].view(data1_ls[k].shape[0], -1).norm(dim=-1)).view(-1)**2 for k in range(len(data1_ls))]))
+    A_norm_ls = torch.sum(torch.stack([torch.norm(data1_ls[k],dim=1).view(-1)**2 for k in range(len(data1_ls))], dim =1),dim=1)
+
+    if inner_prod:
+        A_max = 0
+        A_min = np.inf
+
+    # if is_cuda:
+    #     data2 = data2.cuda()
+
+    # N*1*M
+    # A = data1.unsqueeze(dim=1)
+
+    # # 1*N*M
+    # B = data2.unsqueeze(dim=0)
+
+    full_dist_ls = []
+
+    for start_id in range(0, A_ls[0].shape[0], batch_size):
+        end_id = start_id + batch_size
+        if end_id > A_ls[0].shape[0]:
+            end_id = A_ls[0].shape[0]
+        
+        inner_prod_ls = []
+        vec_norm_ls1 = A_norm_ls[start_id:end_id]
+        
+        # cosine_dis_ls = []
+        for idx in range(ls_idx_range):
+            curr_A = A_ls[idx][start_id: end_id]
+            if is_cuda:
+                curr_A = curr_A.cuda()
+                vec_norm_ls1 = vec_norm_ls1.cuda()
+
+            B = B_ls[idx]
+            curr_inner_prod = (curr_A*B).sum(dim=-1)
+            inner_prod_ls.append(curr_inner_prod)
+            # vec_norm_ls1.append(curr_A.norm(dim=-1)**2)
+            
+
+
+            # curr_A_normalized = curr_A / curr_A.norm(dim=-1, keepdim=True)
+            
+            # B_normalized = B / B.norm(dim=-1, keepdim=True)
+            # curr_cosine = curr_A_normalized * B_normalized    
+            # curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1))
+            # cosine_dis_ls.append(curr_cosine_dis)
+        if flatten:
+            total_cosin_ls = torch.stack(inner_prod_ls, dim = 1)
+        else:
+            total_cosin_ls = torch.sum(torch.stack(inner_prod_ls, dim = 1), dim=1)
+
+        if inner_prod:
+            if no_abs:
+                max_cosine_sim = total_cosin_ls
+            else:
+                max_cosine_sim = torch.abs(total_cosin_ls)
+            A_max = max(A_max, torch.max(max_cosine_sim).detach().item())
+            A_min = min(A_min, torch.min(max_cosine_sim).detach().item())
+        else:
+
+            if not weight_by_norm:
+                # total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
+                total_norm_ls = torch.sqrt(vec_norm_ls1.view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
+                if full_inner_prod:
+                    max_cosine_sim = torch.abs(total_cosin_ls)
+                else:
+                    max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
+            else:
+                total_norm_ls = torch.sqrt(vec_norm_ls1.view(-1).unsqueeze(1)*torch.ones_like(torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1)).unsqueeze(0))
+                if full_inner_prod:
+                    max_cosine_sim = torch.abs(total_cosin_ls)
+                else:
+                    max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
+        # if agg == 'mean':
+        # max_cosine_sim = torch.mean(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
+        # else:
+        #     if agg == 'min':
+        #         max_cosine_sim = torch.min(torch.stack(cosine_dis_ls, dim = 1), dim = 1)[0]
+        #     else:
+        #         raise NotImplementedError
+        if full_inner_prod:
+            final_cosine_dis = max_cosine_sim
+        else:
+            if not inner_prod:
+                final_cosine_dis = 1 - max_cosine_sim
+            else:
+                final_cosine_dis = max_cosine_sim
+        full_dist_ls.append(final_cosine_dis)
+
+    full_dist_tensor = torch.cat(full_dist_ls)
+    # if inner_prod:
+    #     full_dist_tensor = (A_max + full_dist_tensor)/(A_max-A_min+0.0001)
+
+    return full_dist_tensor
+
+
+def pairwise_cosine_ls_no_abs(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg = 'mean', weight_by_norm=False):
     # transfer to device
     # data1, data2 = data1.to(device), data2.to(device)
     B_ls = []
@@ -1287,8 +1614,13 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg
             # curr_cosine_dis = torch.abs(curr_cosine.sum(dim=-1))
             # cosine_dis_ls.append(curr_cosine_dis)
         total_cosin_ls = torch.sum(torch.stack(inner_prod_ls, dim = 1), dim=1)
-        total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
-        max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
+
+        if not weight_by_norm:
+            total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
+            max_cosine_sim = total_cosin_ls/total_norm_ls
+        else:
+            total_norm_ls = torch.sqrt(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1).unsqueeze(1)*torch.ones_like(torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1)).unsqueeze(0))
+            max_cosine_sim = total_cosin_ls/total_norm_ls
         # if agg == 'mean':
         # max_cosine_sim = torch.mean(torch.stack(cosine_dis_ls, dim = 1), dim = 1)
         # else:
@@ -1296,12 +1628,13 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 128, agg
         #         max_cosine_sim = torch.min(torch.stack(cosine_dis_ls, dim = 1), dim = 1)[0]
         #     else:
         #         raise NotImplementedError
-        final_cosine_dis = 1 - max_cosine_sim
+        final_cosine_dis = - max_cosine_sim
         full_dist_ls.append(final_cosine_dis)
 
     full_dist_tensor = torch.cat(full_dist_ls)
 
     return full_dist_tensor
+
 
 
 
