@@ -28,7 +28,7 @@ import collections
 from models.LeNet5 import *
 import models.TAVAAL
 
-from torchvision.models import resnet34, ResNet34_Weights
+import torchvision.models
 
 cached_model_name="cached_model"
 pretrained_model_name="pretrained_model"
@@ -1098,7 +1098,7 @@ def main2(args, logger):
         
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset == 'retina':
-        pretrained_rep_net = resnet34(weights=ResNet34_Weights.IMAGENET1K_V1).cuda()
+        pretrained_rep_net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
         pretrained_rep_net.fc = nn.Linear(512, 5)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
         pretrained_rep_net.eval()
@@ -1258,7 +1258,7 @@ def main2(args, logger):
             else:
                 net = resnet34(num_classes=100)
     elif args.dataset == 'retina':
-        net = resnet34(weights=ResNet34_Weights.IMAGENET1K_V1).cuda()
+        net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
         for param in net.conv1.parameters():
             param.requires_grad = False
         for param in net.layer1.parameters():
