@@ -17,15 +17,17 @@ from PIL import Image
 import numpy
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from datasets.sst import *
-from datasets.imdb import *
-from datasets.trec import *
+# from datasets.sst import *
+# from datasets.imdb import *
+# from datasets.trec import *
+from sklearn.model_selection import train_test_split
+import pandas as pd
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
 # process.
-torch.manual_seed(42)
-random.seed(42)
-numpy.random.seed(42)
+torch.manual_seed(0)
+random.seed(0)
+numpy.random.seed(0)
 
 class GaussianBlur(object):
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
@@ -37,6 +39,40 @@ class GaussianBlur(object):
         sigma = random.uniform(self.sigma[0], self.sigma[1])
         x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
         return x
+
+
+class RetinaDataset(Dataset):
+    def __init__(self, df):
+        transform = transforms.Compose([
+            transforms.Resize((256,256)),
+            transforms.ToTensor(),
+        ])
+        self.df = df
+        self.transform = transform
+        self.targets = torch.tensor(df['level'].values)
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, index):
+        img = Image.open(self.df.iloc[index].image)
+
+        if(self.transform):
+            img = self.transform(img)
+
+        return (index, img, self.targets[index])
+
+    @staticmethod
+    def get_subset_dataset(dataset, sample_ids, labels=None):
+        subset_df = dataset.df.iloc[sample_ids]
+        subset_dataset = RetinaDataset(subset_df)
+        subset_dataset.targets = dataset.targets[sample_ids]
+        return subset_dataset
+
+    @staticmethod
+    def to_cuda(data, targets):
+        return data.cuda(), targets.cuda()
+
 
 class dataset_wrapper(Dataset):
     def __init__(self, data_tensor, label_tensor, transform, three_imgs = False, two_imgs = False):
@@ -988,7 +1024,7 @@ def evaluate_dataset_with_basic_models(args, dataset, model, criterion):
 
     model.load_state_dict(curr_model_state)
 
-def randomly_produce_valid_set(testset, transform_test, rate = 0.1):
+def randomly_produce_valid_set(testset, rate = 0.1):
     rand_test_ids = torch.randperm(testset.__len__())
 
     selected_valid_count = int(len(rand_test_ids)*rate)
@@ -1067,14 +1103,14 @@ def generate_class_biased_dataset(trainset, args, logger, testset, origin_labels
     return trainset, origin_labels
 
 
-def generate_noisy_dataset(args, trainset):
+def generate_noisy_dataset(args, trainset, logger):
     flipped_labels = None
-    logging.info("add errors to train set")
+    logger.info("add errors to train set")
 
     # train_dataset, _ = random_flip_labels_on_training(train_loader.dataset, ratio = args.err_label_ratio)
     # flipped_labels = obtain_flipped_labels(train_dataset, args)
     if not args.load_dataset:
-        logging.info("Not loading dataset")
+        logger.info("Not loading dataset")
         if args.adversarial_flip:
             flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
         elif args.biased_flip:
@@ -1086,7 +1122,7 @@ def generate_noisy_dataset(args, trainset):
             experiment_tag(args) + "_flipped_labels"),
         )
     else:
-        logging.info("Loading dataset")
+        logger.info("Loading dataset")
         flipped_label_dir = os.path.join(
             args.data_dir,
             experiment_tag(args) + "_flipped_labels",
@@ -1100,6 +1136,7 @@ def generate_noisy_dataset(args, trainset):
                 flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
             torch.save(flipped_labels, flipped_label_dir)
         flipped_labels = torch.load(flipped_label_dir)
+    logger.info("Label accuracy: %f"%(torch.sum(flipped_labels == torch.tensor(trainset.df['level'].values)) / len(trainset.targets)))
     trainset.targets = flipped_labels
     return trainset
 
@@ -1117,10 +1154,12 @@ def get_dataloader_for_meta(
     validset = None
     testset = None
     if args.load_dataset:
+        logger.info("Loading dataset")
         trainset, validset, metaset, origin_labels = load_train_valid_set(args)
         testset = load_test_set(args)    
 
     else:
+        logger.info("Not loading dataset")
         if args.dataset == 'cifar10':
             transform_train_list = [
                 transforms.RandomCrop(32, padding=4),
@@ -1187,6 +1226,16 @@ def get_dataloader_for_meta(
                 trainset = dataset_wrapper(trainset.data.clone(), trainset.targets.clone(), transform_train)
                 testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
                 origin_labels = trainset.targets.clone()
+
+        elif args.dataset == 'retina':
+            df = pd.read_csv(args.data_dir + "/diabetic-retinopathy-detection/trainLabels.csv")
+            df['image'] = df['image'].apply(lambda x: args.data_dir + "/diabetic-retinopathy-detection/train/" + x + ".jpeg")
+            df['eye'] = df['image'].map(lambda x: 1 if x.split('_')[-1]=='left' else 0)
+            train_df, test_df = train_test_split(df, test_size=0.2, stratify=df['level'])
+
+            trainset = RetinaDataset(train_df)
+            testset = RetinaDataset(test_df)
+            origin_labels = trainset.targets.clone()
 
         elif args.dataset == 'MNIST':
             transform_train = torchvision.transforms.Compose([
@@ -1290,11 +1339,12 @@ def get_dataloader_for_meta(
     remaining_origin_labels = origin_labels
 
     if args.do_train:
+        logger.info("Do train")
         if args.bias_classes:
             trainset, remaining_origin_labels = generate_class_biased_dataset(trainset,
                     args, logger, testset, remaining_origin_labels)
         if args.flip_labels:
-            trainset = generate_noisy_dataset(args, trainset)
+            trainset = generate_noisy_dataset(args, trainset, logger)
     else:
         if args.continue_label:
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
@@ -1321,7 +1371,7 @@ def get_dataloader_for_meta(
         args.logger.info("unique label count in meta set::%d"%(unique_labels_count))
         
     if validset is None:
-        validset, testset = randomly_produce_valid_set(testset, transform_test, rate = 0.1)
+        validset, testset = randomly_produce_valid_set(testset, rate = 0.1)
 
     cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
     cache_test_set(args, testset)
@@ -1349,7 +1399,7 @@ def get_dataloader_for_meta(
     trainloader = DataLoader(
         trainset,
         batch_size=args.batch_size,
-        num_workers=0, #args.num_workers,
+        num_workers=4*4, #args.num_workers,
         pin_memory=True,
         shuffle=False,
         sampler=train_sampler,
