@@ -17,7 +17,11 @@ epochs=200
 add_valid_in_training_set=true
 lr_decay=true
 warm_up_valid_count=10
+model_prov_period=20
 
 
 valid_ratio_each_run=100 #$(( total_valid_ratio / repeat_times ))
+bias_flip=true
+method="certain"
+total_valid_sample_count=200
 
