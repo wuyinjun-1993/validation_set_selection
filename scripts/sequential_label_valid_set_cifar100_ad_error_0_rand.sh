@@ -84,9 +84,6 @@ output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_r
 
 
 echo "${exe_cmd} > ${output_file_name}"
-
-
-#${exe_cmd} > ${output_file_name} 2>&1
 cmd
 
 exe_cmd="python -m torch.distributed.launch \
@@ -103,7 +100,7 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_certain_seq_select_0/ \
+  --save_path ${save_path_prefix}_rand_select_0/ \
   --prev_save_path ${save_path_root_dir}/biased_error_${err_label_ratio}_warmup/ \
   --continue_label \
   --cuda \
@@ -115,7 +112,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_certain_select_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_rand_select_0.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -127,8 +124,8 @@ mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
 
 echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
-
 <<cmd
+
 #for k in {1..${repeat_times}}
 for (( k=1; k<=repeat_times; k++ ))
 do

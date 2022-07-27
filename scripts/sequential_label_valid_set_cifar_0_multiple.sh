@@ -19,17 +19,20 @@ batch_size=${11}
 test_batch_size=${12}
 epochs=${13}
 #cached_model_name=${14}
-add_valid_in_training_set=${14}
-lr_decay=${15}
+
+
 
 valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 
-save_path_prefix=${save_path_root_dir}/rand_error_${err_label_ratio}_valid_select
+save_path_prefix=${save_path_root_dir}/rand_error_${err_label_ratio}
 
+gpu_id_ls=(1 2 3)
+
+port_num_ls=(10001 10002 10005)
 
 total_valid_sample_count=100
 
-export CUDA_VISIBLE_DEVICES=${gpu_ids}
+export CUDA_VISIBLE_DEVICES=${gpu_id_ls[0]}
 echo CUDA_VISIBLE_DEVICES::${CUDA_VISIBLE_DEVICES}
 
 echo "initial cleaning"
@@ -37,29 +40,20 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_three --cosin_dist --weight_by_norm --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
+#add_valid_in_training_flag="--cluster_method_three --cosin_dist --weight_by_norm --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count}"
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
-<<cmd
-if (( add_valid_in_training_set == true ))
-then
-        add_valid_in_training_flag="--cluster_method_two"
-fi
-
-lr_decay_flag=""
-if (( lr_decay == true  ))
-then
-	lr_decay_flag="--lr_decay"
-fi
-
-echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
-cmd
 
 
+
+repeat_num=1
+
+for (( i=1 ; i <= repeat_num; i++ ))
+do
 
 exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
-  --master_port ${port_num} \
+  --master_port ${port_num_ls[0]} \
   main_train.py \
   --nce-t 0.07 \
   --nce-k 200 \
@@ -69,9 +63,9 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_do_train/ \
+  --save_path ${save_path_prefix}_do_train_${i}/ \
   --cuda \
-  --lr 0.02 \
+  --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
@@ -79,7 +73,7 @@ exe_cmd="python -m torch.distributed.launch \
   --do_train"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_${i}.txt
 
 
 echo "${exe_cmd} > ${output_file_name}"
@@ -88,12 +82,16 @@ echo "${exe_cmd} > ${output_file_name}"
 #${exe_cmd} > ${output_file_name} 2>&1
 
 
+echo "random sampling"
+
+
+add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count}"
+
 exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
   main_train.py \
   --load_dataset \
-  --select_valid_set \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
@@ -101,8 +99,8 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr 5 \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_seq_select_0/ \
-  --prev_save_path ${save_path_prefix}_do_train/ \
+  --save_path ${save_path_prefix}_rand_select_0_${i}/ \
+  --prev_save_path ${save_path_prefix}_do_train_${i}/ \
   --cuda \
   --lr ${lr} \
   --batch_size ${batch_size} \
@@ -112,59 +110,46 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_all_rand.txt
+output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_rand_select_0_${i}.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
-${exe_cmd} > ${output_file_name} 2>&1 
-
-mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
-
-#cp ${save_path_prefix}_seq_select_0/* ${save_path_prefix}_no_reweighting_seq_select_0/
+#${exe_cmd} > ${output_file_name} 2>&1 &
 
 
-echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
+
+echo "clustering method two"
+
+cd ../../scripts/
+
+args="${dataset_name} ${data_dir} ${save_path_root_dir} ${output_dir} ${gpu_id_ls[1]} ${valid_ratio_each_run}  1 ${port_num_ls[1]} ${meta_lr} ${lr} ${batch_size} ${test_batch_size} ${epochs} ${save_path_prefix} ${total_valid_sample_count} ${lr_decay_flag} $i ${err_label_ratio}"
+
+echo "bash run_cluster_method_two.sh ${args} > ${save_path_root_dir}/output_cluster_method_two_${i}.txt"
+
+bash run_cluster_method_two.sh  ${dataset_name} ${data_dir} ${save_path_root_dir} ${output_dir} ${gpu_id_ls[1]} ${valid_ratio_each_run}  1 ${port_num_ls[1]} ${meta_lr} ${lr} ${batch_size} ${test_batch_size} ${epochs} ${save_path_prefix} ${total_valid_sample_count} "${lr_decay_flag}" $i ${err_label_ratio} > ${save_path_root_dir}/output_cluster_method_two_${i}.txt 2>&1 & 
 
 
-#for k in {1..${repeat_times}}
-for (( k=1; k<=repeat_times; k++ ))
-do
+echo "cluster method three"
 
-	exe_cmd="python -m torch.distributed.launch \
-    --nproc_per_node 1 \
-    --master_port ${port_num} \
-    main_train.py \
-    --load_dataset \
-    --select_valid_set \
-    --continue_label \
-    --load_cached_weights \
-    --cached_sample_weights_name cached_sample_weights \
-    --nce-t 0.07 \
-    --nce-k 200 \
-    --data_dir ${data_dir} \
-    --dataset ${dataset_name} \
-    --valid_count ${valid_ratio_each_run} \
-    --meta_lr ${meta_lr} \
-    --not_save_dataset \
-    --flip_labels \
-    --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_$k/ \
-    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
-    --cuda \
-    --lr ${lr} \
-    --batch_size ${batch_size} \
-    --test_batch_size ${test_batch_size} \
-    --epochs ${epochs} \
-    ${add_valid_in_training_flag} \
-	${lr_decay_flag}"
+args="${dataset_name} ${data_dir} ${save_path_root_dir} ${output_dir} ${gpu_id_ls[2]} ${valid_ratio_each_run}  1 ${port_num_ls[2]} ${meta_lr} ${lr} ${batch_size} ${test_batch_size} ${epochs} ${save_path_prefix} ${total_valid_sample_count} ${lr_decay_flag} $i ${err_label_ratio}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_$k.txt
 
-	echo "${exe_cmd} > ${output_file_name}"
-	
-	${exe_cmd} > ${output_file_name} 2>&1 
-	
+echo "bash run_cluster_method_three.sh ${args} > ${save_path_root_dir}/output_cluster_method_three_${i}.txt 2>&1"
+
+
+bash run_cluster_method_three.sh ${dataset_name} ${data_dir} ${save_path_root_dir} ${output_dir} ${gpu_id_ls[2]} ${valid_ratio_each_run}  1 ${port_num_ls[2]} ${meta_lr} ${lr} ${batch_size} ${test_batch_size} ${epochs} ${save_path_prefix} ${total_valid_sample_count} "${lr_decay_flag}" $i ${err_label_ratio} > ${save_path_root_dir}/output_cluster_method_three_${i}.txt 2>&1 &
+
+
+cd ../src/main/
+
+wait
+
 done
+
+
+
+
+
 
 
 

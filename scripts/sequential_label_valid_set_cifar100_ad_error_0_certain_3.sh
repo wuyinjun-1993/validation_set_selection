@@ -103,7 +103,7 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_certain_seq_select_0/ \
+  --save_path ${save_path_prefix}_certain_seq_select_0_3/ \
   --prev_save_path ${save_path_root_dir}/biased_error_${err_label_ratio}_warmup/ \
   --continue_label \
   --cuda \
@@ -115,20 +115,18 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_certain_select_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_certain_select_0_3.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
 ${exe_cmd} > ${output_file_name} 2>&1 
-
-mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
 #cp ${save_path_prefix}_seq_select_0/* ${save_path_prefix}_no_reweighting_seq_select_0/
 
 
 echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
 
-<<cmd
+
 #for k in {1..${repeat_times}}
 for (( k=1; k<=repeat_times; k++ ))
 do
@@ -152,8 +150,8 @@ do
     --not_save_dataset \
     --flip_labels \
     --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_certain_seq_select_$k/ \
-    --prev_save_path ${save_path_prefix}_certain_seq_select_$(( k - 1 ))/ \
+    --save_path ${save_path_prefix}_certain_seq_select_${k}_3/ \
+    --prev_save_path ${save_path_prefix}_certain_seq_select_$(( k - 1 ))_3/ \
     --cuda \
     --lr ${lr} \
     --batch_size ${batch_size} \
@@ -162,13 +160,10 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_certain_select_$k.txt
+	output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_certain_select_${k}_3.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	
 	${exe_cmd} > ${output_file_name} 2>&1 
 	
 done
-
-
-cmd
