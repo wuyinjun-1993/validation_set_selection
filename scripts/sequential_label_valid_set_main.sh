@@ -136,7 +136,7 @@ exe_cmd="python -m torch.distributed.launch \
 "
 
 
-output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_do_train_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_${method}_do_train_0.txt
 
 
 echo "${exe_cmd} > ${output_file_name}"
