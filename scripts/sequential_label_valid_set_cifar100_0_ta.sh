@@ -37,7 +37,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_two --cluster_method_two_plus --not_rescale_features --weight_by_norm  --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --cluster_method_two_sampling --remove_empty_clusters --no_sample_weights_k_means"
+add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count}"
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -94,7 +94,7 @@ exe_cmd="python -m torch.distributed.launch \
   --master_port ${port_num} \
   main_train.py \
   --load_dataset \
-  --select_valid_set \
+  --ta_vaal_train \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
@@ -102,8 +102,8 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_seq_select_0_2/ \
-  --prev_save_path  ${save_path_root_dir}/rand_error_${err_label_ratio}_warmup/\
+  --save_path ${save_path_prefix}_ta_seq_select_0/ \
+  --prev_save_path ${save_path_root_dir}/rand_error_${err_label_ratio}_warmup/ \
   --cuda \
   --lr ${lr} \
   --batch_size ${batch_size} \
@@ -114,7 +114,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_2.txt
+output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_ta_select_seq_select_0.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -127,7 +127,7 @@ mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
 echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
 
-
+<<cmd
 #for k in {1..${repeat_times}}
 for (( k=1; k<=repeat_times; k++ ))
 do
@@ -137,7 +137,7 @@ do
     --master_port ${port_num} \
     main_train.py \
     --load_dataset \
-    --select_valid_set \
+    --ta_vaal_train \
     --continue_label \
     --load_cached_weights \
     --cached_sample_weights_name cached_sample_weights \
@@ -150,8 +150,8 @@ do
     --not_save_dataset \
     --flip_labels \
     --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_${k}_2/ \
-    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))_2/ \
+    --save_path ${save_path_prefix}_ta_seq_select_${k}/ \
+    --prev_save_path ${save_path_prefix}_ta_seq_select_$(( k - 1 ))/ \
     --cuda \
     --lr ${lr} \
     --batch_size ${batch_size} \
@@ -160,7 +160,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_${k}_2.txt
+	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_ta_select_seq_select_$k.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	
@@ -169,4 +169,4 @@ do
 done
 
 
-
+cmd
