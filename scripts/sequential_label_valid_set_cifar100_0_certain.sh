@@ -3,7 +3,7 @@ trap "exit" INT
 
 
 
-err_label_ratio=0.6
+err_label_ratio=${14}
 
 dataset_name=$1
 data_dir=$2
@@ -19,8 +19,8 @@ batch_size=${11}
 test_batch_size=${12}
 epochs=${13}
 #cached_model_name=${14}
-add_valid_in_training_set=${14}
-lr_decay=${15}
+#add_valid_in_training_set=${14}
+#lr_decay=${15}
 
 valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 
@@ -53,7 +53,7 @@ then
 fi
 
 echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
-cmd
+
 
 
 
@@ -88,7 +88,7 @@ echo "${exe_cmd} > ${output_file_name}"
 
 #${exe_cmd} > ${output_file_name} 2>&1
 
-
+cmd
 exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
@@ -103,7 +103,7 @@ exe_cmd="python -m torch.distributed.launch \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_cerntain_seq_select_0/ \
-  --prev_save_path ${save_path_root_dir}/rand_error_0.6_warm_up/ \
+  --prev_save_path ${save_path_root_dir}/rand_error_${err_label_ratio}_warmup/ \
   --cuda \
   --lr ${lr} \
   --batch_size ${batch_size} \
@@ -127,7 +127,7 @@ mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
 echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
 
-
+<<cmd
 #for k in {1..${repeat_times}}
 for (( k=1; k<=repeat_times; k++ ))
 do
@@ -169,4 +169,4 @@ do
 done
 
 
-
+cmd
