@@ -30,6 +30,11 @@ echo "total_valid_sample_count::${total_valid_sample_count}"
 
 #total_valid_sample_count=200
 
+
+mkdir -p ${data_dir}
+mkdir -p ${output_dir}
+mkdir -p ${save_path_root_dir}
+
 export CUDA_VISIBLE_DEVICES=${gpu_ids}
 echo CUDA_VISIBLE_DEVICES::${CUDA_VISIBLE_DEVICES}
 
