@@ -12,3 +12,4 @@ pytorch_transformers
 torchtext
 spacy
 nltk
+apricot-select
