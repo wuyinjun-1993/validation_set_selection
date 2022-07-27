@@ -1,6 +1,6 @@
 import torch
 import time
-import datasets
+import exp_datasets
 from lib.utils import AverageMeter
 import torchvision.transforms as transforms
 import numpy as np

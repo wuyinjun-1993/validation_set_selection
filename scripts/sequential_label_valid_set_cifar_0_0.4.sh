@@ -65,7 +65,7 @@ exe_cmd="python -m torch.distributed.launch \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_count ${valid_ratio_each_run} \
+  --valid_count 10 \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
@@ -92,7 +92,6 @@ exe_cmd="python -m torch.distributed.launch \
   --master_port ${port_num} \
   main_train.py \
   --load_dataset \
-  --select_valid_set \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \

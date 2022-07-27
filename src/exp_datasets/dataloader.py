@@ -6,8 +6,8 @@ import torch.backends.cudnn as cudnn
 
 import torchvision
 import torchvision.transforms as transforms
-import datasets
-from torch.utils.data import Subset, Dataset, DataLoader
+import exp_datasets
+from torch.utils.data import Subset, Dataset, DataLoader, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 from PIL import ImageFilter
 import random
@@ -17,9 +17,10 @@ from PIL import Image
 import numpy
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from datasets.sst import *
-from datasets.imdb import *
-from datasets.trec import *
+from exp_datasets.sst import *
+from exp_datasets.imdb import *
+from exp_datasets.trec import *
+from exp_datasets.craige import *
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
 # process.
@@ -37,6 +38,43 @@ class GaussianBlur(object):
         sigma = random.uniform(self.sigma[0], self.sigma[1])
         x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
         return x
+
+
+class dataset_wrapper_X(Dataset):
+    def __init__(self, data_tensor, transform, three_imgs = False, two_imgs = False):
+
+        # super(new_mnist_dataset, self).__init__(*args, **kwargs)
+        self.data = data_tensor
+        self.transform = transform
+        self.three_imgs = three_imgs
+        self.two_imgs = two_imgs
+
+    def __getitem__(self, index):
+        img = self.data[index]
+        if not type(img) is numpy.ndarray:
+            img = Image.fromarray(img.numpy(), mode="L")
+        else:
+            img = Image.fromarray(img)
+        if self.transform is not None:
+            img1 = self.transform(img)
+
+            if self.two_imgs:
+                img2 = self.transform(img)
+                return (img1, img2), index
+
+
+            if self.three_imgs:
+                img2 = self.transform(img)
+                img3 = self.transform(img)
+                return (img1, img2, img3), index
+
+        return (index, img1)
+        # image, target = super(new_mnist_dataset, self).__getitem__(index)
+
+        # return (index, image,target)
+
+    def __len__(self):
+        return len(self.data)
 
 class dataset_wrapper(Dataset):
     def __init__(self, data_tensor, label_tensor, transform, three_imgs = False, two_imgs = False):
@@ -222,7 +260,7 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
             trainset.two_imgs=args.two_imgs
             trainset.three_imgs=args.three_imgs
         else:
-            trainset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+            trainset = exp_datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
 
@@ -230,7 +268,7 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
 
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
 
-        testset = datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
+        testset = exp_datasets.CIFAR10Instance(root=os.path.join(args.data_dir, 'CIFAR-10'), train=False, download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 4
         ndata = trainset.__len__()
@@ -242,44 +280,44 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
             trainset.two_imgs=args.two_imgs
             trainset.three_imgs=args.three_imgs
         else:
-            trainset = datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+            trainset = exp_datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=True, download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
 
-        testset = datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=False, download=True, transform=transform_test)
+        testset = exp_datasets.CIFAR100Instance(root=os.path.join(args.data_dir, 'CIFAR-100'), train=False, download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 4
         ndata = trainset.__len__()
 
     elif args.dataset == 'stl10':
-        trainset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train', download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        trainset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train', download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False, sampler=train_sampler)
 
-        testset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='test', download=True, transform=transform_test)
+        testset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='test', download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 7
         ndata = trainset.__len__()
 
     elif args.dataset == 'stl10-full':
-        trainset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train+unlabeled', download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        trainset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train+unlabeled', download=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, 
                             pin_memory=False, sampler=train_sampler)
 
-        labeledTrainset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train', download=True, transform=transform_train, two_imgs=args.two_imgs)
+        labeledTrainset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='train', download=True, transform=transform_train, two_imgs=args.two_imgs)
         labeledTrain_sampler = torch.utils.data.distributed.DistributedSampler(labeledTrainset)
         labeledTrainloader = torch.utils.data.DataLoader(labeledTrainset, batch_size=args.batch_size, shuffle=False, 
                             num_workers=2, pin_memory=False, sampler=labeledTrain_sampler)
-        testset = datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='test', download=True, transform=transform_test)
+        testset = exp_datasets.STL10(root=os.path.join(args.data_dir, 'STL10'), split='test', download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 7
         ndata = labeledTrainset.__len__()
 
     elif args.dataset == 'kitchen':
-        trainset = datasets.CIFARImageFolder(root=os.path.join(args.data_dir, 'Kitchen-HC/train'), train=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
+        trainset = exp_datasets.CIFARImageFolder(root=os.path.join(args.data_dir, 'Kitchen-HC/train'), train=True, transform=transform_train, two_imgs=args.two_imgs, three_imgs=args.three_imgs)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=False)
-        testset = datasets.CIFARImageFolder(root=os.path.join(args.data_dir, 'Kitchen-HC/test'), train=False, transform=transform_test)
+        testset = exp_datasets.CIFARImageFolder(root=os.path.join(args.data_dir, 'Kitchen-HC/test'), train=False, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
         args.pool_len = 4
         ndata = trainset.__len__()
@@ -1049,7 +1087,7 @@ def experiment_tag(args):
 
 def generate_class_biased_dataset(trainset, args, logger, testset, origin_labels):
     if not args.load_dataset:
-        imb_trainset = datasets.ImbalanceDataset(trainset, args.imb_factor)
+        imb_trainset = exp_datasets.ImbalanceDataset(trainset, args.imb_factor)
         trainset = trainset.get_subset_dataset(trainset, torch.nonzero(imb_trainset.mask).view(-1))
         origin_labels = origin_labels[imb_trainset.mask]
         logger.info(f"Total number of training samples: {trainset.data.shape[0]}")
@@ -1294,6 +1332,8 @@ def get_dataloader_for_meta(
         selection_method = uncertainty_sample
     elif split_method == 'certainty':
         selection_method = certainty_sample
+    # elif split_method == 'craige':
+        
 
     remaining_origin_labels = origin_labels
 
@@ -1308,16 +1348,29 @@ def get_dataloader_for_meta(
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
 
         if not args.ta_vaal_train:
-            trainset, new_metaset, remaining_origin_labels = selection_method(
-                criterion,
-                optimizer,
-                pretrained_model,
-                trainset,
-                metaset,
-                args,
-                remaining_origin_labels,
-                cached_sample_weights=cached_sample_weights,
-            )
+            if not split_method == 'craige':
+                trainset, new_metaset, remaining_origin_labels = selection_method(
+                    criterion,
+                    optimizer,
+                    pretrained_model,
+                    trainset,
+                    metaset,
+                    args,
+                    remaining_origin_labels,
+                    cached_sample_weights=cached_sample_weights,
+                )
+            else:
+                active_strategy = CRAIGActive(metaset.data, metaset.targets, trainset.data, pretrained_model, torch.nn.CrossEntropyLoss(),  dataset_wrapper_X, dataset_wrapper, args.num_class, args.lr, "Supervised",  True, metaset.transform, {"lr": args.lr, "batch_size": args.batch_size})
+
+                valid_ids = active_strategy.select(args.valid_count)
+
+                update_train_ids = torch.ones(len(trainset))
+                if not args.include_valid_set_in_training:
+                    update_train_ids[valid_ids] = 0
+                update_train_ids = update_train_ids.nonzero().view(-1)
+                trainset, new_metaset = split_train_valid_set_by_ids(args, trainset, remaining_origin_labels, valid_ids, update_train_ids)
+                remaining_origin_labels = origin_labels[update_train_ids]
+
             if args.continue_label:
                 metaset = metaset.concat_validset(metaset, new_metaset)
             else:
@@ -1340,20 +1393,6 @@ def get_dataloader_for_meta(
         rank=args.local_rank,
     )
     metaloader = None
-    if metaset is not None:
-        meta_sampler = DistributedSampler(
-            metaset,
-            num_replicas=args.world_size,
-            rank=args.local_rank,
-        )
-        metaloader = DataLoader(
-            metaset,
-            batch_size=args.test_batch_size,
-            num_workers=args.num_workers,
-            pin_memory=True,
-            sampler=meta_sampler,
-        )
-
     trainloader = DataLoader(
         trainset,
         batch_size=args.batch_size,
@@ -1362,6 +1401,22 @@ def get_dataloader_for_meta(
         shuffle=False,
         sampler=train_sampler,
     )
+    if metaset is not None:
+        # meta_sampler = DistributedSampler(
+        #     metaset,
+        #     num_replicas=args.world_size,
+        #     rank=args.local_rank,
+        # )
+        meta_sampler = RandomSampler(metaset, replacement=True, num_samples=args.epochs*len(trainloader)*args.batch_size*10)
+        metaloader = DataLoader(
+            metaset,
+            batch_size=args.test_batch_size,
+            num_workers=0,#args.num_workers,
+            pin_memory=True,
+            sampler=meta_sampler,
+        )
+
+    
     
     validloader = DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
     testloader = DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)

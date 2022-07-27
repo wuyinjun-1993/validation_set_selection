@@ -18,6 +18,9 @@ class LeNet5(torch.nn.Module):
         self.fc3 = nn.Linear(84, 10)
         # self.relu5 = nn.ReLU()
 
+    def get_embedding_dim(self):
+        return 84
+
     def features(self, x):
         y = self.conv1(x)
         y = self.relu1(y)
