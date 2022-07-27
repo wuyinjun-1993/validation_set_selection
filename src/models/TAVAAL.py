@@ -16,6 +16,8 @@ from datasets.mnist import mnist_to_device
 import main.main_train
 from datasets.dataloader import dataset_wrapper, split_train_valid_set_by_ids
 from models.resnet3 import resnet34
+from models.LeNet5 import *
+from models.DNN import *
 
 MARGIN = 1.0
 WEIGHT = 1.0
@@ -69,6 +71,47 @@ class LossNet(nn.Module):
         return out
 
 
+class LossNet_mnist(nn.Module):
+    def __init__(
+        self,
+        feature_sizes=[84],
+        num_channels=[84],
+        interm_dim=128
+    ):
+        super(LossNet_mnist, self).__init__()
+        
+        # self.GAP1 = nn.AvgPool2d(feature_sizes[0])
+        # self.GAP2 = nn.AvgPool2d(feature_sizes[1])
+        # self.GAP3 = nn.AvgPool2d(feature_sizes[2])
+        # self.GAP4 = nn.AvgPool2d(feature_sizes[3])
+
+        self.FC1 = nn.Linear(num_channels[0], interm_dim)
+        # self.FC2 = nn.Linear(num_channels[1], interm_dim)
+        # self.FC3 = nn.Linear(num_channels[2], interm_dim)
+        # self.FC4 = nn.Linear(num_channels[3], interm_dim)
+
+        self.linear = nn.Linear(interm_dim, 1)
+    
+    def forward(self, features):
+        # out1 = self.GAP1(features[0])
+        # out1 = out1.view(out1.size(0), -1)
+        out1 = F.relu(self.FC1(features[0]))
+
+        # out2 = self.GAP2(features[1])
+        # out2 = out2.view(out2.size(0), -1)
+        # out2 = F.relu(self.FC2(out2))
+
+        # out3 = self.GAP3(features[2])
+        # out3 = out3.view(out3.size(0), -1)
+        # out3 = F.relu(self.FC3(out3))
+
+        # out4 = self.GAP4(features[3])
+        # out4 = out4.view(out4.size(0), -1)
+        # out4 = F.relu(self.FC4(out4))
+
+        out = self.linear(out1)
+        return out
+
 def LossPredLoss(input, target, margin=1.0, reduction='mean'):
     assert len(input) % 2 == 0, 'the batch size is not even.'
     assert input.shape == input.flip(0).shape
@@ -100,7 +143,7 @@ class View(nn.Module):
 
 class VAE(nn.Module):
     """Encoder-Decoder architecture for both WAE-MMD and WAE-GAN."""
-    def __init__(self, z_dim=32, nc=3, f_filt=4):
+    def __init__(self, z_dim=32, nc=3, f_filt=4, encoder_out_dim=1024*2*2):
         super(VAE, self).__init__()
         self.z_dim = z_dim
         self.nc = nc
@@ -372,6 +415,10 @@ def train_vaal(models, optimizers, labeled_dataloader, unlabeled_dataloader,
             r_u_s = torch.sigmoid(r_u).detach()                 
         # VAE step
         for count in range(num_vae_steps): # num_vae_steps
+            if labeled_imgs.shape[-1] < 32:
+                padding_size = int((32 - labeled_imgs.shape[-1])/2)
+                labeled_imgs = F.pad(labeled_imgs, (padding_size, padding_size, padding_size, padding_size))
+                unlabeled_imgs = F.pad(unlabeled_imgs, (padding_size, padding_size, padding_size, padding_size))
             recon, _, mu, logvar = vae(r_l_s,labeled_imgs)
             unsup_loss = vae_loss(labeled_imgs, recon, mu, logvar, beta)
             unlab_recon, _, unlab_mu, unlab_logvar = vae(r_u_s,unlabeled_imgs)
@@ -443,7 +490,7 @@ def train_vaal(models, optimizers, labeled_dataloader, unlabeled_dataloader,
 
 
 # Select the indices of the unlablled data according to the methods
-def query_samples(model, train_set, subset, meta_set, cycle, args):
+def query_samples(model, train_set, subset, meta_set, cycle, args, nc=3, encoder_out_dim = 1024*2*2, z_dim = 32):
     # Create unlabeled dataloader for the unlabeled subset
     unlabeled_loader = DataLoader(
         train_set,
@@ -456,7 +503,7 @@ def query_samples(model, train_set, subset, meta_set, cycle, args):
         batch_size=args.batch_size, 
         pin_memory=True,
     )
-    vae = VAE()
+    vae = VAE(nc=nc, encoder_out_dim =encoder_out_dim, z_dim=z_dim)
     discriminator = Discriminator(32)
     
     models = {'backbone': model['backbone'], 'module': model['module'],'vae': vae, 'discriminator': discriminator}
@@ -475,6 +522,9 @@ def query_samples(model, train_set, subset, meta_set, cycle, args):
         images = images.cuda()
         with torch.no_grad():
             _,_,features = task_model.forward_with_features(images)
+            if images.shape[-1] < 32:
+                padding_size = int((32 - images.shape[-1])/2)
+                images = F.pad(images, (padding_size, padding_size, padding_size, padding_size))
             r = ranker(features)
             _, _, mu, _ = vae(torch.sigmoid(r),images)
             preds = discriminator(r,mu)
@@ -551,7 +601,20 @@ def main_train_taaval(args):
             with torch.cuda.device(CUDA_VISIBLE_DEVICES):
                 resnet = resnet34(num_classes=NO_CLASSES).cuda()
                 loss_module = LossNet().cuda()
+                nc = 3
+                encoder_out_dim=1024*2*2
+                z_dim=32
 
+                if args.dataset == 'MNIST':
+                    # if args.model_type == 'lenet':
+                    resnet = LeNet5().cuda()
+                    loss_module = LossNet_mnist().cuda()
+                    nc=1
+                    encoder_out_dim=1024
+                    z_dim=28
+                    # else:
+                    #     resnet = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
+                    
             if args.use_pretrained_model:
                 resnet = main.main_train.load_checkpoint2(args, resnet)
 
@@ -560,12 +623,16 @@ def main_train_taaval(args):
             
             # Loss, criterion and scheduler (re)initialization
             criterion = nn.CrossEntropyLoss(reduction='none')
-            optim_backbone = optim.SGD(
-                models['backbone'].parameters(),
-                lr=args.lr, 
-                momentum=0.9,
-                weight_decay=5e-4,
-            )
+            if args.dataset == 'MNIST':
+                optim_backbone = optim.SGD(
+                    models['backbone'].parameters(),
+                    lr=args.lr, 
+                    momentum=0.9,
+                    weight_decay=5e-4,
+                )
+            else:
+                optim_backbone = torch.optim.SGD(resnet.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+                optim_backbone.param_groups[0]['initial_lr'] = args.lr
  
             sched_backbone = lr_scheduler.MultiStepLR(
                 optim_backbone,
@@ -628,6 +695,9 @@ def main_train_taaval(args):
                 meta_set,
                 cycle,
                 args,
+                nc = nc,
+                encoder_out_dim = encoder_out_dim,
+                # z_dim = z_dim
             )
 
             # Update the labeled dataset and the unlabeled dataset, respectively
