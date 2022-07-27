@@ -18,6 +18,9 @@ class LeNet5(torch.nn.Module):
         self.fc3 = nn.Linear(84, 10)
         # self.relu5 = nn.ReLU()
 
+    def get_embedding_dim(self):
+        return 84
+
     def features(self, x):
         y = self.conv1(x)
         y = self.relu1(y)
@@ -53,4 +56,19 @@ class LeNet5(torch.nn.Module):
 
         return grad_approx
 
+    def forward_with_features(self, x):
+        outf = self.features(x)        
+        y = self.fc3(outf)
+        # y = self.relu5(y)
+        return y, outf, [outf]
+        # x = self.layer0(x)
+        # out1 = self.layer1(x)
+        # out2 = self.layer2(out1)
+        # out3 = self.layer3(out2)
+        # out4 = self.layer4(out3)
+        # spatial_size = out4.size(2)
+        # x = nn.functional.avg_pool2d(out4, spatial_size, 1)
+        # outf = x.view(x.size(0), -1)
+        # x = self.fc(outf)
+        # return x, outf, [out1, out2, out3, out4]
 

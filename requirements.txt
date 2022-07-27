@@ -13,3 +13,4 @@ torchtext
 spacy
 nltk
 pandas
+apricot-select

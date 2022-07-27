@@ -3,7 +3,7 @@ import torch
 import os,sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from common.parse_args import *
-from datasets.mnist import *
+from exp_datasets.mnist import *
 from models.DNN import *
 from common.utils import *
 from tqdm.notebook import tqdm
@@ -12,7 +12,7 @@ import itertools
 import torch_higher as higher
 from main.find_valid_set import *
 from main.meta_reweighting_rl import *
-from datasets.dataloader import *
+from exp_datasets.dataloader import *
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 import json
@@ -260,6 +260,8 @@ def meta_learning_model(
     for ep in tqdm(range(start_ep, args.epochs)):
         
         train_loss, train_acc = 0, 0
+        rand_epoch_seed = random.randint(0, args.epochs*10)
+        train_loader.sampler.set_epoch(rand_epoch_seed)
         curr_w_array_delta = torch.zeros_like(w_array)
 
         avg_train_loss = 0
@@ -555,6 +557,8 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
     test_loss_ls = []
     test_acc_ls = []
     for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
+        rand_epoch_seed = random.randint(0, args.epochs*10)
+        train_loader.sampler.set_epoch(rand_epoch_seed)
         if args.active_learning:
             with torch.no_grad():
                 # Select 10 samples based on heuristic and assign correct label
@@ -645,7 +649,8 @@ def glc_train(train_loader, valid_loader, test_loader, meta_set, criterion, args
     network.eval()
     C = get_confusion_for_glc(meta_set, network, num_classes)
     for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
-
+        rand_epoch_seed = random.randint(0, args.epochs*10)
+        train_loader.sampler.set_epoch(rand_epoch_seed)
         network.train()
         for batch_idx, (_, data, target) in enumerate(train_loader):
             if args.cuda:
@@ -1065,25 +1070,29 @@ def main2(args, logger):
     logger.info('==> Preparing data..')
 
     if args.dataset == 'MNIST':
-        if args.model_type == 'lenet':
-            pretrained_rep_net = LeNet5()
-        else:
-            pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
+        # if args.model_type == 'lenet':
+        pretrained_rep_net = LeNet5()
+        # else:
+        #     pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
         optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
             if args.model_type == 'resnet18':
                 pretrained_rep_net = ResNet18(num_classes=10).cuda()
+                args.num_class=10
             else:    
                 pretrained_rep_net = resnet34(num_classes=10).cuda()
+                args.num_class=10
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(),
                     lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
         else:
             if args.model_type == 'resnet18':
                 pretrained_rep_net = ResNet18(num_classes=100).cuda()
+                args.num_class=100
             else:
                 pretrained_rep_net = resnet34(num_classes=100).cuda()
+                args.num_class=100
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
         pretrained_rep_net.eval()
         
@@ -1097,18 +1106,22 @@ def main2(args, logger):
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('sst2'):
         pretrained_rep_net = custom_Bert(2)
+        args.num_class=2
         # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     elif args.dataset.startswith('sst5'):
         pretrained_rep_net = custom_Bert(5)
+        args.num_class=5
         # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     elif args.dataset.startswith('imdb'):
         pretrained_rep_net = custom_Bert(2)
+        args.num_class=2
         # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     elif args.dataset.startswith('trec'):
         pretrained_rep_net = custom_Bert(6)
+        args.num_class=6
         # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     else:
@@ -1158,6 +1171,16 @@ def main2(args, logger):
             optimizer,
             args,
             'certainty',
+            logger,
+            pretrained_model=pretrained_rep_net,
+            cached_sample_weights=cached_sample_weights,
+        )
+    elif args.craige:
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
+            criterion,
+            optimizer,
+            args,
+            'craige',
             logger,
             pretrained_model=pretrained_rep_net,
             cached_sample_weights=cached_sample_weights,
@@ -1219,10 +1242,10 @@ def main2(args, logger):
     start_epoch = 0
 
     if args.dataset == 'MNIST':
-        if args.model_type == 'lenet':
-            net = LeNet5()
-        else:
-            net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
+        # if args.model_type == 'lenet':
+        net = LeNet5()
+        # else:
+        #     net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
             if args.model_type == 'resnet18':

@@ -3,7 +3,7 @@ import torch
 import os,sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from common.parse_args import *
-from datasets.mnist import *
+from exp_datasets.mnist import *
 from models.DNN import *
 from common.utils import *
 from tqdm.notebook import tqdm
@@ -11,7 +11,7 @@ import itertools
 import torch_higher as higher
 from main.find_valid_set import *
 from main.meta_reweighting_rl import *
-from datasets.dataloader import *
+from exp_datasets.dataloader import *
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 import json
