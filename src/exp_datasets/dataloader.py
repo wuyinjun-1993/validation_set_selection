@@ -20,6 +20,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from exp_datasets.sst import *
 from exp_datasets.imdb import *
 from exp_datasets.trec import *
+from exp_datasets.craige import *
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
 # process.
@@ -37,6 +38,43 @@ class GaussianBlur(object):
         sigma = random.uniform(self.sigma[0], self.sigma[1])
         x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
         return x
+
+
+class dataset_wrapper_X(Dataset):
+    def __init__(self, data_tensor, transform, three_imgs = False, two_imgs = False):
+
+        # super(new_mnist_dataset, self).__init__(*args, **kwargs)
+        self.data = data_tensor
+        self.transform = transform
+        self.three_imgs = three_imgs
+        self.two_imgs = two_imgs
+
+    def __getitem__(self, index):
+        img = self.data[index]
+        if not type(img) is numpy.ndarray:
+            img = Image.fromarray(img.numpy(), mode="L")
+        else:
+            img = Image.fromarray(img)
+        if self.transform is not None:
+            img1 = self.transform(img)
+
+            if self.two_imgs:
+                img2 = self.transform(img)
+                return (img1, img2), index
+
+
+            if self.three_imgs:
+                img2 = self.transform(img)
+                img3 = self.transform(img)
+                return (img1, img2, img3), index
+
+        return (index, img1)
+        # image, target = super(new_mnist_dataset, self).__getitem__(index)
+
+        # return (index, image,target)
+
+    def __len__(self):
+        return len(self.data)
 
 class dataset_wrapper(Dataset):
     def __init__(self, data_tensor, label_tensor, transform, three_imgs = False, two_imgs = False):
@@ -1294,6 +1332,8 @@ def get_dataloader_for_meta(
         selection_method = uncertainty_sample
     elif split_method == 'certainty':
         selection_method = certainty_sample
+    # elif split_method == 'craige':
+        
 
     remaining_origin_labels = origin_labels
 
@@ -1308,16 +1348,29 @@ def get_dataloader_for_meta(
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
 
         if not args.ta_vaal_train:
-            trainset, new_metaset, remaining_origin_labels = selection_method(
-                criterion,
-                optimizer,
-                pretrained_model,
-                trainset,
-                metaset,
-                args,
-                remaining_origin_labels,
-                cached_sample_weights=cached_sample_weights,
-            )
+            if not split_method == 'craige':
+                trainset, new_metaset, remaining_origin_labels = selection_method(
+                    criterion,
+                    optimizer,
+                    pretrained_model,
+                    trainset,
+                    metaset,
+                    args,
+                    remaining_origin_labels,
+                    cached_sample_weights=cached_sample_weights,
+                )
+            else:
+                active_strategy = CRAIGActive(metaset.data, metaset.targets, trainset.data, pretrained_model, torch.nn.CrossEntropyLoss(),  dataset_wrapper_X, dataset_wrapper, args.num_class, args.lr, "Supervised",  True, metaset.transform, {"lr": args.lr, "batch_size": args.batch_size})
+
+                valid_ids = active_strategy.select(args.valid_count)
+
+                update_train_ids = torch.ones(len(trainset))
+                if not args.include_valid_set_in_training:
+                    update_train_ids[valid_ids] = 0
+                update_train_ids = update_train_ids.nonzero().view(-1)
+                trainset, new_metaset = split_train_valid_set_by_ids(args, trainset, remaining_origin_labels, valid_ids, update_train_ids)
+                remaining_origin_labels = origin_labels[update_train_ids]
+
             if args.continue_label:
                 metaset = metaset.concat_validset(metaset, new_metaset)
             else:

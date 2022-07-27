@@ -1068,33 +1068,41 @@ def main2(args, logger):
         if args.dataset == 'cifar10':
             if args.model_type == 'resnet18':
                 pretrained_rep_net = ResNet18(num_classes=10).cuda()
+                args.num_class=10
             else:    
                 pretrained_rep_net = resnet34(num_classes=10).cuda()
+                args.num_class=10
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(),
                     lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
         else:
             if args.model_type == 'resnet18':
                 pretrained_rep_net = ResNet18(num_classes=100).cuda()
+                args.num_class=100
             else:
                 pretrained_rep_net = resnet34(num_classes=100).cuda()
+                args.num_class=100
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
         pretrained_rep_net.eval()
         
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('sst2'):
         pretrained_rep_net = custom_Bert(2)
+        args.num_class=2
         # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     elif args.dataset.startswith('sst5'):
         pretrained_rep_net = custom_Bert(5)
+        args.num_class=5
         # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     elif args.dataset.startswith('imdb'):
         pretrained_rep_net = custom_Bert(2)
+        args.num_class=2
         # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     elif args.dataset.startswith('trec'):
         pretrained_rep_net = custom_Bert(6)
+        args.num_class=6
         # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
     else:
@@ -1144,6 +1152,16 @@ def main2(args, logger):
             optimizer,
             args,
             'certainty',
+            logger,
+            pretrained_model=pretrained_rep_net,
+            cached_sample_weights=cached_sample_weights,
+        )
+    elif args.craige:
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
+            criterion,
+            optimizer,
+            args,
+            'craige',
             logger,
             pretrained_model=pretrained_rep_net,
             cached_sample_weights=cached_sample_weights,

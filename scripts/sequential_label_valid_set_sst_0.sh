@@ -35,7 +35,7 @@ echo "initial cleaning"
 cd ../src/main/
 
 
-add_valid_in_training_flag="--cluster_method_two --cosin_dist"
+add_valid_in_training_flag="--cluster_method_two --all_layer --use_pretrained_model"
 lr_decay_flag=""
 
 <<cmd
@@ -69,7 +69,7 @@ exe_cmd="python -m torch.distributed.launch \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
-  --lr 0.01 \
+  --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
@@ -81,18 +81,19 @@ output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_rat
 
 echo "${exe_cmd} > ${output_file_name}"
  
-#${exe_cmd} > ${output_file_name} 2>&1
+${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
   main_train.py \
+  --select_valid_set \
   --load_dataset \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
-  --valid_ratio 0.0001 \
+  --valid_ratio 0.00003 \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
@@ -102,8 +103,7 @@ exe_cmd="python -m torch.distributed.launch \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  --cluster_method_two \
-  --cosin_dist"
+  ${add_valid_in_training_flag}"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0.txt
@@ -145,8 +145,7 @@ do
     --batch_size ${batch_size} \
     --test_batch_size ${test_batch_size} \
     --epochs ${epochs} \
-    --cluster_method_two \
-    --cosin_dist"
+    ${add_valid_in_training_flag}"
 
 	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_${k}_2.txt
 
