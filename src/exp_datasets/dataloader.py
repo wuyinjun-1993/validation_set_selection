@@ -7,7 +7,7 @@ import torch.backends.cudnn as cudnn
 import torchvision
 import torchvision.transforms as transforms
 import exp_datasets
-from torch.utils.data import Subset, Dataset, DataLoader
+from torch.utils.data import Subset, Dataset, DataLoader, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 from PIL import ImageFilter
 import random
@@ -1393,20 +1393,6 @@ def get_dataloader_for_meta(
         rank=args.local_rank,
     )
     metaloader = None
-    if metaset is not None:
-        meta_sampler = DistributedSampler(
-            metaset,
-            num_replicas=args.world_size,
-            rank=args.local_rank,
-        )
-        metaloader = DataLoader(
-            metaset,
-            batch_size=args.test_batch_size,
-            num_workers=args.num_workers,
-            pin_memory=True,
-            sampler=meta_sampler,
-        )
-
     trainloader = DataLoader(
         trainset,
         batch_size=args.batch_size,
@@ -1415,6 +1401,22 @@ def get_dataloader_for_meta(
         shuffle=False,
         sampler=train_sampler,
     )
+    if metaset is not None:
+        # meta_sampler = DistributedSampler(
+        #     metaset,
+        #     num_replicas=args.world_size,
+        #     rank=args.local_rank,
+        # )
+        meta_sampler = RandomSampler(metaset, replacement=True, num_samples=args.epochs*len(trainloader)*args.batch_size*10)
+        metaloader = DataLoader(
+            metaset,
+            batch_size=args.test_batch_size,
+            num_workers=0,#args.num_workers,
+            pin_memory=True,
+            sampler=meta_sampler,
+        )
+
+    
     
     validloader = DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
     testloader = DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)

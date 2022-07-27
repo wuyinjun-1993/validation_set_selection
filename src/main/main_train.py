@@ -258,6 +258,8 @@ def meta_learning_model(
     for ep in tqdm(range(start_ep, args.epochs)):
         
         train_loss, train_acc = 0, 0
+        rand_epoch_seed = random.randint(0, args.epochs*10)
+        train_loader.sampler.set_epoch(rand_epoch_seed)
         curr_w_array_delta = torch.zeros_like(w_array)
 
         avg_train_loss = 0
@@ -550,6 +552,8 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
     test_loss_ls = []
     test_acc_ls = []
     for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
+        rand_epoch_seed = random.randint(0, args.epochs*10)
+        train_loader.sampler.set_epoch(rand_epoch_seed)
         if args.active_learning:
             with torch.no_grad():
                 # Select 10 samples based on heuristic and assign correct label
@@ -638,7 +642,8 @@ def glc_train(train_loader, valid_loader, test_loader, meta_set, criterion, args
     network.eval()
     C = get_confusion_for_glc(meta_set, network, num_classes)
     for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
-
+        rand_epoch_seed = random.randint(0, args.epochs*10)
+        train_loader.sampler.set_epoch(rand_epoch_seed)
         network.train()
         for batch_idx, (_, data, target) in enumerate(train_loader):
             if args.cuda:
