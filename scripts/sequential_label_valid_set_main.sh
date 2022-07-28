@@ -30,6 +30,11 @@ echo "total_valid_sample_count::${total_valid_sample_count}"
 
 #total_valid_sample_count=200
 
+
+mkdir -p ${data_dir}
+mkdir -p ${output_dir}
+mkdir -p ${save_path_root_dir}
+
 export CUDA_VISIBLE_DEVICES=${gpu_ids}
 echo CUDA_VISIBLE_DEVICES::${CUDA_VISIBLE_DEVICES}
 
@@ -87,7 +92,7 @@ fi
 
 
 
-save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select
+save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}
 
 
 <<cmd
@@ -131,7 +136,7 @@ exe_cmd="python -m torch.distributed.launch \
 "
 
 
-output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_do_train_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_${method}_do_train_0.txt
 
 
 echo "${exe_cmd} > ${output_file_name}"
@@ -152,15 +157,14 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_seq_select_0_${method}/ \
-  --prev_save_path ${save_path_root_dir}/${err_type}_${err_label_ratio}_warm_up/\
+  --save_path ${save_path_prefix}_seq_select_0/ \
+  --prev_save_path ${save_path_prefix}_do_train/\
   --cuda \
-  --continue_label \
   --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  ${add_valid_in_training_flag} \
+  --total_valid_sample_count ${total_valid_sample_count} \
   ${lr_decay_flag}"
 
 
@@ -168,7 +172,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 
 echo "${exe_cmd} > ${output_file_name}"
 
-#${exe_cmd} > ${output_file_name} 2>&1 
+${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
@@ -199,8 +203,8 @@ do
     --not_save_dataset \
     --flip_labels \
     --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_${k}_${method}/ \
-    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))_${method}/ \
+    --save_path ${save_path_prefix}_seq_select_${k}/ \
+    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
     --cuda \
     --lr ${lr} \
     --batch_size ${batch_size} \
@@ -213,7 +217,7 @@ do
 
 	echo "${exe_cmd} > ${output_file_name}"
 	
-#	${exe_cmd} > ${output_file_name} 2>&1 
+	${exe_cmd} > ${output_file_name} 2>&1 
 	
 done
 

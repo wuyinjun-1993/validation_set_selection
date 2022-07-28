@@ -24,7 +24,7 @@ epochs=${13}
 
 valid_ratio_each_run=$6 #$(( total_valid_ratio / repeat_times ))
 
-save_path_prefix=${save_path_root_dir}/rand_error_${err_label_ratio}_valid_select
+save_path_prefix=${save_path_root_dir}/biased_error_${err_label_ratio}_valid_select
 
 
 total_valid_sample_count=200
@@ -38,6 +38,7 @@ cd ../src/main/
 
 
 add_valid_in_training_flag="--cluster_method_two --cluster_method_two_plus --not_rescale_features --weight_by_norm  --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --cluster_method_two_sampling --remove_empty_clusters --no_sample_weights_k_means"
+
 lr_decay_flag="--use_pretrained_model --lr_decay"
 
 <<cmd
@@ -67,6 +68,7 @@ exe_cmd="python -m torch.distributed.launch \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
   --meta_lr ${meta_lr} \
+  --biased_flip \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
@@ -74,13 +76,12 @@ exe_cmd="python -m torch.distributed.launch \
   --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
-  --epochs ${epochs} \
-  --do_train \
-  --lr_decay
-"
+  --epochs 200 \
+  --lr_decay \
+  --do_train"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_do_train_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_do_train_0.txt
 
 
 echo "${exe_cmd} > ${output_file_name}"
@@ -93,8 +94,9 @@ exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
   main_train.py \
-  --load_dataset \
   --select_valid_set \
+  --load_dataset \
+  --biased_flip \
   --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
@@ -103,18 +105,18 @@ exe_cmd="python -m torch.distributed.launch \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0_2/ \
-  --prev_save_path  ${save_path_root_dir}/rand_error_${err_label_ratio}_warmup/\
+  --prev_save_path ${save_path_root_dir}/biased_error_${err_label_ratio}_warmup/ \
+  --continue_label \
   --cuda \
   --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  --continue_label \
   ${add_valid_in_training_flag} \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_2.txt
+output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_valid_select_seq_select_0_2.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -137,6 +139,7 @@ do
     --master_port ${port_num} \
     main_train.py \
     --load_dataset \
+    --biased_flip \
     --select_valid_set \
     --continue_label \
     --load_cached_weights \
@@ -160,7 +163,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_${k}_2.txt
+	output_file_name=${output_dir}/output_${dataset_name}_biased_error_${err_label_ratio}_valid_select_seq_select_${k}_2.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	

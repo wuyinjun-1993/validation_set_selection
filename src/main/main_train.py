@@ -28,6 +28,8 @@ import collections
 from models.LeNet5 import *
 import models.TAVAAL
 
+import torchvision.models
+
 cached_model_name="cached_model"
 pretrained_model_name="pretrained_model"
 
@@ -443,6 +445,9 @@ def meta_learning_model(
 
             total_iter_count += 1
 
+            if idx % 10 == 0:
+                logger.info("Loss at iter %d: %f"%(idx, minibatch_loss.detach().cpu()))
+
 
             # del meta_inputs[2], inputs[2]
 
@@ -575,6 +580,8 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            if batch_idx % 10 == 0:
+                logger.info("Loss at batch %d: %f"%(batch_idx, loss))
             # if epoch < args.warm and warmup_scheduler is not None:
             #     warmup_scheduler.step()
         
@@ -1063,10 +1070,10 @@ def main2(args, logger):
     logger.info('==> Preparing data..')
 
     if args.dataset == 'MNIST':
-        if args.model_type == 'lenet':
-            pretrained_rep_net = LeNet5()
-        else:
-            pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
+        # if args.model_type == 'lenet':
+        pretrained_rep_net = LeNet5()
+        # else:
+        #     pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
         optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('cifar'):
@@ -1087,6 +1094,13 @@ def main2(args, logger):
                 pretrained_rep_net = resnet34(num_classes=100).cuda()
                 args.num_class=100
             optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
+        pretrained_rep_net.eval()
+        
+        optimizer.param_groups[0]['initial_lr'] = args.lr
+    elif args.dataset == 'retina':
+        pretrained_rep_net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
+        pretrained_rep_net.fc = nn.Linear(512, 5)
+        optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
         pretrained_rep_net.eval()
         
         optimizer.param_groups[0]['initial_lr'] = args.lr
@@ -1228,10 +1242,10 @@ def main2(args, logger):
     start_epoch = 0
 
     if args.dataset == 'MNIST':
-        if args.model_type == 'lenet':
-            net = LeNet5()
-        else:
-            net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
+        # if args.model_type == 'lenet':
+        net = LeNet5()
+        # else:
+        #     net = DNN_three_layers(args.nce_k, low_dim=args.low_dim)
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
             if args.model_type == 'resnet18':
@@ -1243,6 +1257,15 @@ def main2(args, logger):
                 net = ResNet18(num_classes=100)
             else:
                 net = resnet34(num_classes=100)
+    elif args.dataset == 'retina':
+        net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
+        for param in net.conv1.parameters():
+            param.requires_grad = False
+        for param in net.layer1.parameters():
+            param.requires_grad = False
+        for param in net.layer2.parameters():
+            param.requires_grad = False
+        net.fc = nn.Linear(512, 5)
     elif args.dataset.startswith('sst2'):
         net = custom_Bert(2)
     elif args.dataset.startswith('sst5'):
