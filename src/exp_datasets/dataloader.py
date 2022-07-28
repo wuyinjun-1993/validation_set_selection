@@ -1273,13 +1273,17 @@ def get_dataloader_for_meta(
                 origin_labels = trainset.targets.clone()
 
         elif args.dataset == 'retina':
-            df = pd.read_csv(args.data_dir + "/diabetic-retinopathy-detection/trainLabels.csv")
-            df['image'] = df['image'].apply(lambda x: args.data_dir + "/diabetic-retinopathy-detection/train/" + x + ".jpeg")
-            df['eye'] = df['image'].map(lambda x: 1 if x.split('_')[-1]=='left' else 0)
-            train_df, test_df = train_test_split(df, test_size=0.2, stratify=df['level'])
+            # df = pd.read_csv(args.data_dir + "/diabetic-retinopathy-detection/trainLabels.csv")
+            # df['image'] = df['image'].apply(lambda x: args.data_dir + "/diabetic-retinopathy-detection/train/" + x + ".jpeg")
+            # df['eye'] = df['image'].map(lambda x: 1 if x.split('_')[-1]=='left' else 0)
+            # train_df, test_df = train_test_split(df, test_size=0.2, stratify=df['level'])
 
-            trainset = RetinaDataset(train_df)
-            testset = RetinaDataset(test_df)
+            # trainset = RetinaDataset(train_df)
+            # testset = RetinaDataset(test_df)
+
+            trainset = torch.load(os.path.join(args.data_dir, "transformed_train_dataset"))
+            testset = torch.load(os.path.join(args.data_dir, "transformed_test_dataset"))
+
             origin_labels = trainset.targets.clone()
 
         elif args.dataset == 'MNIST':

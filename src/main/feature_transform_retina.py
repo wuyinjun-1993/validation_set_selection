@@ -165,7 +165,7 @@ def main(args, logger):
     norm_mean, norm_std = (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)
 
     transform_train_list = [
-        transforms.RandomResizedCrop((587,587)),
+        transforms.RandomResizedCrop((256,256)),
         transforms.RandomVerticalFlip(),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
@@ -177,7 +177,7 @@ def main(args, logger):
     ]
     transform_train = transforms.Compose(transform_train_list)
     transform_test = transforms.Compose([
-            transforms.Resize((587,587)),
+            transforms.Resize((256,256)),
             transforms.ToTensor(),
             transforms.Normalize(norm_mean, norm_std),
         ])
