@@ -160,7 +160,6 @@ exe_cmd="python -m torch.distributed.launch \
   --save_path ${save_path_prefix}_seq_select_0/ \
   --prev_save_path ${save_path_prefix}_do_train/\
   --cuda \
-  --continue_label \
   --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
