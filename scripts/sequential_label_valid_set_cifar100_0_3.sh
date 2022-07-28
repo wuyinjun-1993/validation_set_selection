@@ -102,7 +102,7 @@ exe_cmd="python -m torch.distributed.launch \
   --meta_lr ${meta_lr} \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_seq_select_0_2/ \
+  --save_path ${save_path_prefix}_seq_select_0_3/ \
   --prev_save_path  ${save_path_root_dir}/rand_error_${err_label_ratio}_warmup/\
   --cuda \
   --lr ${lr} \
@@ -114,7 +114,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_2.txt
+output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_0_3.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -150,8 +150,8 @@ do
     --not_save_dataset \
     --flip_labels \
     --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_${k}_2/ \
-    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))_2/ \
+    --save_path ${save_path_prefix}_seq_select_${k}_3/ \
+    --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))_3/ \
     --cuda \
     --lr ${lr} \
     --batch_size ${batch_size} \
@@ -160,7 +160,7 @@ do
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_${k}_2.txt
+	output_file_name=${output_dir}/output_${dataset_name}_rand_error_${err_label_ratio}_valid_select_seq_select_${k}_3.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	
