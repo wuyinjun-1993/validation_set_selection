@@ -104,7 +104,8 @@ class dataset_wrapper(Dataset):
                 img2 = self.transform(img)
                 img3 = self.transform(img)
                 return (img1, img2, img3), target, index
-
+        else:
+            img1 = img
         return (index, img1, target)
         # image, target = super(new_mnist_dataset, self).__getitem__(index)
 

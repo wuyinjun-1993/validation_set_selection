@@ -6,9 +6,9 @@ import torch.nn.functional as F
 from torch.nn import Parameter
 
 
-__all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
-           'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
-           'wide_resnet50_2', 'wide_resnet101_2']
+__all__ = ['ResNet', 'resnet18_imagenet', 'resnet34_imagenet', 'resnet50_imagenet', 'resnet101_imagenet',
+           'resnet152_imagenet', 'resnext50_32x4d_imagenet', 'resnext101_32x8d_imagenet',
+           'wide_resnet50_2_imagenet', 'wide_resnet101_2_imagenet']
 
 
 model_urls = {
@@ -39,7 +39,7 @@ class BasicBlock(nn.Module):
     expansion = 1
 
     def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
-                 base_width=64, dilation=1, norm_layer=None):
+                 base_width=64, dilation=1, norm_layer=None, momentum_bn=0.1):
         super(BasicBlock, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -133,7 +133,7 @@ class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
                  norm_layer=None, two_branch=False, mlp=False, normlinear=False,
-                 momentum_bn=0.1):
+                 momentum_bn=0.1, first=True, last=True):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -154,39 +154,43 @@ class ResNet(nn.Module):
         self.momentum_bn = momentum_bn
         self.mlp = mlp
         linear = NormedLinear if normlinear else nn.Linear
+        self.first = first
+        self.last = last
+        if first:
+            self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
+                                bias=False)
+            self.bn1 = norm_layer(self.inplanes, momentum=momentum_bn)
+            self.relu = nn.ReLU(inplace=True)
+            self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+            self.layer1 = self._make_layer(block, 64, layers[0])
+            self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
+                                        dilate=replace_stride_with_dilation[0])
 
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-        self.bn1 = norm_layer(self.inplanes, momentum=momentum_bn)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
-                                       dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
-                                       dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
-                                       dilate=replace_stride_with_dilation[2])
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        if last:
+            self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
+                                        dilate=replace_stride_with_dilation[1])
+            self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+                                        dilate=replace_stride_with_dilation[2])
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
-        if self.mlp:
-            if self.two_branch:
-                self.fc = nn.Sequential(
-                    nn.Linear(512 * block.expansion, 512 * block.expansion),
-                    nn.ReLU()
-                ) 
-                self.instDis = linear(512 * block.expansion, num_classes)
-                self.groupDis = linear(512 * block.expansion, num_classes)
+            if self.mlp:
+                if self.two_branch:
+                    self.fc = nn.Sequential(
+                        nn.Linear(512 * block.expansion, 512 * block.expansion),
+                        nn.ReLU()
+                    ) 
+                    self.instDis = linear(512 * block.expansion, num_classes)
+                    self.groupDis = linear(512 * block.expansion, num_classes)
+                else:
+                    self.fc = nn.Sequential(
+                        nn.Linear(512 * block.expansion, 512 * block.expansion),
+                        nn.ReLU(),
+                        linear(512 * block.expansion, num_classes)
+                    ) 
             else:
-                self.fc = nn.Sequential(
-                    nn.Linear(512 * block.expansion, 512 * block.expansion),
-                    nn.ReLU(),
-                    linear(512 * block.expansion, num_classes)
-                ) 
-        else:
-            self.fc = nn.Linear(512 * block.expansion, num_classes)
-            if self.two_branch:
-                self.groupDis = nn.Linear(512 * block.expansion, num_classes)
+                self.fc = nn.Linear(512 * block.expansion, num_classes)
+                if self.two_branch:
+                    self.groupDis = nn.Linear(512 * block.expansion, num_classes)
 
 
         for m in self.modules():
@@ -231,19 +235,22 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, full_pred=True):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
+        if self.first:
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.maxpool(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+            x = self.layer1(x)
+            x = self.layer2(x)
 
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
+        if self.last:
+            x = self.layer3(x)
+            x = self.layer4(x)
+
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
+            x = self.fc(x)
         # if self.mlp and self.two_branch:
         #     x = self.fc(x)
         #     x1 = self.instDis(x)
@@ -257,18 +264,21 @@ class ResNet(nn.Module):
         return x
 
     def feature_forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
+        if self.first:
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.maxpool(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+            x = self.layer1(x)
+            x = self.layer2(x)
 
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
+        if self.last:
+            x = self.layer3(x)
+            x = self.layer4(x)
+
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
         # x = self.fc(x)
         # if self.mlp and self.two_branch:
         #     x = self.fc(x)
@@ -288,11 +298,11 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
     return model
 
 
-def resnet18(pretrained=False, progress=True, **kwargs):
+def resnet18_imagenet(pretrained=False, progress=True, **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
@@ -304,7 +314,7 @@ def resnet18(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
-def resnet34(pretrained=False, progress=True, **kwargs):
+def resnet34_imagenet(pretrained=False, progress=True, **kwargs):
     r"""ResNet-34 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
@@ -316,7 +326,7 @@ def resnet34(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
-def resnet50(pretrained=False, progress=True, **kwargs):
+def resnet50_imagenet(pretrained=False, progress=True, **kwargs):
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
@@ -328,7 +338,7 @@ def resnet50(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
-def resnet101(pretrained=False, progress=True, **kwargs):
+def resnet101_imagenet(pretrained=False, progress=True, **kwargs):
     r"""ResNet-101 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
@@ -340,7 +350,7 @@ def resnet101(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
-def resnet152(pretrained=False, progress=True, **kwargs):
+def resnet152_imagenet(pretrained=False, progress=True, **kwargs):
     r"""ResNet-152 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
@@ -352,7 +362,7 @@ def resnet152(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
-def resnext50_32x4d(pretrained=False, progress=True, **kwargs):
+def resnext50_32x4d_imagenet(pretrained=False, progress=True, **kwargs):
     r"""ResNeXt-50 32x4d model from
     `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_
 
@@ -366,7 +376,7 @@ def resnext50_32x4d(pretrained=False, progress=True, **kwargs):
                    pretrained, progress, **kwargs)
 
 
-def resnext101_32x8d(pretrained=False, progress=True, **kwargs):
+def resnext101_32x8d_imagenet(pretrained=False, progress=True, **kwargs):
     r"""ResNeXt-101 32x8d model from
     `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_
 
@@ -380,7 +390,7 @@ def resnext101_32x8d(pretrained=False, progress=True, **kwargs):
                    pretrained, progress, **kwargs)
 
 
-def wide_resnet50_2(pretrained=False, progress=True, **kwargs):
+def wide_resnet50_2_imagenet(pretrained=False, progress=True, **kwargs):
     r"""Wide ResNet-50-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_
 
@@ -398,7 +408,7 @@ def wide_resnet50_2(pretrained=False, progress=True, **kwargs):
                    pretrained, progress, **kwargs)
 
 
-def wide_resnet101_2(pretrained=False, progress=True, **kwargs):
+def wide_resnet101_2_imagenet(pretrained=False, progress=True, **kwargs):
     r"""Wide ResNet-101-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_
 
