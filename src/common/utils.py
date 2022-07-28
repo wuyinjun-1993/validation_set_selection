@@ -131,9 +131,9 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
         optimizer.param_groups[0]['initial_lr'] = args.lr
         if args.do_train:
             if args.bias_classes:
-                mile_stones_epochs = [160, 180]
+                mile_stones_epochs = [20, 40]
             else:
-                mile_stones_epochs = [150, 225]
+                mile_stones_epochs = [20, 40]
             scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 optimizer,
                 milestones=mile_stones_epochs,
@@ -142,13 +142,13 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
         else:
             if args.use_pretrained_model:
                 if args.bias_classes:
-                    mile_stones_epochs = [80, 90]
+                    mile_stones_epochs = [20, 40]
                     gamma = 0.1
                 else:
-                    mile_stones_epochs = [80, 90]
+                    mile_stones_epochs = [20, 40]
                     gamma = 0.2
             else:
-                mile_stones_epochs = [150, 200]
+                mile_stones_epochs = [20, 40]
                 gamma = 0.1
             if args.lr_decay:
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(
