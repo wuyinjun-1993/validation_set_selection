@@ -122,11 +122,12 @@ class dataset_wrapper(Dataset):
 
     def __getitem__(self, index):
         img, target = self.data[index], self.targets[index]
-        if not type(img) is numpy.ndarray:
-            img = Image.fromarray(img.numpy(), mode="L")
-        else:
-            img = Image.fromarray(img)
         if self.transform is not None:
+            if not type(img) is numpy.ndarray:
+                img = Image.fromarray(img.numpy(), mode="L")
+            else:
+                img = Image.fromarray(img)
+        
             img1 = self.transform(img)
 
             if self.two_imgs:
@@ -1181,7 +1182,7 @@ def generate_noisy_dataset(args, trainset, logger):
                 flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
             torch.save(flipped_labels, flipped_label_dir)
         flipped_labels = torch.load(flipped_label_dir)
-    logger.info("Label accuracy: %f"%(torch.sum(flipped_labels == torch.tensor(trainset.df['level'].values)) / len(trainset.targets)))
+    # logger.info("Label accuracy: %f"%(torch.sum(flipped_labels == torch.tensor(trainset.df['level'].values)) / len(trainset.targets)))
     trainset.targets = flipped_labels
     return trainset
 
