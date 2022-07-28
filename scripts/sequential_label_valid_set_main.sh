@@ -164,7 +164,7 @@ exe_cmd="python -m torch.distributed.launch \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  ${add_valid_in_training_flag} \
+  --total_valid_sample_count ${total_valid_sample_count} \
   ${lr_decay_flag}"
 
 
