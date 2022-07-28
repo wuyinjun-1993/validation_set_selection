@@ -142,7 +142,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+#${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
@@ -158,14 +158,13 @@ exe_cmd="python -m torch.distributed.launch \
   --flip_labels \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
-  --prev_save_path ${save_path_root_dir}/${err_type}_${err_label_ratio}_warm_up/\
+  --prev_save_path ${save_path_prefix}_do_train/\
   --cuda \
-  --continue_label \
   --lr ${lr} \
   --batch_size ${batch_size} \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
-  ${add_valid_in_training_flag} \
+  --total_valid_sample_count ${total_valid_sample_count} \
   ${lr_decay_flag}"
 
 
