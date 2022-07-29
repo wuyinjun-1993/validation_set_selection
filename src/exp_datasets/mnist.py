@@ -260,7 +260,10 @@ def random_flip_labels_for_each_class(err_label_ids, origin_labels, label_type_c
 def systematically_flip_labels(err_label_ids, origin_labels, label_type_count):
     origin_label_for_err_label_ids = origin_labels[err_label_ids]
     # full_labels = set(list(range(label_type_count)))
-    rand_labels = torch.randperm(label_type_count)
+    if label_type_count == 2:
+        rand_labels = torch.tensor([1,0])
+    else:
+        rand_labels = torch.randperm(label_type_count)
     full_rand_err_label_ls = torch.zeros(len(err_label_ids), dtype = torch.long)
 
     for l in range(label_type_count):

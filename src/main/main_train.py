@@ -576,7 +576,9 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
     test_acc_ls = []
     for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
         rand_epoch_seed = random.randint(0, args.epochs*10)
-        train_loader.sampler.set_epoch(rand_epoch_seed)
+        invert_op = getattr(train_loader.sampler, "set_epoch", None)
+        if callable(invert_op):
+            train_loader.sampler.set_epoch(rand_epoch_seed)
         if args.active_learning:
             with torch.no_grad():
                 # Select 10 samples based on heuristic and assign correct label
@@ -668,7 +670,9 @@ def glc_train(train_loader, valid_loader, test_loader, meta_set, criterion, args
     C = get_confusion_for_glc(meta_set, network, num_classes)
     for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
         rand_epoch_seed = random.randint(0, args.epochs*10)
-        train_loader.sampler.set_epoch(rand_epoch_seed)
+        invert_op = getattr(train_loader.sampler, "set_epoch", None)
+        if callable(invert_op):
+            train_loader.sampler.set_epoch(rand_epoch_seed)
         network.train()
         for batch_idx, (_, data, target) in enumerate(train_loader):
             if args.cuda:
@@ -1118,9 +1122,9 @@ def main2(args, logger):
     elif args.dataset == 'retina':
         # pretrained_rep_net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
 
-        pretrained_rep_net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
+        pretrained_rep_net = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True).cuda()
 
-        pretrained_rep_net.fc = nn.Linear(512, 5)
+        pretrained_rep_net.fc = nn.Linear(512, 2)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
         # pretrained_rep_net.eval()
         
@@ -1284,14 +1288,14 @@ def main2(args, logger):
                 net = resnet34(num_classes=100)
     elif args.dataset == 'retina':
         # net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
-        net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
+        net = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True).cuda()
         # for param in net.conv1.parameters():
         #     param.requires_grad = False
         # for param in net.layer1.parameters():
         #     param.requires_grad = False
         # for param in net.layer2.parameters():
         #     param.requires_grad = False
-        net.fc = nn.Linear(512, 5)
+        net.fc = nn.Linear(512, 2)
     elif args.dataset == 'imagenet':
         net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
         for param in net.conv1.parameters():
