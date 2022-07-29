@@ -151,7 +151,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+#${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
@@ -165,6 +165,7 @@ exe_cmd="python -m torch.distributed.launch \
   --valid_count ${warm_up_valid_count} \
   --meta_lr ${meta_lr} \
   --flip_labels \
+  ${bias_flip_str} \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
   --prev_save_path ${save_path_prefix}_do_train/\
@@ -211,6 +212,7 @@ do
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     --flip_labels \
+    ${bias_flip_str} \
     --err_label_ratio ${err_label_ratio} \
     --save_path ${save_path_prefix}_seq_select_${k}/ \
     --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
