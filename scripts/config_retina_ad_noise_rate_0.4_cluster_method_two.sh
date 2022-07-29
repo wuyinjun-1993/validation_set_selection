@@ -21,7 +21,7 @@ model_prov_period=20
 
 
 valid_ratio_each_run=100 #$(( total_valid_ratio / repeat_times ))
-bias_flip=false
+bias_flip=true
 method="cluster_method_two"
 total_valid_sample_count=100
 use_pretrained_model=false

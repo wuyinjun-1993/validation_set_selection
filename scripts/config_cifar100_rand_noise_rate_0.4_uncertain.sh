@@ -2,9 +2,9 @@ err_label_ratio=0.4
 
 dataset_name=cifar100
 data_dir="/data1/wuyinjun/valid_set_selections/cifar100_4/"
-save_path_root_dir="/data2/wuyinjun/valid_set_selections/cifar100_4/"
+save_path_root_dir="/data1/wuyinjun/valid_set_selections/cifar100_4/"
 output_dir="/data1/wuyinjun/valid_set_selections/cifar100_4/"
-gpu_ids=0
+gpu_ids=2
 #total_valid_ratio=$6
 repeat_times=2
 port_num=10010
@@ -24,4 +24,4 @@ valid_ratio_each_run=200 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
 method="uncertain"
 total_valid_sample_count=200
-
+use_pretrained_model=true

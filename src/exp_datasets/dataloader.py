@@ -470,6 +470,12 @@ def split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, 
     return train_set, meta_set
 
 def random_partition_train_valid_dataset0(criterion, optimizer, net, train_dataset, validset, args, origin_labels, cached_sample_weights=None):
+    # if validset is not None and args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
+    #     args.logger.info("already collect enough samples, exit!!!!")
+    #     sys.exit(1)
+
+    # if len(validset) + args.valid_count > args.total_valid_sample_count:
+    #     args.valid_count = args.total_valid_sample_count - len(validset)
     train_ids = torch.arange(len(train_dataset))
     rand_train_ids = torch.randperm(len(train_ids))
 
@@ -485,6 +491,13 @@ def random_partition_train_valid_dataset0(criterion, optimizer, net, train_datas
 
 
 def random_partition_train_valid_dataset0_by_class(criterion, optimizer, net, train_dataset, validset, args, origin_labels, cached_sample_weights=None, sample_count_per_class = None):
+
+    # if validset is not None and args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
+    #     args.logger.info("already collect enough samples, exit!!!!")
+    #     sys.exit(1)
+
+    # if len(validset) + args.valid_count > args.total_valid_sample_count:
+    #     args.valid_count = args.total_valid_sample_count - len(validset)
 
     unique_label_set = set(origin_labels.tolist())
     valid_size = args.valid_count
@@ -797,6 +810,13 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
 
 
 def uncertainty_sample(criterion, optimizer, net, train_dataset, validset, args, origin_labels, cached_sample_weights=None):
+    # if validset is not None and args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
+    #     args.logger.info("already collect enough samples, exit!!!!")
+    #     sys.exit(1)
+
+    # if len(validset) + args.valid_count > args.total_valid_sample_count:
+    #     args.valid_count = args.total_valid_sample_count - len(validset)
+    
     vals = torch.zeros((train_dataset.targets.shape[0],))
     labels = torch.zeros((train_dataset.targets.shape[0],)).long()
     trainloader = DataLoader(train_dataset, batch_size=32, shuffle=False)
@@ -832,6 +852,13 @@ def uncertainty_sample(criterion, optimizer, net, train_dataset, validset, args,
     return train_set, meta_set, remaining_origin_labels
 
 def certainty_sample(criterion, optimizer, net, train_dataset, validset, args, origin_labels, cached_sample_weights=None):
+    # if validset is not None and args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
+    #     args.logger.info("already collect enough samples, exit!!!!")
+    #     sys.exit(1)
+
+    # if len(validset) + args.valid_count > args.total_valid_sample_count:
+    #     args.valid_count = args.total_valid_sample_count - len(validset)
+
     vals = torch.zeros((train_dataset.targets.shape[0],))
     labels = torch.zeros((train_dataset.targets.shape[0],)).long()
     trainloader = DataLoader(train_dataset, batch_size=32, shuffle=False)
@@ -1448,6 +1475,14 @@ def get_dataloader_for_meta(
     else:
         if args.continue_label:
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
+
+        if metaset is not None and args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(metaset):
+            args.logger.info("already collect enough samples, exit!!!!")
+            sys.exit(1)
+
+        if metaset is not None and len(metaset) + args.valid_count > args.total_valid_sample_count:
+            args.valid_count = args.total_valid_sample_count - len(metaset)
+
 
         if not args.ta_vaal_train:
             if not split_method == 'craige':

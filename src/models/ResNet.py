@@ -264,7 +264,7 @@ class ResNet(nn.Module):
         #         return [x1, x2]
         return x
 
-    def feature_forward(self, x):
+    def feature_forward(self, x, all_layer=False):
         if self.first:
             x = self.conv1(x)
             x = self.bn1(x)

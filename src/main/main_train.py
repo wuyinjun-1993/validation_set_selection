@@ -208,7 +208,7 @@ def meta_learning_model(
     criterion,
     meta_criterion,
     train_loader,
-    meta_loader,
+    metaloader,
     valid_loader,
     test_loader,
     to_device,
@@ -220,9 +220,10 @@ def meta_learning_model(
     heuristic=None,
     gt_training_labels=None,
 ):
-    logger.info("Meta set set: {}".format(len(meta_loader.dataset)))
+    logger.info("Meta set set: {}".format(len(metaloader.dataset)))
     
-    
+    metaloader = iter(metaloader)
+
     if args.cuda:
         device = torch.device("cuda:" + str(torch.cuda.current_device()))
     else:
@@ -262,7 +263,9 @@ def meta_learning_model(
         
         train_loss, train_acc = 0, 0
         rand_epoch_seed = random.randint(0, args.epochs*10)
-        train_loader.sampler.set_epoch(rand_epoch_seed)
+        invert_op = getattr(train_loader.sampler, "set_epoch", None)
+        if callable(invert_op):
+            train_loader.sampler.set_epoch(rand_epoch_seed)
         curr_w_array_delta = torch.zeros_like(w_array)
 
         avg_train_loss = 0
@@ -275,32 +278,40 @@ def meta_learning_model(
                 _, indices = torch.sort(
                     heuristic(model.module, train_loader), descending=True
                 )
-                metaset = meta_loader.dataset
+                metaset = metaloader.dataset
                 metaset.targets = torch.cat(
-                    (meta_loader.dataset.targets, gt_training_labels[indices[:5]]),
+                    (metaloader.dataset.targets, gt_training_labels[indices[:5]]),
                     dim=0,
                 )
                 metaset.data = torch.cat(
-                    (meta_loader.dataset.data, train_loader.dataset.data[indices[:5]]),
+                    (metaloader.dataset.data, train_loader.dataset.data[indices[:5]]),
                     dim=0,
                 )
                 torch.save(indices[:5], os.path.join(args.save_path,
                     'actively_chosen_samples_' + str(ep)))
                 logger.info("meta dataset size::%d"%(len(metaset.targets)))
-                meta_sampler = torch.utils.data.distributed.DistributedSampler(
-                    metaset,
-                    num_replicas=args.world_size,
-                    rank=args.local_rank,
-                )
-                meta_loader = torch.utils.data.DataLoader(
+                # meta_sampler = torch.utils.data.distributed.DistributedSampler(
+                #     metaset,
+                #     num_replicas=args.world_size,
+                #     rank=args.local_rank,
+                # )
+                # meta_loader = torch.utils.data.DataLoader(
+                #     metaset,
+                #     batch_size=args.test_batch_size,
+                #     num_workers=args.num_workers,
+                #     pin_memory=True,
+                #     sampler=meta_sampler,
+                # )
+                meta_sampler = RandomSampler(metaset, replacement=True, num_samples=args.epochs*len(train_loader)*args.batch_size*10)
+                metaloader = DataLoader(
                     metaset,
                     batch_size=args.test_batch_size,
-                    num_workers=args.num_workers,
+                    num_workers=0,#args.num_workers,
                     pin_memory=True,
                     sampler=meta_sampler,
                 )
 
-        metaloader = itertools.cycle(meta_loader)
+        # metaloader = itertools.cycle(meta_loader)
 
         model.train()
         for idx, inputs in enumerate(train_loader):
@@ -351,6 +362,9 @@ def meta_learning_model(
                 
                 
                 meta_opt.step(meta_train_loss)
+
+
+                del meta_train_loss
     
                 # 2. Compute grads of eps on meta validation data
                 # meta_inputs, meta_labels =  next(meta_loader)
@@ -401,7 +415,7 @@ def meta_learning_model(
 
             curr_w_array_delta[train_ids] = w_array[train_ids].detach() - prev_w_array
 
-
+            del prev_w_array, eps_grads, meta_val_loss, model_out, meta_model, meta_opt
             # if args.learning_decay and total_iter_count%warm_up_steps == 0:
             #         opt, curr_learning_rate = vary_learning_rate(curr_learning_rate, ep, args, model=model)
 
@@ -449,6 +463,9 @@ def meta_learning_model(
             if idx % 10 == 0:
                 logger.info("Loss at iter %d: %f"%(idx, minibatch_loss.detach().cpu()))
 
+            del minibatch_loss, meta_train_outputs, model_out, labels, inputs, meta_inputs, eps, model_pred
+
+            torch.cuda.empty_cache()
 
             # del meta_inputs[2], inputs[2]
 

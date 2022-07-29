@@ -28,6 +28,9 @@ echo "bias_flip::${bias_flip}"
 echo "method::${method}"
 echo "total_valid_sample_count::${total_valid_sample_count}"
 
+
+echo "use_pretrained_model::$use_pretrained_model"
+
 #total_valid_sample_count=200
 
 
@@ -78,7 +81,6 @@ fi
 #add_valid_in_training_flag="--cluster_method_two --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
 
 #add_valid_in_training_flag="--cluster_method_three --not_rescale_features --weight_by_norm  --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --remove_empty_clusters --no_sample_weights_k_means"
-lr_decay_flag="--use_pretrained_model --lr_decay"
 
 
 bias_flip_str=''
@@ -90,6 +92,13 @@ then
 	err_type='bias_error'
 fi
 
+
+lr_decay_flag="--lr_decay"
+
+if "${use_pretrained_model}";
+then 
+	lr_decay_flag="--use_pretrained_model --lr_decay"
+fi
 
 
 save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}
@@ -142,7 +151,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+#${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \

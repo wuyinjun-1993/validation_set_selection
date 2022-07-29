@@ -239,7 +239,7 @@ class DifferentiableOptimizer(_abc.ABC):
             all_grads = grad_callback(all_grads)
         elif self._grad_callback is not None:
             all_grads = self._grad_callback(all_grads)
-
+        
         grouped_grads = []
         for group, mapping in zip(self.param_groups, self._group_to_param_list):
             grads = []
@@ -247,7 +247,7 @@ class DifferentiableOptimizer(_abc.ABC):
                 group['params'][i] = params[index]
                 grads.append(all_grads[index])
             grouped_grads.append(grads)
-
+        del all_grads
         self._update(grouped_grads)
 
         new_params = params[:]
