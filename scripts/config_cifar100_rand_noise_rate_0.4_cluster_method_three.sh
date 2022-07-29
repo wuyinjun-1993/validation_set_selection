@@ -2,7 +2,7 @@ err_label_ratio=0.4
 
 dataset_name=cifar100
 data_dir="/data1/wuyinjun/valid_set_selections/cifar100_4/"
-save_path_root_dir="/data2/wuyinjun/valid_set_selections/cifar100_4/"
+save_path_root_dir="/data1/wuyinjun/valid_set_selections/cifar100_4/"
 output_dir="/data1/wuyinjun/valid_set_selections/cifar100_4/"
 gpu_ids=3
 #total_valid_ratio=$6
