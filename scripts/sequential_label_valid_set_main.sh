@@ -76,7 +76,17 @@ then
         add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --ta_vaal_train"
 
 
+elif [[ $method == 'craige' ]];
+then 
+	add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --craige"
+
+elif [[ $method == 'finetune'  ]]
+then 
+	add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --finetune"
+
 fi
+
+
 
 #add_valid_in_training_flag="--cluster_method_two --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
 
