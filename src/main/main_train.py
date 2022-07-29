@@ -263,7 +263,9 @@ def meta_learning_model(
         
         train_loss, train_acc = 0, 0
         rand_epoch_seed = random.randint(0, args.epochs*10)
-        train_loader.sampler.set_epoch(rand_epoch_seed)
+        invert_op = getattr(train_loader.sampler, "set_epoch", None)
+        if callable(invert_op):
+            train_loader.sampler.set_epoch(rand_epoch_seed)
         curr_w_array_delta = torch.zeros_like(w_array)
 
         avg_train_loss = 0
