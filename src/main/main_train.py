@@ -1118,7 +1118,7 @@ def main2(args, logger):
     elif args.dataset == 'retina':
         # pretrained_rep_net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
 
-        pretrained_rep_net = resnet34_imagenet(pretrained=True, first=True, last=True).cuda()
+        pretrained_rep_net = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True).cuda()
 
         pretrained_rep_net.fc = nn.Linear(512, 2)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
@@ -1284,7 +1284,7 @@ def main2(args, logger):
                 net = resnet34(num_classes=100)
     elif args.dataset == 'retina':
         # net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
-        net = resnet34_imagenet(pretrained=True, first=True, last=True).cuda()
+        net = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True).cuda()
         # for param in net.conv1.parameters():
         #     param.requires_grad = False
         # for param in net.layer1.parameters():

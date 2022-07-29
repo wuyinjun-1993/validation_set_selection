@@ -1210,7 +1210,7 @@ def generate_noisy_dataset(args, trainset, logger):
         logger.info("Not loading dataset")
         if args.adversarial_flip:
             flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
-        elif args.biased_flip:
+        elif args.biased_flip or args.dataset == 'retina':
             flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
         else:
             flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
