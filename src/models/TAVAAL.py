@@ -18,6 +18,8 @@ from exp_datasets.dataloader import dataset_wrapper, split_train_valid_set_by_id
 from models.resnet3 import resnet34
 from models.LeNet5 import *
 from models.DNN import *
+from torch.utils.data.distributed import DistributedSampler
+
 
 MARGIN = 1.0
 WEIGHT = 1.0
@@ -575,12 +577,30 @@ def main_train_taaval(args):
             pin_memory=True,
             # drop_last=True,
         )
+
+        train_sampler = DistributedSampler(
+            train_set,
+            num_replicas=args.world_size,
+            rank=args.local_rank,
+            shuffle = False
+        )
+
         train_loader = DataLoader(
             train_set,
-            batch_size=args.batch_size, 
+            batch_size=args.batch_size,
+            # num_workers=4*4, #args.num_workers,
             pin_memory=True,
-            # drop_last=True,
+            shuffle=False,
+            sampler=train_sampler,
         )
+
+        # train_loader = DataLoader(
+        #     train_set,
+        #     batch_size=args.batch_size, 
+        #     pin_memory=True,
+            
+        #     # drop_last=True,
+        # )
         valid_loader = DataLoader(
             valid_set,
             batch_size=args.batch_size, 
