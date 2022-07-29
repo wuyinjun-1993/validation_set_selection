@@ -1125,6 +1125,10 @@ def main2(args, logger):
         # pretrained_rep_net.eval()
         
         optimizer.param_groups[0]['initial_lr'] = args.lr
+    elif args.dataset == 'imagenet':
+        pretrained_rep_net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
+        optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
+        optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('sst2'):
         pretrained_rep_net = custom_Bert(2)
         args.num_class=2
@@ -1288,6 +1292,14 @@ def main2(args, logger):
         # for param in net.layer2.parameters():
         #     param.requires_grad = False
         net.fc = nn.Linear(512, 5)
+    elif args.dataset == 'imagenet':
+        net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
+        for param in net.conv1.parameters():
+            param.requires_grad = False
+        for param in net.layer1.parameters():
+            param.requires_grad = False
+        for param in net.layer2.parameters():
+            param.requires_grad = False
     elif args.dataset.startswith('sst2'):
         net = custom_Bert(2)
     elif args.dataset.startswith('sst5'):

@@ -567,9 +567,9 @@ def main_train_taaval(args):
         indices = list(range(NUM_TRAIN))
         random.shuffle(indices)
 
-        meta_set = torch.load(os.path.join(args.save_path, "cached_meta_set"))
-        valid_set = torch.load(os.path.join(args.save_path, "cached_valid_set"))
-        test_set = torch.load(os.path.join(args.save_path, "cached_test_set"))
+        meta_set = torch.load(os.path.join(args.prev_save_path, "cached_meta_set"))
+        valid_set = torch.load(os.path.join(args.prev_save_path, "cached_valid_set"))
+        test_set = torch.load(os.path.join(args.prev_save_path, "cached_test_set"))
 
         unlabeled_set = list(range(len(train_set)))
         # meta_loader = DataLoader(
@@ -747,13 +747,42 @@ def main_train_taaval(args):
             torch.save(meta_set, os.path.join(args.save_path, "cached_meta_set"))
             torch.save(train_set, os.path.join(args.save_path, "cached_train_set"))
 
-            dataloaders['meta'] = DataLoader(
+            meta_sampler = RandomSampler(meta_set, replacement=True, num_samples=args.epochs*len(train_loader)*args.batch_size*10)
+            meta_loader = DataLoader(
                 meta_set,
-                batch_size=args.batch_size, 
+                batch_size=args.test_batch_size,
+                num_workers=0,#args.num_workers,
                 pin_memory=True,
+                sampler=meta_sampler,
             )
-            dataloaders['train'] = DataLoader(
+
+
+
+            dataloaders['meta'] = meta_loader
+            # DataLoader(
+            #     meta_set,
+            #     batch_size=args.batch_size, 
+            #     pin_memory=True,
+            # )
+
+            train_sampler = DistributedSampler(
                 train_set,
-                batch_size=args.batch_size, 
-                pin_memory=True,
+                num_replicas=args.world_size,
+                rank=args.local_rank,
+                shuffle = False
             )
+
+            train_loader = DataLoader(
+                train_set,
+                batch_size=args.batch_size,
+                # num_workers=4*4, #args.num_workers,
+                pin_memory=True,
+                shuffle=False,
+                sampler=train_sampler,
+            )
+            dataloaders['train'] = train_loader
+            # DataLoader(
+            #     train_set,
+            #     batch_size=args.batch_size, 
+            #     pin_memory=True,
+            # )
