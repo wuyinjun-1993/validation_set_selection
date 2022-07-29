@@ -74,6 +74,30 @@ class RetinaDataset(Dataset):
     def to_cuda(data, targets):
         return data.cuda(), targets.cuda()
 
+class ImageNetDataset(Dataset):
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.targets = dataset.targets
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, index):
+        return self.dataset[index]
+
+    @staticmethod
+    def get_subset_dataset(dataset, sample_ids, labels=None):
+        subset_samples = [dataset.samples[i] for i in sample_ids]
+        subset_data = copy.deepcopy(dataset)
+        subset_data.samples = subset_samples
+        subset_data.targets = [s[1] for s in subset_samples]
+        subset_dataset = ImageNetDataset(subset_data)
+        return subset_dataset
+
+    @staticmethod
+    def to_cuda(data, targets):
+        return data.cuda(), targets.cuda()
+
 class dataset_wrapper_X(Dataset):
     def __init__(self, data_tensor, transform, three_imgs = False, two_imgs = False):
 
@@ -1287,6 +1311,30 @@ def get_dataloader_for_meta(
 
             origin_labels = trainset.targets.clone()
 
+        elif args.dataset == 'imagenet':
+            normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                             std=[0.229, 0.224, 0.225])
+
+            trainset = ImageNetDataset(torchvision.datasets.ImageNet(
+                args.data_dir,
+                "train",
+                transform=transforms.Compose([
+                    transforms.RandomResizedCrop(224),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    normalize,
+                ])))
+
+            testset = ImageNetDataset(torchvision.datasets.ImageNet(
+                args.data_dir,
+                "val",
+                transform=transforms.Compose([
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    normalize,
+                ])))
+            origin_labels = trainset.targets.clone()
         elif args.dataset == 'MNIST':
             transform_train = torchvision.transforms.Compose([
                 torchvision.transforms.ToTensor(),
