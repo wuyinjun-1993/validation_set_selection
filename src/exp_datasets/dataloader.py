@@ -1432,7 +1432,7 @@ def get_dataloader_for_meta(
             args.logger.info("already collect enough samples, exit!!!!")
             sys.exit(1)
 
-        if len(metaset) + args.valid_count > args.total_valid_sample_count:
+        if metaset is not None and len(metaset) + args.valid_count > args.total_valid_sample_count:
             args.valid_count = args.total_valid_sample_count - len(metaset)
 
 
