@@ -1120,7 +1120,7 @@ def main2(args, logger):
 
         pretrained_rep_net = resnet34_imagenet(pretrained=True, first=True, last=True).cuda()
 
-        pretrained_rep_net.fc = nn.Linear(512, 5)
+        pretrained_rep_net.fc = nn.Linear(512, 2)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
         # pretrained_rep_net.eval()
         
@@ -1291,7 +1291,7 @@ def main2(args, logger):
         #     param.requires_grad = False
         # for param in net.layer2.parameters():
         #     param.requires_grad = False
-        net.fc = nn.Linear(512, 5)
+        net.fc = nn.Linear(512, 2)
     elif args.dataset == 'imagenet':
         net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
         for param in net.conv1.parameters():

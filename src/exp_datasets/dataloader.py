@@ -1335,6 +1335,10 @@ def get_dataloader_for_meta(
 
             trainset = torch.load(os.path.join(args.data_dir, "transformed_train_dataset"))
             testset = torch.load(os.path.join(args.data_dir, "transformed_test_dataset"))
+            if len(trainset.targets.unique()) == 5:
+                trainset.targets = (trainset.targets >= 2).type(torch.long).view(-1)
+                testset.targets = (testset.targets >= 2).type(torch.long).view(-1)
+
 
             origin_labels = trainset.targets.clone()
 
