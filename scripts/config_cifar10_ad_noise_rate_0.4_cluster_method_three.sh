@@ -4,10 +4,10 @@ dataset_name=cifar10
 data_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
 save_path_root_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
 output_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
-gpu_ids=0
+gpu_ids=3
 #total_valid_ratio=$6
-repeat_times=2
-port_num=10010
+repeat_times=10
+port_num=10013
 meta_lr=30
 lr=0.1
 batch_size=128
@@ -21,7 +21,7 @@ model_prov_period=20
 
 
 valid_ratio_each_run=100 #$(( total_valid_ratio / repeat_times ))
-bias_flip=false
-method="uncertain"
+bias_flip=true
+method="cluster_method_three"
 total_valid_sample_count=100
 use_pretrained_model=true
