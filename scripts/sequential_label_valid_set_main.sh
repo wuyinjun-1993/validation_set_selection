@@ -151,7 +151,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+#${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
