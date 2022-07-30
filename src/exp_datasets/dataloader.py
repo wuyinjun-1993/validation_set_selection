@@ -253,11 +253,11 @@ class dataset_wrapper(Dataset):
             if len(dataset2.data.shape) < len(valid_data_mat.shape):
                 dataset2.data = dataset2.data.unsqueeze(0)
                 dataset2.targets = dataset2.targets.unsqueeze(0)
-            
+            if len(dataset2.data.shape) > len(valid_data_mat.shape):
+                dataset2.data = dataset2.data.squeeze(0)
             print("origin_valid data shape::", valid_data_mat.shape)
             print("new valid data shape::", dataset2.data.shape)
-            if len(dataset2.data.shape) < len(valid_data_mat.shape):
-                dataset2.data = dataset2.data.unsqueeze(0)
+            
             
             valid_data_mat = torch.cat([valid_data_mat, dataset2.data], dim = 0)
             valid_labels = torch.cat([valid_labels, dataset2.targets], dim = 0)
