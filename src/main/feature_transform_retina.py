@@ -100,7 +100,7 @@ def obtain_features_single_dataset(trainloader, net):
     for _, (idx, features, targets) in tqdm(enumerate(trainloader)):
         features = features.cuda()
         # targets = targets.cuda()
-        feature_out = net(features)
+        feature_out = features#net(features)
 
         feature_out_array.append(feature_out.detach().cpu())
         targets_array.append(targets)

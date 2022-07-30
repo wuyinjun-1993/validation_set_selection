@@ -24,13 +24,12 @@ echo "lr_decay::${lr_decay}"
 echo "warm_up_valid_count::${warm_up_valid_count}"
 echo "model_prov_period::${model_prov_period}"
 echo "valid_ratio_each_run::${valid_ratio_each_run}" #$(( total_valid_ratio / repeat_times ))
-echo "bias_flip::${bias_flip}"
 echo "method::${method}"
 echo "total_valid_sample_count::${total_valid_sample_count}"
 
 echo "metric::${metric}"
 echo "suffix::${suffix}"
-
+echo "imb_factor::${imb_factor}"
 echo "use_pretrained_model::$use_pretrained_model"
 
 #total_valid_sample_count=200
@@ -105,14 +104,8 @@ fi
 #add_valid_in_training_flag="--cluster_method_three --not_rescale_features --weight_by_norm  --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --remove_empty_clusters --no_sample_weights_k_means"
 
 
-bias_flip_str=''
-err_type='rand_error'
-
-if "${bias_flip}";
-then
-	bias_flip_str='--biased_flip'
-	err_type='bias_error'
-fi
+bias_flip_str="--bias_classes --imb_factor ${imb_factor}"
+err_type="imb_factor_${imb_factor}"
 
 
 lr_decay_flag="--lr_decay"
@@ -206,7 +199,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 
 echo "${exe_cmd} > ${output_file_name}"
 
-#${exe_cmd} > ${output_file_name} 2>&1 
+${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 

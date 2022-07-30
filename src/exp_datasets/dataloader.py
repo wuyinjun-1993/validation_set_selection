@@ -1210,7 +1210,7 @@ def generate_noisy_dataset(args, trainset, logger):
         logger.info("Not loading dataset")
         if args.adversarial_flip:
             flipped_labels = adversarial_flip_labels(trainset, ratio=args.err_label_ratio)
-        elif args.biased_flip:
+        elif args.biased_flip or args.dataset == 'retina':
             flipped_labels = random_flip_labels_on_training3(trainset, ratio=args.err_label_ratio)
         else:
             flipped_labels = random_flip_labels_on_training2(trainset, ratio=args.err_label_ratio)
@@ -1335,6 +1335,10 @@ def get_dataloader_for_meta(
 
             trainset = torch.load(os.path.join(args.data_dir, "transformed_train_dataset"))
             testset = torch.load(os.path.join(args.data_dir, "transformed_test_dataset"))
+            if len(trainset.targets.unique()) == 5:
+                trainset.targets = (trainset.targets >= 2).type(torch.long).view(-1)
+                testset.targets = (testset.targets >= 2).type(torch.long).view(-1)
+
 
             origin_labels = trainset.targets.clone()
 

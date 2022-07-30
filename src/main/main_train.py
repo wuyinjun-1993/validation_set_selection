@@ -503,14 +503,34 @@ def meta_learning_model(
                     criterion.reduction = 'mean'
                 if len(valid_loader) > 0:
                     logger.info("valid performance at epoch %d"%(ep))
-                    valid_loss, valid_acc = test(valid_loader, model, criterion, args, logger, "valid")
-                    report_best_test_performance_so_far(logger, valid_loss_ls,
-                        valid_acc_ls, valid_loss, valid_acc, "valid")
+                    valid_loss, valid_acc, valid_quadratic_kappa, valid_auc_score = test(valid_loader, model, criterion, args, logger, "valid")
+                    if args.metric == 'accuracy':
+                        report_best_test_performance_so_far(logger, valid_loss_ls,
+                            valid_acc_ls, valid_loss, valid_acc, "valid")
+                    elif args.metric == 'kappa':
+                        report_best_test_performance_so_far(logger, valid_loss_ls,
+                            valid_acc_ls, valid_loss, valid_quadratic_kappa, "valid")
+                    elif args.metric == 'auc':
+                        report_best_test_performance_so_far(logger, valid_loss_ls,
+                            valid_acc_ls, valid_loss, valid_auc_score, "valid")
+                    else:
+                        raise NotImplementedError
 
                 logger.info("test performance at epoch %d"%(ep))
-                test_loss, test_acc = test(test_loader, model, criterion, args, logger, "test")
-                report_best_test_performance_so_far(logger, test_loss_ls,
+                test_loss, test_acc, test_quadratic_kappa, test_auc_score = test(test_loader, model, criterion, args, logger, "test")
+
+                if args.metric == 'accuracy':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
                         test_acc_ls, test_loss, test_acc, "test")
+                elif args.metric == 'kappa':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
+                        test_acc_ls, test_loss, test_quadratic_kappa, "test")
+                elif args.metric == 'auc':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
+                        test_acc_ls, test_loss, test_auc_score, "test")
+                else:
+                    raise NotImplementedError
+
 
         if scheduler is not None:
             logger.info("learning rate at iteration %d before using scheduler: %f" %(int(ep), float(opt.param_groups[0]['lr'])))
@@ -576,7 +596,9 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
     test_acc_ls = []
     for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
         rand_epoch_seed = random.randint(0, args.epochs*10)
-        train_loader.sampler.set_epoch(rand_epoch_seed)
+        invert_op = getattr(train_loader.sampler, "set_epoch", None)
+        if callable(invert_op):
+            train_loader.sampler.set_epoch(rand_epoch_seed)
         if args.active_learning:
             with torch.no_grad():
                 # Select 10 samples based on heuristic and assign correct label
@@ -613,14 +635,33 @@ def basic_train(train_loader, valid_loader, test_loader, criterion, args,
         logger.info("learning rate at epoch %d: %f"%(epoch, float(optimizer.param_groups[0]['lr'])))
         with torch.no_grad():
             if valid_loader is not None and args.local_rank == 0:
-                valid_loss, valid_acc = test(valid_loader, network, criterion, args, logger, "valid")
-                report_best_test_performance_so_far(logger, valid_loss_ls,
+                valid_loss, valid_acc,valid_quadratic_kappa, valid_auc_score = test(valid_loader, network, criterion, args, logger, "valid")
+                if args.metric == 'accuracy':
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
                         valid_acc_ls, valid_loss, valid_acc, "valid")
+                elif args.metric == 'kappa':
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
+                        valid_acc_ls, valid_loss, valid_quadratic_kappa, "valid")
+                elif args.metric == 'auc':
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
+                        valid_acc_ls, valid_loss, valid_auc_score, "valid")
+                else:
+                    raise NotImplementedError
+               
             
             if args.local_rank == 0:
-                test_loss, test_acc = test(test_loader, network, criterion, args, logger, "test")
-                report_best_test_performance_so_far(logger, test_loss_ls,
+                test_loss, test_acc, test_quadratic_kappa, test_auc_score = test(test_loader, network, criterion, args, logger, "test")
+                # report_best_test_performance_so_far(logger, test_loss_ls,
+                #         test_acc_ls, test_loss, test_acc, "test")
+                if args.metric == 'accuracy':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
                         test_acc_ls, test_loss, test_acc, "test")
+                elif args.metric == 'kappa':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
+                        test_acc_ls, test_loss, test_quadratic_kappa, "test")
+                elif args.metric == 'auc':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
+                        test_acc_ls, test_loss, test_auc_score, "test")
 
     if args.local_rank == 0:
         best_index = report_final_performance_by_early_stopping(valid_loss_ls,
@@ -668,7 +709,9 @@ def glc_train(train_loader, valid_loader, test_loader, meta_set, criterion, args
     C = get_confusion_for_glc(meta_set, network, num_classes)
     for epoch in tqdm(range(start_epoch, args.epochs+start_epoch)):
         rand_epoch_seed = random.randint(0, args.epochs*10)
-        train_loader.sampler.set_epoch(rand_epoch_seed)
+        invert_op = getattr(train_loader.sampler, "set_epoch", None)
+        if callable(invert_op):
+            train_loader.sampler.set_epoch(rand_epoch_seed)
         network.train()
         for batch_idx, (_, data, target) in enumerate(train_loader):
             if args.cuda:
@@ -695,14 +738,34 @@ def glc_train(train_loader, valid_loader, test_loader, meta_set, criterion, args
         logger.info("learning rate at epoch %d: %f"%(epoch, float(optimizer.param_groups[0]['lr'])))
         with torch.no_grad():
             if valid_loader is not None and args.local_rank == 0:
-                valid_loss, valid_acc = test(valid_loader, network, criterion, args, logger, "valid")
-                report_best_test_performance_so_far(logger, valid_loss_ls,
+                valid_loss, valid_acc, valid_quadratic_kappa, valid_auc_score = test(valid_loader, network, criterion, args, logger, "valid")
+                # report_best_test_performance_so_far(logger, valid_loss_ls,
+                #         valid_acc_ls, valid_loss, valid_acc, "valid")
+                if args.metric == 'accuracy':
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
                         valid_acc_ls, valid_loss, valid_acc, "valid")
+                elif args.metric == 'kappa':
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
+                        valid_acc_ls, valid_loss, valid_quadratic_kappa, "valid")
+                elif args.metric == 'auc':
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
+                        valid_acc_ls, valid_loss, valid_auc_score, "valid")
+                else:
+                    raise NotImplementedError
             
             if args.local_rank == 0:
-                test_loss, test_acc = test(test_loader, network, criterion, args, logger, "test")
-                report_best_test_performance_so_far(logger, test_loss_ls,
+                test_loss, test_acc, test_quadratic_kappa, test_auc_score = test(test_loader, network, criterion, args, logger, "test")
+                # report_best_test_performance_so_far(logger, test_loss_ls,
+                #         test_acc_ls, test_loss, test_acc, "test")
+                if args.metric == 'accuracy':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
                         test_acc_ls, test_loss, test_acc, "test")
+                elif args.metric == 'kappa':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
+                        test_acc_ls, test_loss, test_quadratic_kappa, "test")
+                elif args.metric == 'auc':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
+                        test_acc_ls, test_loss, test_auc_score, "test")
 
     if args.local_rank == 0:
         best_index = report_final_performance_by_early_stopping(valid_loss_ls,
@@ -755,14 +818,34 @@ def active_learning(train_loader, valid_loader, test_loader, criterion,
         
         with torch.no_grad():
             if valid_loader is not None and args.local_rank == 0:
-                valid_loss, valid_acc = test(valid_loader, network, criterion, args, logger, "valid")
-                report_best_test_performance_so_far(logger, valid_loss_ls,
+                valid_loss, valid_acc, valid_quadratic_kappa, valid_auc_score = test(valid_loader, network, criterion, args, logger, "valid")
+                # report_best_test_performance_so_far(logger, valid_loss_ls,
+                #         valid_acc_ls, valid_loss, valid_acc, "valid")
+                if args.metric == 'accuracy':
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
                         valid_acc_ls, valid_loss, valid_acc, "valid")
+                elif args.metric == 'kappa':
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
+                        valid_acc_ls, valid_loss, valid_quadratic_kappa, "valid")
+                elif args.metric == 'auc':
+                    report_best_test_performance_so_far(logger, valid_loss_ls,
+                        valid_acc_ls, valid_loss, valid_auc_score, "valid")
+                else:
+                    raise NotImplementedError
 
             if args.local_rank == 0:
-                test_loss, test_acc = test(test_loader, network, criterion, args, logger, "test")
-                report_best_test_performance_so_far(logger, test_loss_ls,
+                test_loss, test_acc, test_quadratic_kappa, test_auc_score = test(test_loader, network, criterion, args, logger, "test")
+                # report_best_test_performance_so_far(logger, test_loss_ls,
+                #         test_acc_ls, test_loss, test_acc, "test")
+                if args.metric == 'accuracy':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
                         test_acc_ls, test_loss, test_acc, "test")
+                elif args.metric == 'kappa':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
+                        test_acc_ls, test_loss, test_quadratic_kappa, "test")
+                elif args.metric == 'auc':
+                    report_best_test_performance_so_far(logger, test_loss_ls,
+                        test_acc_ls, test_loss, test_auc_score, "test")
 
     if args.local_rank == 0:
         report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls,
@@ -1118,9 +1201,9 @@ def main2(args, logger):
     elif args.dataset == 'retina':
         # pretrained_rep_net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
 
-        pretrained_rep_net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
+        pretrained_rep_net = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True).cuda()
 
-        pretrained_rep_net.fc = nn.Linear(512, 5)
+        pretrained_rep_net.fc = nn.Linear(512, 2)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
         # pretrained_rep_net.eval()
         
@@ -1284,14 +1367,14 @@ def main2(args, logger):
                 net = resnet34(num_classes=100)
     elif args.dataset == 'retina':
         # net = torchvision.models.resnet34(weights=torchvision.models.ResNet34_Weights.IMAGENET1K_V1).cuda()
-        net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
+        net = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True).cuda()
         # for param in net.conv1.parameters():
         #     param.requires_grad = False
         # for param in net.layer1.parameters():
         #     param.requires_grad = False
         # for param in net.layer2.parameters():
         #     param.requires_grad = False
-        net.fc = nn.Linear(512, 5)
+        net.fc = nn.Linear(512, 2)
     elif args.dataset == 'imagenet':
         net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
         for param in net.conv1.parameters():
