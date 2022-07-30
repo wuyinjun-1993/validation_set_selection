@@ -25,3 +25,7 @@ bias_flip=false
 method="cluster_method_three"
 total_valid_sample_count=100
 use_pretrained_model=false
+
+metric='auc'
+suffix='_2'
+

@@ -79,7 +79,7 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
                     mile_stones_epochs = [80,90]
                     gamma = 0.1
             else:
-                mile_stones_epochs = [100,110]
+                mile_stones_epochs = [80,90]
                 gamma = 0.1
 
             if args.lr_decay:
@@ -114,7 +114,7 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
                     mile_stones_epochs = [80, 90]
                     gamma = 0.2
             else:
-                mile_stones_epochs = [150, 200]
+                mile_stones_epochs = [80, 90]
                 gamma = 0.1
             if args.lr_decay:
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(

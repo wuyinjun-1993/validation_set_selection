@@ -47,4 +47,4 @@ def test(test_loader, network, criterion, args, logger, prefix = "test"):
     logger.info(prefix + ' performance: Avg. loss: %f, Accuracy: %d/%d (%f), Quadratic Kappa: %f, AUC score: %f'%(
         test_loss, correct.item(), len(test_loader.dataset),test_acc, quadratic_kappa, auc_score))
 
-    return test_loss, test_acc
+    return test_loss, test_acc, quadratic_kappa, auc_score
