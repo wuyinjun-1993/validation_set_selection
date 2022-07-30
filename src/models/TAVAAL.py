@@ -39,40 +39,64 @@ class LossNet(nn.Module):
         self,
         feature_sizes=[32, 16, 8, 4],
         num_channels=[64, 128, 256, 512],
-        interm_dim=128
+        interm_dim=128,
+        first = True,
+        last = True
     ):
         super(LossNet, self).__init__()
+        if first:
+            self.GAP1 = nn.AvgPool2d(feature_sizes[0])
+            self.GAP2 = nn.AvgPool2d(feature_sizes[1])
         
-        self.GAP1 = nn.AvgPool2d(feature_sizes[0])
-        self.GAP2 = nn.AvgPool2d(feature_sizes[1])
-        self.GAP3 = nn.AvgPool2d(feature_sizes[2])
-        self.GAP4 = nn.AvgPool2d(feature_sizes[3])
+        if last:
+            self.GAP3 = nn.AvgPool2d(feature_sizes[2])
+            self.GAP4 = nn.AvgPool2d(feature_sizes[3])
 
-        self.FC1 = nn.Linear(num_channels[0], interm_dim)
-        self.FC2 = nn.Linear(num_channels[1], interm_dim)
-        self.FC3 = nn.Linear(num_channels[2], interm_dim)
-        self.FC4 = nn.Linear(num_channels[3], interm_dim)
-
+        if first:
+            self.FC1 = nn.Linear(num_channels[0], interm_dim)
+            self.FC2 = nn.Linear(num_channels[1], interm_dim)
+        
+        if last:
+            self.FC3 = nn.Linear(num_channels[2], interm_dim)
+            self.FC4 = nn.Linear(num_channels[3], interm_dim)
+        self.first = first
+        self.last = last
         self.linear = nn.Linear(4 * interm_dim, 1)
     
     def forward(self, features):
-        out1 = self.GAP1(features[0])
-        out1 = out1.view(out1.size(0), -1)
-        out1 = F.relu(self.FC1(out1))
+        k = 0
+        out_ls = []
+        if self.first:
+            out1 = self.GAP1(features[k])
+            k += 1
+            out1 = out1.view(out1.size(0), -1)
+            out1 = F.relu(self.FC1(out1))
+            out_ls.append(out1)
 
-        out2 = self.GAP2(features[1])
-        out2 = out2.view(out2.size(0), -1)
-        out2 = F.relu(self.FC2(out2))
+            out2 = self.GAP2(features[k])
+            k += 1
 
-        out3 = self.GAP3(features[2])
-        out3 = out3.view(out3.size(0), -1)
-        out3 = F.relu(self.FC3(out3))
+            out2 = out2.view(out2.size(0), -1)
+            out2 = F.relu(self.FC2(out2))
 
-        out4 = self.GAP4(features[3])
-        out4 = out4.view(out4.size(0), -1)
-        out4 = F.relu(self.FC4(out4))
+            out_ls.append(out2)
 
-        out = self.linear(torch.cat((out1, out2, out3, out4), 1))
+        if self.last:
+            out3 = self.GAP3(features[k])
+            k+=1
+
+            out3 = out3.view(out3.size(0), -1)
+            out3 = F.relu(self.FC3(out3))
+            out_ls.append(out3)
+
+            out4 = self.GAP4(features[k])
+
+            k += 1
+
+            out4 = out4.view(out4.size(0), -1)
+            out4 = F.relu(self.FC4(out4))
+            out_ls.append(out4)
+        out = self.linear(torch.cat(out_ls, 1))
         return out
 
 
@@ -293,10 +317,11 @@ def train_epoch(models, method, criterion, optimizers, dataloaders, epoch,
         target_loss = criterion(scores, labels)
 
         if epoch > epoch_loss:
-            features[0] = features[0].detach()
-            features[1] = features[1].detach()
-            features[2] = features[2].detach()
-            features[3] = features[3].detach()
+            for k in range(len(features)):
+                features[k] = features[k].detach()
+            # features[1] = features[1].detach()
+            # features[2] = features[2].detach()
+            # features[3] = features[3].detach()
 
         pred_loss = models['module'](features)
         pred_loss = pred_loss.view(pred_loss.size(0))
@@ -632,10 +657,13 @@ def main_train_taaval(args):
             # Model - create new instance for every cycle so that it resets
             with torch.cuda.device(CUDA_VISIBLE_DEVICES):
                 resnet = resnet34(num_classes=NO_CLASSES).cuda()
-                if args.dataset == 'retina':
-                    resnet = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True).cuda()
-                    resnet.fc = nn.Linear(512, 2)
                 loss_module = LossNet().cuda()
+                if args.dataset == 'retina':
+                    resnet = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True)
+                    resnet.fc = nn.Linear(512, 2)
+                    resnet = resnet.cuda()
+                    loss_module = LossNet(first=args.biased_flip, last=True).cuda()
+                
                 nc = 3
                 encoder_out_dim=1024*2*2
                 z_dim=32

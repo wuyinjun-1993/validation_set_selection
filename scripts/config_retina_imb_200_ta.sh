@@ -7,7 +7,7 @@ output_dir="/data1/wuyinjun/valid_set_selections/retina_data/"
 gpu_ids=0
 #total_valid_ratio=$6
 repeat_times=10
-port_num=10010
+port_num=10110
 meta_lr=20
 lr=0.001
 batch_size=128
@@ -21,7 +21,7 @@ model_prov_period=20
 
 
 valid_ratio_each_run=20 #$(( total_valid_ratio / repeat_times ))
-method="cluster_method_three"
+method="ta"
 total_valid_sample_count=20
 use_pretrained_model=false
 imb_factor=200
