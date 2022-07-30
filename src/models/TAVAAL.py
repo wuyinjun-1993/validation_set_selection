@@ -1,4 +1,6 @@
 import os, sys
+
+from models.ResNet import resnet34_imagenet
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 import torch
 import numpy as np
@@ -630,6 +632,9 @@ def main_train_taaval(args):
             # Model - create new instance for every cycle so that it resets
             with torch.cuda.device(CUDA_VISIBLE_DEVICES):
                 resnet = resnet34(num_classes=NO_CLASSES).cuda()
+                if args.dataset == 'retina':
+                    resnet = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True).cuda()
+                    resnet.fc = nn.Linear(512, 2)
                 loss_module = LossNet().cuda()
                 nc = 3
                 encoder_out_dim=1024*2*2
