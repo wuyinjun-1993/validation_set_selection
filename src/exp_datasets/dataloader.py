@@ -109,23 +109,25 @@ class dataset_wrapper_X(Dataset):
 
     def __getitem__(self, index):
         img = self.data[index]
-        if not type(img) is numpy.ndarray:
-            img = Image.fromarray(img.numpy(), mode="L")
-        else:
-            img = Image.fromarray(img)
         if self.transform is not None:
-            img1 = self.transform(img)
+            if not type(img) is numpy.ndarray:
+                img = Image.fromarray(img.numpy(), mode="L")
+            else:
+                img = Image.fromarray(img)
+            if self.transform is not None:
+                img1 = self.transform(img)
 
-            if self.two_imgs:
-                img2 = self.transform(img)
-                return (img1, img2), index
+                if self.two_imgs:
+                    img2 = self.transform(img)
+                    return (img1, img2), index
 
 
-            if self.three_imgs:
-                img2 = self.transform(img)
-                img3 = self.transform(img)
-                return (img1, img2, img3), index
-
+                if self.three_imgs:
+                    img2 = self.transform(img)
+                    img3 = self.transform(img)
+                    return (img1, img2, img3), index
+        else:
+            img1 = img
         return (index, img1)
         # image, target = super(new_mnist_dataset, self).__getitem__(index)
 

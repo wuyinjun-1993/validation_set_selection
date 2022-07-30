@@ -293,6 +293,40 @@ class ResNet(nn.Module):
         #         return [x1, x2]
         return x
 
+    def forward_with_features(self, x):
+        # x = self.layer0(x)
+        # out1 = self.layer1(x)
+        # out2 = self.layer2(out1)
+        # out3 = self.layer3(out2)
+        # out4 = self.layer4(out3)
+        # spatial_size = out4.size(2)
+        # x = nn.functional.avg_pool2d(out4, spatial_size, 1)
+        # outf = x.view(x.size(0), -1)
+        if self.first:
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.maxpool(x)
+
+            out1 = self.layer1(x)
+            x = self.layer2(out1)
+            out2 = x
+        if self.last:
+            out3 = self.layer3(x)
+            out4 = self.layer4(out3)
+
+            x = self.avgpool(out4)
+            outf = torch.flatten(x, 1)
+
+            x = self.fc(outf)
+        
+        if self.first and self.last:
+            return x, outf, [out1, out2, out3, out4]
+        else:
+            if self.last:
+                return x, outf, [out3, out4]
+            else:
+                return x, None, [out1, out2]
 
 def _resnet(arch, block, layers, pretrained, progress, **kwargs):
     model = ResNet(block, layers, **kwargs)

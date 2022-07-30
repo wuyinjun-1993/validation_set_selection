@@ -1,4 +1,6 @@
 import os, sys
+
+from models.ResNet import resnet34_imagenet
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 import torch
 import numpy as np
@@ -37,40 +39,64 @@ class LossNet(nn.Module):
         self,
         feature_sizes=[32, 16, 8, 4],
         num_channels=[64, 128, 256, 512],
-        interm_dim=128
+        interm_dim=128,
+        first = True,
+        last = True
     ):
         super(LossNet, self).__init__()
+        if first:
+            self.GAP1 = nn.AvgPool2d(feature_sizes[0])
+            self.GAP2 = nn.AvgPool2d(feature_sizes[1])
         
-        self.GAP1 = nn.AvgPool2d(feature_sizes[0])
-        self.GAP2 = nn.AvgPool2d(feature_sizes[1])
-        self.GAP3 = nn.AvgPool2d(feature_sizes[2])
-        self.GAP4 = nn.AvgPool2d(feature_sizes[3])
+        if last:
+            self.GAP3 = nn.AvgPool2d(feature_sizes[2])
+            self.GAP4 = nn.AvgPool2d(feature_sizes[3])
 
-        self.FC1 = nn.Linear(num_channels[0], interm_dim)
-        self.FC2 = nn.Linear(num_channels[1], interm_dim)
-        self.FC3 = nn.Linear(num_channels[2], interm_dim)
-        self.FC4 = nn.Linear(num_channels[3], interm_dim)
-
+        if first:
+            self.FC1 = nn.Linear(num_channels[0], interm_dim)
+            self.FC2 = nn.Linear(num_channels[1], interm_dim)
+        
+        if last:
+            self.FC3 = nn.Linear(num_channels[2], interm_dim)
+            self.FC4 = nn.Linear(num_channels[3], interm_dim)
+        self.first = first
+        self.last = last
         self.linear = nn.Linear(4 * interm_dim, 1)
     
     def forward(self, features):
-        out1 = self.GAP1(features[0])
-        out1 = out1.view(out1.size(0), -1)
-        out1 = F.relu(self.FC1(out1))
+        k = 0
+        out_ls = []
+        if self.first:
+            out1 = self.GAP1(features[k])
+            k += 1
+            out1 = out1.view(out1.size(0), -1)
+            out1 = F.relu(self.FC1(out1))
+            out_ls.append(out1)
 
-        out2 = self.GAP2(features[1])
-        out2 = out2.view(out2.size(0), -1)
-        out2 = F.relu(self.FC2(out2))
+            out2 = self.GAP2(features[k])
+            k += 1
 
-        out3 = self.GAP3(features[2])
-        out3 = out3.view(out3.size(0), -1)
-        out3 = F.relu(self.FC3(out3))
+            out2 = out2.view(out2.size(0), -1)
+            out2 = F.relu(self.FC2(out2))
 
-        out4 = self.GAP4(features[3])
-        out4 = out4.view(out4.size(0), -1)
-        out4 = F.relu(self.FC4(out4))
+            out_ls.append(out2)
 
-        out = self.linear(torch.cat((out1, out2, out3, out4), 1))
+        if self.last:
+            out3 = self.GAP3(features[k])
+            k+=1
+
+            out3 = out3.view(out3.size(0), -1)
+            out3 = F.relu(self.FC3(out3))
+            out_ls.append(out3)
+
+            out4 = self.GAP4(features[k])
+
+            k += 1
+
+            out4 = out4.view(out4.size(0), -1)
+            out4 = F.relu(self.FC4(out4))
+            out_ls.append(out4)
+        out = self.linear(torch.cat(out_ls, 1))
         return out
 
 
@@ -146,26 +172,43 @@ class View(nn.Module):
 
 class VAE(nn.Module):
     """Encoder-Decoder architecture for both WAE-MMD and WAE-GAN."""
-    def __init__(self, z_dim=32, nc=3, f_filt=4, encoder_out_dim=1024*2*2):
+    def __init__(self, z_dim=32, nc=3, f_filt=4, encoder_out_dim=1024*2*2, first = True, last = True):
         super(VAE, self).__init__()
         self.z_dim = z_dim
         self.nc = nc
         self.f_filt = f_filt
-        self.encoder = nn.Sequential(
-            nn.Conv2d(nc, 128, 4, 2, 1, bias=False),              # B,  128, 32, 32
-            nn.BatchNorm2d(128),
-            nn.ReLU(True),
-            nn.Conv2d(128, 256, 4, 2, 1, bias=False),             # B,  256, 16, 16
-            nn.BatchNorm2d(256),
-            nn.ReLU(True),
-            nn.Conv2d(256, 512, 4, 2, 1, bias=False),             # B,  512,  8,  8
-            nn.BatchNorm2d(512),
-            nn.ReLU(True),
-            nn.Conv2d(512, 1024, self.f_filt, 2, 1, bias=False),            # B, 1024,  4,  4
-            nn.BatchNorm2d(1024),
-            nn.ReLU(True),
-            View((-1, 1024*2*2)),                                 # B, 1024*4*4
-        )
+        if first == False:
+            self.encoder = nn.Sequential(
+                # nn.Conv2d(nc, 128, 4, 2, 1, bias=False),              # B,  128, 32, 32
+                # nn.BatchNorm2d(128),
+                # nn.ReLU(True),
+                nn.Conv2d(128, 256, 4, 2, 1, bias=False),             # B,  256, 16, 16
+                nn.BatchNorm2d(256),
+                nn.ReLU(True),
+                nn.Conv2d(256, 512, 4, 2, 1, bias=False),             # B,  512,  8,  8
+                nn.BatchNorm2d(512),
+                nn.ReLU(True),
+                nn.Conv2d(512, 1024, self.f_filt, 2, 1, bias=False),            # B, 1024,  4,  4
+                nn.BatchNorm2d(1024),
+                nn.ReLU(True),
+                View((-1, 1024*2*2)),                                 # B, 1024*4*4
+            )
+        else:
+            self.encoder = nn.Sequential(
+                nn.Conv2d(nc, 128, 4, 2, 1, bias=False),              # B,  128, 32, 32
+                nn.BatchNorm2d(128),
+                nn.ReLU(True),
+                nn.Conv2d(128, 256, 4, 2, 1, bias=False),             # B,  256, 16, 16
+                nn.BatchNorm2d(256),
+                nn.ReLU(True),
+                nn.Conv2d(256, 512, 4, 2, 1, bias=False),             # B,  512,  8,  8
+                nn.BatchNorm2d(512),
+                nn.ReLU(True),
+                nn.Conv2d(512, 1024, self.f_filt, 2, 1, bias=False),            # B, 1024,  4,  4
+                nn.BatchNorm2d(1024),
+                nn.ReLU(True),
+                View((-1, 1024*2*2)),                                 # B, 1024*4*4
+            )
 
         self.fc_mu = nn.Linear(1024*2*2, z_dim)                            # B, z_dim
         self.fc_logvar = nn.Linear(1024*2*2, z_dim)                            # B, z_dim
@@ -291,10 +334,11 @@ def train_epoch(models, method, criterion, optimizers, dataloaders, epoch,
         target_loss = criterion(scores, labels)
 
         if epoch > epoch_loss:
-            features[0] = features[0].detach()
-            features[1] = features[1].detach()
-            features[2] = features[2].detach()
-            features[3] = features[3].detach()
+            for k in range(len(features)):
+                features[k] = features[k].detach()
+            # features[1] = features[1].detach()
+            # features[2] = features[2].detach()
+            # features[3] = features[3].detach()
 
         pred_loss = models['module'](features)
         pred_loss = pred_loss.view(pred_loss.size(0))
@@ -506,7 +550,7 @@ def query_samples(model, train_set, subset, meta_set, cycle, args, nc=3, encoder
         batch_size=args.batch_size, 
         pin_memory=True,
     )
-    vae = VAE(nc=nc, encoder_out_dim =encoder_out_dim, z_dim=z_dim)
+    vae = VAE(nc=nc, encoder_out_dim =encoder_out_dim, z_dim=z_dim, first=args.biased_flip, last=True)
     discriminator = Discriminator(32)
     
     models = {'backbone': model['backbone'], 'module': model['module'],'vae': vae, 'discriminator': discriminator}
@@ -631,6 +675,12 @@ def main_train_taaval(args):
             with torch.cuda.device(CUDA_VISIBLE_DEVICES):
                 resnet = resnet34(num_classes=NO_CLASSES).cuda()
                 loss_module = LossNet().cuda()
+                if args.dataset == 'retina':
+                    resnet = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True)
+                    resnet.fc = nn.Linear(512, 2)
+                    resnet = resnet.cuda()
+                    loss_module = LossNet(first=args.biased_flip, last=True).cuda()
+                
                 nc = 3
                 encoder_out_dim=1024*2*2
                 z_dim=32

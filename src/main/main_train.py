@@ -1177,6 +1177,7 @@ def main2(args, logger):
         #     pretrained_rep_net = DNN_three_layers(args.nce_k, low_dim=args.low_dim).cuda()
         optimizer = torch.optim.SGD(pretrained_rep_net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
+        args.num_class=10
     elif args.dataset.startswith('cifar'):
         if args.dataset == 'cifar10':
             if args.model_type == 'resnet18':
@@ -1206,7 +1207,7 @@ def main2(args, logger):
         pretrained_rep_net.fc = nn.Linear(512, 2)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
         # pretrained_rep_net.eval()
-        
+        args.num_class=2
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset == 'imagenet':
         pretrained_rep_net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()

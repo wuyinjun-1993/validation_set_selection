@@ -145,10 +145,8 @@ exe_cmd="python -m torch.distributed.launch \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
-  --meta_lr ${meta_lr} \
-  --flip_labels \
+  --meta_lr ${meta_lr} \ 
   ${bias_flip_str} \
-  --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
   --lr ${lr} \
@@ -167,7 +165,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+#${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
@@ -180,9 +178,7 @@ exe_cmd="python -m torch.distributed.launch \
   --dataset ${dataset_name} \
   --valid_count ${warm_up_valid_count} \
   --meta_lr ${meta_lr} \
-  --flip_labels \
   ${bias_flip_str} \
-  --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
   --prev_save_path ${save_path_prefix}_do_train/\
   --cuda \
@@ -199,7 +195,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 
 echo "${exe_cmd} > ${output_file_name}"
 
-${exe_cmd} > ${output_file_name} 2>&1 
+#${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
@@ -228,9 +224,7 @@ do
     --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
-    --flip_labels \
     ${bias_flip_str} \
-    --err_label_ratio ${err_label_ratio} \
     --save_path ${save_path_prefix}_seq_select_${k}/ \
     --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
     --cuda \

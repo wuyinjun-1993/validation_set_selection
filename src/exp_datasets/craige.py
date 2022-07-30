@@ -760,6 +760,8 @@ class CRAIGStrategy(DataSelectionStrategy):
                 else:
                     idxs = torch.where(labels == i)[0]
                     N = len(idxs)
+                    if N <= 0:
+                        continue
                     self.compute_score(model_params, idxs)
                     row = torch.cat((row, idxs.repeat_interleave(N)), dim=0)
                     col = torch.cat((col, idxs.repeat(N)), dim=0)
