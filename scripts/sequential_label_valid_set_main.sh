@@ -28,6 +28,8 @@ echo "bias_flip::${bias_flip}"
 echo "method::${method}"
 echo "total_valid_sample_count::${total_valid_sample_count}"
 
+echo "metric::${metric}"
+echo "suffix::${suffix}"
 
 echo "use_pretrained_model::$use_pretrained_model"
 
@@ -76,7 +78,27 @@ then
         add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --ta_vaal_train"
 
 
+elif [[ $method == 'craige' ]];
+then 
+	add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --craige"
+
+elif [[ $method == 'finetune'  ]]
+then 
+	add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --finetune"
+
 fi
+
+
+
+metric_str=""
+if [[ ${metric} == "auc" ]];
+then
+	metric_str="--metric auc"
+elif [[ ${metric} == "kappa" ]];
+then
+	metric_str="--metric kappa"
+fi
+
 
 #add_valid_in_training_flag="--cluster_method_two --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
 
@@ -101,7 +123,7 @@ then
 fi
 
 
-save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}
+save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}${suffix}
 
 
 <<cmd
@@ -141,17 +163,18 @@ exe_cmd="python -m torch.distributed.launch \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
   --do_train \
+  ${metric_str} \
   --lr_decay
 "
 
 
-output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_${method}_do_train_0.txt
+output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_${method}_do_train_0${suffix}.txt
 
 
 echo "${exe_cmd} > ${output_file_name}"
 
 
-#${exe_cmd} > ${output_file_name} 2>&1
+${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
@@ -175,10 +198,11 @@ exe_cmd="python -m torch.distributed.launch \
   --test_batch_size ${test_batch_size} \
   --epochs ${epochs} \
   --total_valid_sample_count ${total_valid_sample_count} \
+  ${metric_str} \
   ${lr_decay_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}.txt
+output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
@@ -221,10 +245,11 @@ do
     --batch_size ${batch_size} \
     --test_batch_size ${test_batch_size} \
     --epochs ${epochs} \
+    ${metric_str} \
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
 
-	output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_${k}_${method}.txt
+	output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_${k}_${method}${suffix}.txt
 
 	echo "${exe_cmd} > ${output_file_name}"
 	
