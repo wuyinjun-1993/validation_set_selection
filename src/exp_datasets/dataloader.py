@@ -260,7 +260,7 @@ class dataset_wrapper(Dataset):
             
             
             valid_data_mat = torch.cat([valid_data_mat, dataset2.data], dim = 0)
-            valid_labels = torch.cat([valid_labels, dataset2.targets], dim = 0)
+            valid_labels = torch.cat([valid_labels.view(-1), dataset2.targets.view(-1)], dim = 0)
         valid_set = dataset_wrapper(valid_data_mat, valid_labels, dataset1.transform)
         return valid_set
 
