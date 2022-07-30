@@ -172,26 +172,43 @@ class View(nn.Module):
 
 class VAE(nn.Module):
     """Encoder-Decoder architecture for both WAE-MMD and WAE-GAN."""
-    def __init__(self, z_dim=32, nc=3, f_filt=4, encoder_out_dim=1024*2*2):
+    def __init__(self, z_dim=32, nc=3, f_filt=4, encoder_out_dim=1024*2*2, first = True, last = True):
         super(VAE, self).__init__()
         self.z_dim = z_dim
         self.nc = nc
         self.f_filt = f_filt
-        self.encoder = nn.Sequential(
-            nn.Conv2d(nc, 128, 4, 2, 1, bias=False),              # B,  128, 32, 32
-            nn.BatchNorm2d(128),
-            nn.ReLU(True),
-            nn.Conv2d(128, 256, 4, 2, 1, bias=False),             # B,  256, 16, 16
-            nn.BatchNorm2d(256),
-            nn.ReLU(True),
-            nn.Conv2d(256, 512, 4, 2, 1, bias=False),             # B,  512,  8,  8
-            nn.BatchNorm2d(512),
-            nn.ReLU(True),
-            nn.Conv2d(512, 1024, self.f_filt, 2, 1, bias=False),            # B, 1024,  4,  4
-            nn.BatchNorm2d(1024),
-            nn.ReLU(True),
-            View((-1, 1024*2*2)),                                 # B, 1024*4*4
-        )
+        if first == False:
+            self.encoder = nn.Sequential(
+                # nn.Conv2d(nc, 128, 4, 2, 1, bias=False),              # B,  128, 32, 32
+                # nn.BatchNorm2d(128),
+                # nn.ReLU(True),
+                nn.Conv2d(128, 256, 4, 2, 1, bias=False),             # B,  256, 16, 16
+                nn.BatchNorm2d(256),
+                nn.ReLU(True),
+                nn.Conv2d(256, 512, 4, 2, 1, bias=False),             # B,  512,  8,  8
+                nn.BatchNorm2d(512),
+                nn.ReLU(True),
+                nn.Conv2d(512, 1024, self.f_filt, 2, 1, bias=False),            # B, 1024,  4,  4
+                nn.BatchNorm2d(1024),
+                nn.ReLU(True),
+                View((-1, 1024*2*2)),                                 # B, 1024*4*4
+            )
+        else:
+            self.encoder = nn.Sequential(
+                nn.Conv2d(nc, 128, 4, 2, 1, bias=False),              # B,  128, 32, 32
+                nn.BatchNorm2d(128),
+                nn.ReLU(True),
+                nn.Conv2d(128, 256, 4, 2, 1, bias=False),             # B,  256, 16, 16
+                nn.BatchNorm2d(256),
+                nn.ReLU(True),
+                nn.Conv2d(256, 512, 4, 2, 1, bias=False),             # B,  512,  8,  8
+                nn.BatchNorm2d(512),
+                nn.ReLU(True),
+                nn.Conv2d(512, 1024, self.f_filt, 2, 1, bias=False),            # B, 1024,  4,  4
+                nn.BatchNorm2d(1024),
+                nn.ReLU(True),
+                View((-1, 1024*2*2)),                                 # B, 1024*4*4
+            )
 
         self.fc_mu = nn.Linear(1024*2*2, z_dim)                            # B, z_dim
         self.fc_logvar = nn.Linear(1024*2*2, z_dim)                            # B, z_dim
@@ -533,7 +550,7 @@ def query_samples(model, train_set, subset, meta_set, cycle, args, nc=3, encoder
         batch_size=args.batch_size, 
         pin_memory=True,
     )
-    vae = VAE(nc=nc, encoder_out_dim =encoder_out_dim, z_dim=z_dim)
+    vae = VAE(nc=nc, encoder_out_dim =encoder_out_dim, z_dim=z_dim, first=args.biased_flip, last=True)
     discriminator = Discriminator(32)
     
     models = {'backbone': model['backbone'], 'module': model['module'],'vae': vae, 'discriminator': discriminator}
