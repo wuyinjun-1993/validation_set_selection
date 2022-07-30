@@ -247,6 +247,9 @@ class dataset_wrapper(Dataset):
             valid_labels = numpy.concatenate((valid_labels, dataset2.targets), axis = 0)
             
         else:
+
+            print("origin_valid data shape::", valid_data_mat.shape)
+            print("new valid data shape::", dataset2.data.shape)
             if len(dataset2.data.shape) < len(valid_data_mat.shape):
                 dataset2.data = dataset2.data.unsqueeze(0)
                 dataset2.targets = dataset2.targets.unsqueeze(0)
