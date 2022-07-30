@@ -180,7 +180,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+#${exe_cmd} > ${output_file_name} 2>&1
 
 
 exe_cmd="python -m torch.distributed.launch \
@@ -212,7 +212,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 
 echo "${exe_cmd} > ${output_file_name}"
 
-${exe_cmd} > ${output_file_name} 2>&1 
+#${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
@@ -223,7 +223,7 @@ echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
 
 
 #for k in {1..${repeat_times}}
-for (( k=1; k<=repeat_times; k++ ))
+for (( k=4; k<=repeat_times; k++ ))
 do
 
 	exe_cmd="python -m torch.distributed.launch \

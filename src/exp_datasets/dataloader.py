@@ -1550,14 +1550,29 @@ def get_dataloader_for_meta(
         #     num_replicas=args.world_size,
         #     rank=args.local_rank,
         # )
-        meta_sampler = RandomSampler(metaset, replacement=True, num_samples=args.epochs*len(trainloader)*args.batch_size*10)
-        metaloader = DataLoader(
-            metaset,
-            batch_size=args.test_batch_size,
-            num_workers=0,#args.num_workers,
-            pin_memory=True,
-            sampler=meta_sampler,
-        )
+        if not args.finetune:
+            meta_sampler = RandomSampler(metaset, replacement=True, num_samples=args.epochs*len(trainloader)*args.batch_size*10)
+            metaloader = DataLoader(
+                metaset,
+                batch_size=args.test_batch_size,
+                num_workers=0,#args.num_workers,
+                pin_memory=True,
+                sampler=meta_sampler,
+            )
+        else:
+            meta_sampler = DistributedSampler(
+                metaset,
+                num_replicas=args.world_size,
+                rank=args.local_rank,
+            )
+            metaloader = DataLoader(
+                metaset,
+                batch_size=args.batch_size,
+                num_workers=4*4, #args.num_workers,
+                pin_memory=True,
+                shuffle=False,
+                sampler=meta_sampler,
+            )       
 
     
     
