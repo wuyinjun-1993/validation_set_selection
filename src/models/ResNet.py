@@ -318,7 +318,7 @@ class ResNet(nn.Module):
             x = self.avgpool(out4)
             outf = torch.flatten(x, 1)
 
-            x = self.fc(x)
+            x = self.fc(outf)
         
         if self.first and self.last:
             return x, outf, [out1, out2, out3, out4]
