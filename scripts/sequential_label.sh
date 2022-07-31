@@ -37,9 +37,6 @@ then
   # selection_cmd="--select_valid_set --cluster_method_three --cosin_dist --lr_decay --weight_by_norm --use_model_prov --model_prov_period 10 --replace"
   selection_cmd="--select_valid_set \
     --cluster_method_two \
-    --cluster_method_two_plus \
-    --cluster_method_two_sampling \
-    --cluster_method_two_sample_col_count 1000 \
     --no_sample_weights_k_means \
     --not_rescale_features \
     --weight_by_norm \
@@ -54,7 +51,6 @@ then
   selection_cmd="--select_valid_set \
     --cluster_method_three \
     --cluster_method_three_sampling \
-    --cluster_method_three_sample_col_count 1000 \
     --no_sample_weights_k_means \
     --not_rescale_features \
     --weight_by_norm \
@@ -92,9 +88,9 @@ else
   then
     warm_count=10
   else
-    warm_count=100
+    warm_count=10
   fi
-  result_dir=${res_dir}/logs_${dataset}_random_${noise_type}_${err_param}_lr_${lr}_pretrained_select_${warm_count}_1_1
+  result_dir=${res_dir}/logs_${dataset}_random_${noise_type}_${err_param}_lr_0.5_pretrained_select_${warm_count}_1_1
 fi
 
 # Sequentially train the model using a selected "clean" set
@@ -108,7 +104,7 @@ do
   exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port} \
-  main_train.py \
+  feature_transform_imagenet.py \
   --load_dataset \
   --use_pretrained_model \
   ${selection_cmd} \
@@ -124,8 +120,8 @@ do
   --prev_save_path ${prev_result_dir} \
   --cuda \
   --lr ${lr} \
-  --batch_size 128 \
-  --test_batch_size 256 \
+  --batch_size 32 \
+  --test_batch_size 32 \
   --epochs 100"
    
   output_file_name=${result_dir}/master_log.txt
