@@ -684,6 +684,12 @@ def main_train_taaval(args):
                     resnet = resnet.cuda()
                     loss_module = LossNet(first=args.biased_flip, last=True, num_channels=[64, 128, 1024, 2048]).cuda()
                 
+                if args.dataset == 'imagenet':
+                    resnet = resnet34_imagenet(pretrained=True, first=True, last=True)
+                    resnet.fc = nn.Linear(512, 10)
+                    resnet = resnet.cuda()
+                    loss_module = LossNet(first=True, last=True, num_channels=[64, 128, 1024, 2048]).cuda()
+
                 nc = 3
                 encoder_out_dim=1024*2*2
                 z_dim=32
