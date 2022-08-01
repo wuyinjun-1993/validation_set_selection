@@ -836,8 +836,8 @@ def uncertainty_sample(criterion, optimizer, net, train_dataset, validset, args,
             data = data.cuda()
         with torch.no_grad():
             output = net(data)
-        vals[indices] = F.cross_entropy(output, output).cpu()
-        labels[indices] = target.cpu()
+        vals[indices] = criterion(output, output).cpu()
+        labels[indices] = target.type(torch.long).cpu()
 
     if args.clustering_by_class:
         valid_ids = []
@@ -878,8 +878,8 @@ def certainty_sample(criterion, optimizer, net, train_dataset, validset, args, o
             data = data.cuda()
         with torch.no_grad():
             output = net(data)
-        vals[indices] = F.cross_entropy(output, output).cpu()
-        labels[indices] = target.cpu()
+        vals[indices] = criterion(output, output).cpu()
+        labels[indices] = target.type(torch.long).cpu()
 
     if args.clustering_by_class:
         valid_ids = []
@@ -1349,8 +1349,8 @@ def get_dataloader_for_meta(
             if len(trainset.targets.unique()) == 5:
                 trainset.targets = (trainset.targets >= 2).type(torch.long).view(-1)
                 testset.targets = (testset.targets >= 2).type(torch.long).view(-1)
-
-
+            
+            
             origin_labels = trainset.targets.clone()
 
         elif args.dataset == 'imagenet':
@@ -1502,6 +1502,12 @@ def get_dataloader_for_meta(
 
         if not args.ta_vaal_train:
             if not split_method == 'craige':
+                if args.dataset == 'retina':
+                    testset.targets = testset.targets.float()
+                    trainset.targets = trainset.targets.float()
+                    validset.targets = validset.targets.float()
+                    if metaset is not None:
+                        metaset.targets = metaset.targets.float()
                 trainset, new_metaset, remaining_origin_labels = selection_method(
                     criterion,
                     optimizer,
@@ -1539,6 +1545,13 @@ def get_dataloader_for_meta(
 
     cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
     cache_test_set(args, testset)
+
+    if args.dataset == 'retina':
+        testset.targets = testset.targets.float()
+        trainset.targets = trainset.targets.float()
+        validset.targets = validset.targets.float()
+        if metaset is not None:
+            metaset.targets = metaset.targets.float()
 
     train_sampler = DistributedSampler(
         trainset,

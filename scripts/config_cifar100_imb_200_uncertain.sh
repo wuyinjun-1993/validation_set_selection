@@ -6,13 +6,13 @@ save_path_root_dir="/data1/wuyinjun/valid_set_selections/cifar100_4/"
 output_dir="/data1/wuyinjun/valid_set_selections/cifar100_4/"
 gpu_ids=0
 #total_valid_ratio=$6
-repeat_times=2
-port_num=10030
+repeat_times=10
+port_num=10134
 meta_lr=30
 lr=0.1
 batch_size=128
 test_batch_size=128
-epochs=200
+epochs=150
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
@@ -22,6 +22,8 @@ model_prov_period=20
 
 valid_ratio_each_run=200 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
-method="cluster_method_two"
+method="uncertain"
 total_valid_sample_count=200
+use_pretrained_model=true
+imb_factor=200
 

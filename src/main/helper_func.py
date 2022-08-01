@@ -24,23 +24,33 @@ def test(test_loader, network, criterion, args, logger, prefix = "test"):
             orig_target = target.clone()
             if isinstance(criterion, torch.nn.L1Loss):
                 target = F.one_hot(target, num_classes=10)
-                output = F.softmax(output)
+                if output.shape[1] > 1:
+                    output = F.softmax(output)
+                # else:
+                #     output = F.sigmoid(output)
             if type(output) is tuple:
                 output = output[0]
             test_loss += criterion(output, target).item()*target.shape[0]
-            pred = output.data.max(1, keepdim=True)[1]
+            if len(output.shape) > 1:
+                pred = output.data.max(1, keepdim=True)[1]
+            else:
+                pred = (output>0.5).long().view(-1)
             y_hat.append(pred)
             y.append(orig_target.data.view_as(pred))
-            pred_prob_ls.append(F.softmax(output,dim=1))
+
+            if len(output.shape) > 1:
+                pred_prob_ls.append(F.softmax(output,dim=1))
+            else:
+                pred_prob_ls.append(output)
             correct += pred.eq(orig_target.data.view_as(pred)).sum()
     y_hat = torch.cat(y_hat, dim=0).cpu()
     y = torch.cat(y, dim=0).cpu()
     pred_prob_ls_tensor = torch.cat(pred_prob_ls)
     quadratic_kappa = torch.tensor(cohen_kappa_score(y_hat, y, weights='quadratic'),device='cuda:0')
-    if pred_prob_ls_tensor.shape[1] > 2:
-        auc_score = sklearn.metrics.roc_auc_score(y.data.cpu().numpy(), pred_prob_ls_tensor.cpu().numpy(), multi_class='ovr')
-    else:
-        auc_score = sklearn.metrics.roc_auc_score(y.data.cpu().numpy(), pred_prob_ls_tensor[:,1].cpu().numpy())
+    # if pred_prob_ls_tensor.shape[1] > 2:
+    auc_score = sklearn.metrics.roc_auc_score(y.data.cpu().numpy(), pred_prob_ls_tensor.cpu().numpy(), multi_class='ovr')
+    # else:
+    #     auc_score = sklearn.metrics.roc_auc_score(y.data.cpu().numpy(), pred_prob_ls_tensor[:,1].cpu().numpy())
     test_loss /= len(test_loader.dataset)
     test_acc = 100. * correct.item()*1.0 / len(test_loader.dataset)
     # test_losses.append(test_loss)
