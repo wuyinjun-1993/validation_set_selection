@@ -837,7 +837,7 @@ def uncertainty_sample(criterion, optimizer, net, train_dataset, validset, args,
         with torch.no_grad():
             output = net(data)
         vals[indices] = criterion(output, output).cpu()
-        labels[indices] = target.cpu()
+        labels[indices] = target.type(torch.long).cpu()
 
     if args.clustering_by_class:
         valid_ids = []
@@ -879,7 +879,7 @@ def certainty_sample(criterion, optimizer, net, train_dataset, validset, args, o
         with torch.no_grad():
             output = net(data)
         vals[indices] = criterion(output, output).cpu()
-        labels[indices] = target.cpu()
+        labels[indices] = target.type(torch.long).cpu()
 
     if args.clustering_by_class:
         valid_ids = []
