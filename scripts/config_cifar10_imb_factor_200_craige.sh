@@ -4,12 +4,10 @@ dataset_name=cifar10
 data_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
 save_path_root_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
 output_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
-gpu_ids=1
+gpu_ids=0
 #total_valid_ratio=$6
 repeat_times=2
-
-port_num=10011
-
+port_num=10330
 meta_lr=30
 lr=0.1
 batch_size=128
@@ -27,3 +25,4 @@ bias_flip=false
 method="craige"
 total_valid_sample_count=100
 use_pretrained_model=true
+imb_factor=200
