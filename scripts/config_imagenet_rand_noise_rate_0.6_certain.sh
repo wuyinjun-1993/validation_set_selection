@@ -1,22 +1,22 @@
 err_label_ratio=0.6
 
-dataset_name=retina
-data_dir="/data1/wuyinjun/valid_set_selections/retina_data/"
-save_path_root_dir="/data1/wuyinjun/valid_set_selections/retina_data/"
-output_dir="/data1/wuyinjun/valid_set_selections/retina_data/"
+dataset_name=imagenet
+data_dir="/data4/wuyinjun/valid_set_selections/imagenet/transformed_images/"
+save_path_root_dir="/data4/wuyinjun/valid_set_selections/imagenet/"
+output_dir="/data4/wuyinjun/valid_set_selections/imagenet/"
 gpu_ids=1
 #total_valid_ratio=$6
-repeat_times=2
+repeat_times=10
 port_num=10011
 meta_lr=20
-lr=0.05
-batch_size=128
-test_batch_size=128
-epochs=20
+lr=0.02
+batch_size=32
+test_batch_size=32
+epochs=30
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
-warm_up_valid_count=2
+warm_up_valid_count=10
 model_prov_period=20
 
 
@@ -25,4 +25,3 @@ bias_flip=false
 method="certain"
 total_valid_sample_count=100
 use_pretrained_model=true
-metric='auc'
