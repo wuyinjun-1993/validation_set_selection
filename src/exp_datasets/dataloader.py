@@ -836,7 +836,7 @@ def uncertainty_sample(criterion, optimizer, net, train_dataset, validset, args,
             data = data.cuda()
         with torch.no_grad():
             output = net(data)
-        vals[indices] = F.cross_entropy(output, output).cpu()
+        vals[indices] = criterion(output, output).cpu()
         labels[indices] = target.cpu()
 
     if args.clustering_by_class:
@@ -878,7 +878,7 @@ def certainty_sample(criterion, optimizer, net, train_dataset, validset, args, o
             data = data.cuda()
         with torch.no_grad():
             output = net(data)
-        vals[indices] = F.cross_entropy(output, output).cpu()
+        vals[indices] = criterion(output, output).cpu()
         labels[indices] = target.cpu()
 
     if args.clustering_by_class:
@@ -1501,6 +1501,12 @@ def get_dataloader_for_meta(
 
         if not args.ta_vaal_train:
             if not split_method == 'craige':
+                if args.dataset == 'retina':
+                    testset.targets = testset.targets.float()
+                    trainset.targets = trainset.targets.float()
+                    validset.targets = validset.targets.float()
+                    if metaset is not None:
+                        metaset.targets = metaset.targets.float()
                 trainset, new_metaset, remaining_origin_labels = selection_method(
                     criterion,
                     optimizer,

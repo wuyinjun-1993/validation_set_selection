@@ -294,14 +294,26 @@ def obtain_net_grad4(loss, sampled_net_param_layer_ls, sampled_layer_sqrt_prob_l
 
 
 def obtain_full_loss(output, target, is_cuda, loss):
-    onehot_target = torch.zeros([output.shape[0], output.shape[1]])
+    if len(output.shape) > 1:
+        onehot_target = torch.zeros([output.shape[0], output.shape[1]])
 
-    sample_id_ls = torch.tensor(list(range(output.shape[0])))
-    onehot_target[sample_id_ls,target] = 1
-    if is_cuda:
-        onehot_target = onehot_target.cuda()
+        sample_id_ls = torch.tensor(list(range(output.shape[0])))
+        onehot_target[sample_id_ls,target] = 1
+        if is_cuda:
+            onehot_target = onehot_target.cuda()
 
-    total_loss = loss + torch.sum(onehot_target.view(output.shape[0], -1)*output.view(output.shape[0], -1))
+        total_loss = loss + torch.sum(onehot_target.view(output.shape[0], -1)*output.view(output.shape[0], -1))
+    else:
+        
+
+        # onehot_target = torch.zeros([output.shape[0], output.shape[1]])
+
+        # sample_id_ls = torch.tensor(list(range(output.shape[0])))
+        # onehot_target[sample_id_ls,target] = 1
+        # if is_cuda:
+        #     onehot_target = onehot_target.cuda()
+
+        total_loss = loss + torch.sum(output*target + (1-output)*(1-target))#torch.sum(onehot_target.view(output.shape[0], -1)*output.view(output.shape[0], -1))
 
     return total_loss
 
