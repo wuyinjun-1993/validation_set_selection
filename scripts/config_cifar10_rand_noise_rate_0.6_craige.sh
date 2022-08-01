@@ -7,7 +7,9 @@ output_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
 gpu_ids=1
 #total_valid_ratio=$6
 repeat_times=2
-port_num=10331
+
+port_num=10011
+
 meta_lr=30
 lr=0.1
 batch_size=128

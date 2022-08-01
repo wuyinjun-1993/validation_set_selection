@@ -247,11 +247,20 @@ class dataset_wrapper(Dataset):
             valid_labels = numpy.concatenate((valid_labels, dataset2.targets), axis = 0)
             
         else:
+
+            print("origin_valid data shape::", valid_data_mat.shape)
+            print("new valid data shape::", dataset2.data.shape)
             if len(dataset2.data.shape) < len(valid_data_mat.shape):
                 dataset2.data = dataset2.data.unsqueeze(0)
                 dataset2.targets = dataset2.targets.unsqueeze(0)
+            if len(dataset2.data.shape) > len(valid_data_mat.shape):
+                dataset2.data = dataset2.data.squeeze(0)
+            print("origin_valid data shape::", valid_data_mat.shape)
+            print("new valid data shape::", dataset2.data.shape)
+            
+            
             valid_data_mat = torch.cat([valid_data_mat, dataset2.data], dim = 0)
-            valid_labels = torch.cat([valid_labels, dataset2.targets], dim = 0)
+            valid_labels = torch.cat([valid_labels.view(-1), dataset2.targets.view(-1)], dim = 0)
         valid_set = dataset_wrapper(valid_data_mat, valid_labels, dataset1.transform)
         return valid_set
 
@@ -1340,8 +1349,8 @@ def get_dataloader_for_meta(
             if len(trainset.targets.unique()) == 5:
                 trainset.targets = (trainset.targets >= 2).type(torch.long).view(-1)
                 testset.targets = (testset.targets >= 2).type(torch.long).view(-1)
-
-
+            
+            
             origin_labels = trainset.targets.clone()
 
         elif args.dataset == 'imagenet':
@@ -1530,6 +1539,13 @@ def get_dataloader_for_meta(
     cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
     cache_test_set(args, testset)
 
+    if args.dataset == 'retina':
+        testset.targets = testset.targets.float()
+        trainset.targets = trainset.targets.float()
+        validset.targets = validset.targets.float()
+        if metaset is not None:
+            metaset.targets = metaset.targets.float()
+
     train_sampler = DistributedSampler(
         trainset,
         num_replicas=args.world_size,
@@ -1550,14 +1566,29 @@ def get_dataloader_for_meta(
         #     num_replicas=args.world_size,
         #     rank=args.local_rank,
         # )
-        meta_sampler = RandomSampler(metaset, replacement=True, num_samples=args.epochs*len(trainloader)*args.batch_size*10)
-        metaloader = DataLoader(
-            metaset,
-            batch_size=args.test_batch_size,
-            num_workers=0,#args.num_workers,
-            pin_memory=True,
-            sampler=meta_sampler,
-        )
+        if not args.finetune:
+            meta_sampler = RandomSampler(metaset, replacement=True, num_samples=args.epochs*len(trainloader)*args.batch_size*10)
+            metaloader = DataLoader(
+                metaset,
+                batch_size=args.test_batch_size,
+                num_workers=0,#args.num_workers,
+                pin_memory=True,
+                sampler=meta_sampler,
+            )
+        else:
+            meta_sampler = DistributedSampler(
+                metaset,
+                num_replicas=args.world_size,
+                rank=args.local_rank,
+            )
+            metaloader = DataLoader(
+                metaset,
+                batch_size=args.batch_size,
+                num_workers=4*4, #args.num_workers,
+                pin_memory=True,
+                shuffle=False,
+                sampler=meta_sampler,
+            )       
 
     
     

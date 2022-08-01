@@ -453,7 +453,10 @@ def meta_learning_model(
 
             avg_train_loss += minibatch_loss.detach().cpu().item()*inputs[2].shape[0]
 
-            model_pred = torch.max(model_out, dim = 1)[1]
+            if len(model_out.shape) > 1:
+                model_pred = torch.max(model_out, dim = 1)[1]
+            else:
+                model_pred = (model_out > 0.5).type(torch.long).view(-1)
 
             train_pred_correct += torch.sum(model_pred.view(-1).detach().cpu() == inputs[2].detach().cpu().view(-1)).item()
 
@@ -1064,7 +1067,7 @@ def load_checkpoint2(args, model):
             state = torch.load(cached_model_file_name, map_location=torch.device("cpu"))
 
             if type(state) is collections.OrderedDict:
-                model.load_state_dict(state)
+                model.load_state_dict(state, strict=False)
             else:
                 model.load_state_dict(state.state_dict())
             args.logger.info('==> Loading cached model successfully')
@@ -1204,7 +1207,7 @@ def main2(args, logger):
 
         pretrained_rep_net = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True).cuda()
 
-        pretrained_rep_net.fc = nn.Linear(512, 2)
+        pretrained_rep_net.fc = nn.Linear(512, 1)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
         # pretrained_rep_net.eval()
         args.num_class=2
@@ -1236,7 +1239,10 @@ def main2(args, logger):
     else:
         raise NotImplementedError
         # pretrained_rep_net = ResNet18().cuda()
-    criterion = torch.nn.CrossEntropyLoss()
+    if not args.dataset == 'retina':
+        criterion = torch.nn.CrossEntropyLoss()
+    else:
+        criterion = torch.nn.BCELoss()
 
     meta_criterion = criterion
     if args.l1_meta_loss:
@@ -1375,7 +1381,7 @@ def main2(args, logger):
         #     param.requires_grad = False
         # for param in net.layer2.parameters():
         #     param.requires_grad = False
-        net.fc = nn.Linear(512, 2)
+        net.fc = nn.Linear(512, 1)
     elif args.dataset == 'imagenet':
         net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
         for param in net.conv1.parameters():

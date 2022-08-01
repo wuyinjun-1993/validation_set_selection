@@ -4,10 +4,10 @@ dataset_name=retina
 data_dir="/data1/wuyinjun/valid_set_selections/retina_data/"
 save_path_root_dir="/data1/wuyinjun/valid_set_selections/retina_data/"
 output_dir="/data1/wuyinjun/valid_set_selections/retina_data/"
-gpu_ids=0
+gpu_ids=1
 #total_valid_ratio=$6
 repeat_times=10
-port_num=10050
+port_num=10151
 meta_lr=20
 lr=0.001
 batch_size=128
@@ -22,10 +22,9 @@ model_prov_period=4
 
 valid_ratio_each_run=20 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
-method="cluster_method_three"
+method="cluster_method_one"
 total_valid_sample_count=20
 use_pretrained_model=false
-
 metric='auc'
-
+suffix='_2'
 
