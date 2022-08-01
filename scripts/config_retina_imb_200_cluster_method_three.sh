@@ -9,15 +9,15 @@ gpu_ids=0
 repeat_times=10
 port_num=10010
 meta_lr=20
-lr=0.001
-batch_size=128
-test_batch_size=128
-epochs=30
+lr=0.002
+batch_size=64
+test_batch_size=64
+epochs=50
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
-warm_up_valid_count=10
-model_prov_period=20
+warm_up_valid_count=2
+model_prov_period=4
 
 
 valid_ratio_each_run=20 #$(( total_valid_ratio / repeat_times ))

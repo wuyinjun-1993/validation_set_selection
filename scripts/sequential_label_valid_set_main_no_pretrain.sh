@@ -182,7 +182,7 @@ echo "${exe_cmd} > ${output_file_name}"
 
 ${exe_cmd} > ${output_file_name} 2>&1
 
-
+<<cmd
 exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
@@ -212,7 +212,47 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 
 echo "${exe_cmd} > ${output_file_name}"
 
-#${exe_cmd} > ${output_file_name} 2>&1 
+${exe_cmd} > ${output_file_name} 2>&1 
+
+cmd
+
+
+exe_cmd="python -m torch.distributed.launch \
+    --nproc_per_node 1 \
+    --master_port ${port_num} \
+    main_train.py \
+    --load_dataset \
+    --nce-t 0.07 \
+    --nce-k 200 \
+    --data_dir ${data_dir} \
+    --dataset ${dataset_name} \
+    --valid_count ${valid_ratio_each_run} \
+    --meta_lr ${meta_lr} \
+    --not_save_dataset \
+    --flip_labels \
+    ${bias_flip_str} \
+    --err_label_ratio ${err_label_ratio} \
+    --save_path ${save_path_prefix}_seq_select_0/ \
+    --prev_save_path ${save_path_prefix}_do_train/ \
+    --cuda \
+    --lr ${lr} \
+    --batch_size ${batch_size} \
+    --test_batch_size ${test_batch_size} \
+    --epochs ${epochs} \
+    ${metric_str} \
+    ${add_valid_in_training_flag} \
+        ${lr_decay_flag}"
+
+
+output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}.txt
+
+echo "${exe_cmd} > ${output_file_name}"
+
+${exe_cmd} > ${output_file_name} 2>&1
+
+
+
+
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 

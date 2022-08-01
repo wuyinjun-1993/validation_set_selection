@@ -1214,6 +1214,8 @@ def main2(args, logger):
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset == 'imagenet':
         pretrained_rep_net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
+        pretrained_rep_net.fc = nn.Linear(512, 10)
+        args.num_class=10
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
     elif args.dataset.startswith('sst2'):
