@@ -453,7 +453,10 @@ def meta_learning_model(
 
             avg_train_loss += minibatch_loss.detach().cpu().item()*inputs[2].shape[0]
 
-            model_pred = torch.max(model_out, dim = 1)[1]
+            if len(model_out.shape) > 1:
+                model_pred = torch.max(model_out, dim = 1)[1]
+            else:
+                model_pred = (model_out > 0.5).type(torch.long).view(-1)
 
             train_pred_correct += torch.sum(model_pred.view(-1).detach().cpu() == inputs[2].detach().cpu().view(-1)).item()
 

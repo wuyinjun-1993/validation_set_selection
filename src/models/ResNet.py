@@ -254,7 +254,7 @@ class ResNet(nn.Module):
             x = self.fc(x)
 
             if x.shape[1] <= 1:
-                x = F.sigmoid(x).view(-1)
+                x = torch.sigmoid(x).view(-1)
         # if self.mlp and self.two_branch:
         #     x = self.fc(x)
         #     x1 = self.instDis(x)
@@ -285,7 +285,7 @@ class ResNet(nn.Module):
             x = torch.flatten(x, 1)
 
             if x.shape[1] <= 1:
-                x = F.sigmoid(x).view(-1)
+                x = torch.sigmoid(x).view(-1)
         # x = self.fc(x)
         # if self.mlp and self.two_branch:
         #     x = self.fc(x)
