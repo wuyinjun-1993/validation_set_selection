@@ -1377,13 +1377,14 @@ def main2(args, logger):
         #     param.requires_grad = False
         net.fc = nn.Linear(512, 2)
     elif args.dataset == 'imagenet':
-        net = resnet34_imagenet(pretrained=True, first=False, last=True).cuda()
-        for param in net.conv1.parameters():
-            param.requires_grad = False
-        for param in net.layer1.parameters():
-            param.requires_grad = False
-        for param in net.layer2.parameters():
-            param.requires_grad = False
+        net = resnet34_imagenet(pretrained=True, first=True, last=True).cuda()
+        net.fc = nn.Linear(512, 10)
+        # for param in net.conv1.parameters():
+        #     param.requires_grad = False
+        # for param in net.layer1.parameters():
+        #     param.requires_grad = False
+        # for param in net.layer2.parameters():
+        #     param.requires_grad = False
     elif args.dataset.startswith('sst2'):
         net = custom_Bert(2)
     elif args.dataset.startswith('sst5'):
