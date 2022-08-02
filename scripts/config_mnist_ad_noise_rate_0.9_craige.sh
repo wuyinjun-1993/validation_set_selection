@@ -25,3 +25,4 @@ bias_flip=true
 method="craige"
 total_valid_sample_count=100
 use_pretrained_model=false
+suffix='_2'

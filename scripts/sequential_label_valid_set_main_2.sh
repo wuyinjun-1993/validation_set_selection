@@ -131,7 +131,7 @@ fi
 
 save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}${suffix}
 
-
+save_path_prefix0=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}
 <<cmd
 if (( add_valid_in_training_set == true ))
 then
@@ -162,7 +162,7 @@ exe_cmd="python -m torch.distributed.launch \
   --flip_labels \
   ${bias_flip_str} \
   --err_label_ratio ${err_label_ratio} \
-  --save_path ${save_path_prefix}_do_train/ \
+  --save_path ${save_path_prefix0}_do_train/ \
   --cuda \
   --lr ${lr} \
   --batch_size ${batch_size} \
@@ -197,7 +197,7 @@ exe_cmd="python -m torch.distributed.launch \
   ${bias_flip_str} \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
-  --prev_save_path ${save_path_prefix}_do_train/\
+  --prev_save_path ${save_path_prefix0}_do_train/\
   --cuda \
   --lr ${lr} \
   --batch_size ${batch_size} \
@@ -212,7 +212,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 
 echo "${exe_cmd} > ${output_file_name}"
 
-#${exe_cmd} > ${output_file_name} 2>&1 
+${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
@@ -223,7 +223,7 @@ echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
 
 
 #for k in {1..${repeat_times}}
-for (( k=4; k<=repeat_times; k++ ))
+for (( k=1; k<=repeat_times; k++ ))
 do
 
 	exe_cmd="python -m torch.distributed.launch \
