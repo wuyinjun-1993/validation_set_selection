@@ -9,14 +9,14 @@ gpu_ids=1
 repeat_times=2
 port_num=10011
 meta_lr=20
-lr=0.001
+lr=0.05
 batch_size=128
 test_batch_size=128
-epochs=30
+epochs=20
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
-warm_up_valid_count=10
+warm_up_valid_count=2
 model_prov_period=20
 
 
@@ -24,4 +24,5 @@ valid_ratio_each_run=100 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
 method="certain"
 total_valid_sample_count=100
-use_pretrained_model=false
+use_pretrained_model=true
+metric='auc'

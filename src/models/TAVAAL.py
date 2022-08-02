@@ -61,7 +61,10 @@ class LossNet(nn.Module):
             self.FC4 = nn.Linear(num_channels[3], interm_dim)
         self.first = first
         self.last = last
-        self.linear = nn.Linear(4 * interm_dim, 1)
+        if not first:
+            self.linear = nn.Linear(2 * interm_dim, 1)
+        else:
+            self.linear = nn.Linear(4 * interm_dim, 1)
     
     def forward(self, features):
         k = 0
@@ -222,9 +225,9 @@ class VAE(nn.Module):
             nn.BatchNorm2d(256),
             nn.ReLU(True),
             nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),    # B,  128, 64, 64
-            nn.BatchNorm2d(128),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(128, nc, 1),                       # B,   nc, 64, 64
+            # nn.BatchNorm2d(128),
+            # nn.ReLU(True),
+            # nn.ConvTranspose2d(128, nc, 1),                       # B,   nc, 64, 64
         )
         self.weight_init()
 
@@ -240,7 +243,7 @@ class VAE(nn.Module):
         z = self._encode(x)
         mu, logvar = self.fc_mu(z), self.fc_logvar(z)
         z = self.reparameterize(mu, logvar)
-        z = torch.cat([z,r],1)
+        z = torch.cat([z[0:r.shape[0]],r],1)
         x_recon = self._decode(z)
 
         return x_recon, z, mu, logvar
@@ -281,7 +284,7 @@ class Discriminator(nn.Module):
                 kaiming_init(m)
 
     def forward(self, r,z):  
-        z = torch.cat([z, r], 1)
+        z = torch.cat([z[0:r.shape[0]], r], 1)
         return self.net(z)
 
 
@@ -679,8 +682,14 @@ def main_train_taaval(args):
                     resnet = resnet34_imagenet(pretrained=True, first=args.biased_flip, last=True)
                     resnet.fc = nn.Linear(512, 2)
                     resnet = resnet.cuda()
-                    loss_module = LossNet(first=args.biased_flip, last=True).cuda()
+                    loss_module = LossNet(first=args.biased_flip, last=True, num_channels=[64, 128, 1024, 2048]).cuda()
                 
+                if args.dataset == 'imagenet':
+                    resnet = resnet34_imagenet(pretrained=True, first=True, last=True)
+                    resnet.fc = nn.Linear(512, 10)
+                    resnet = resnet.cuda()
+                    loss_module = LossNet(first=True, last=True, num_channels=[64, 128, 1024, 2048]).cuda()
+
                 nc = 3
                 encoder_out_dim=1024*2*2
                 z_dim=32

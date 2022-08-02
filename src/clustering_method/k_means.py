@@ -187,6 +187,8 @@ def select_samples_by_ls(X, selected, is_cuda):
 
     for idx in range(len(X)):
         curr_X = X[idx][selected]
+        # print("selected shape::", selected.shape)
+        # print("curr_X shape::", curr_X.shape)
         if is_cuda:
             curr_X = curr_X.cuda()
 
