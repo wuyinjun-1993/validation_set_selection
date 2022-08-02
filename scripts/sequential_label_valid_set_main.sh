@@ -225,6 +225,7 @@ echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
 #for k in {1..${repeat_times}}
 for (( k=1; k<=repeat_times; k++ ))
 do
+	rm -rf ${save_path_prefix}_seq_select_${k}/
 
 	exe_cmd="python -m torch.distributed.launch \
     --nproc_per_node 1 \
