@@ -553,7 +553,7 @@ def query_samples(model, train_set, subset, meta_set, cycle, args, nc=3, encoder
         batch_size=args.batch_size, 
         pin_memory=True,
     )
-    vae = VAE(nc=nc, encoder_out_dim =encoder_out_dim, z_dim=z_dim, first=args.biased_flip, last=True)
+    vae = VAE(nc=nc, encoder_out_dim =encoder_out_dim, z_dim=z_dim, first=True, last=True)
     discriminator = Discriminator(32)
     
     models = {'backbone': model['backbone'], 'module': model['module'],'vae': vae, 'discriminator': discriminator}
