@@ -20,8 +20,8 @@ warm_up_valid_count=100
 model_prov_period=20
 
 
-valid_ratio_each_run=100 #$(( total_valid_ratio / repeat_times ))
+valid_ratio_each_run=20 #$(( total_valid_ratio / repeat_times ))
 bias_flip=true
 method="rand"
-total_valid_sample_count=100
+total_valid_sample_count=20
 use_pretrained_model=false
