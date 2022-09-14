@@ -1534,7 +1534,7 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg 
                 else:
                     max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
             else:
-                total_norm_ls = torch.sqrt(vec_norm_ls2.view(-1).unsqueeze(1)*torch.ones_like(torch.sum(torch.stack(vec_norm_ls1, dim = 0), dim =0).view(-1)).unsqueeze(0))
+                total_norm_ls = torch.sqrt(torch.ones_like(vec_norm_ls1.view(-1)).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
                 if full_inner_prod:
                     max_cosine_sim = torch.abs(total_cosin_ls)
                 else:
