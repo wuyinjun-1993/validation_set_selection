@@ -16,7 +16,7 @@ epochs=150
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
-warm_up_valid_count=10
+warm_up_valid_count=50
 model_prov_period=20
 
 
