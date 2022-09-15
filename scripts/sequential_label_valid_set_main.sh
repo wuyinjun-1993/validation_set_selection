@@ -60,6 +60,12 @@ then
 	
 	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
 
+
+elif [[ $method == "cluster_method_one" ]];
+then
+        add_valid_in_training_flag="--select_valid_set --cluster_method_two --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
+
+
 elif [[ $method == "certain" ]];
 then
 
@@ -206,7 +212,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 
 echo "${exe_cmd} > ${output_file_name}"
 
-#${exe_cmd} > ${output_file_name} 2>&1 
+${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
@@ -219,6 +225,7 @@ echo "add_valid_in_training_flag: ${add_valid_in_training_flag}"
 #for k in {1..${repeat_times}}
 for (( k=1; k<=repeat_times; k++ ))
 do
+	rm -rf ${save_path_prefix}_seq_select_${k}/
 
 	exe_cmd="python -m torch.distributed.launch \
     --nproc_per_node 1 \

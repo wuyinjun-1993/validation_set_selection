@@ -20,12 +20,18 @@ class ImbalanceDataset(Dataset):
         num_classes = classes.shape[0]
 
         # 2. Get average number of samples per class
-        samples_per_class = unbiased_dataset.targets.shape[0] / num_classes
-
+        samples_per_class = -1
+        for cls in range(num_classes):
+            curr_samples_per_class = torch.sum(unbiased_dataset.targets == cls)
+            if samples_per_class < 0:
+                samples_per_class = curr_samples_per_class
+            else:
+                samples_per_class = torch.min(samples_per_class, curr_samples_per_class)
+        print("sample_class_count::", samples_per_class)
         # 3. Delete samples from each class based on some bias
         self.mask = torch.zeros(unbiased_dataset.targets.shape[0], dtype=torch.bool)
         for cls in range(num_classes):
-            num_select = samples_per_class * (imb_factor**(cls / (num_classes - 1.0)))
+            num_select = samples_per_class * (imb_factor**(-cls / (num_classes - 1.0)))
             all_cls_idx = torch.nonzero(unbiased_dataset.targets == cls)
             shuffle = torch.randperm(len(all_cls_idx))
             idx = all_cls_idx[shuffle][:int(num_select)]

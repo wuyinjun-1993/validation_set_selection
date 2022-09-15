@@ -129,45 +129,45 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
         optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, net.parameters()), lr=args.lr,
                 momentum=0.9, weight_decay=5e-4, nesterov=True)
         optimizer.param_groups[0]['initial_lr'] = args.lr
-        if args.do_train:
-            if args.bias_classes:
-                mile_stones_epochs = [20, 40]
-            else:
-                mile_stones_epochs = [20, 40]
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(
-                optimizer,
-                milestones=mile_stones_epochs,
-                gamma=0.1,
-            )
-        else:
-            if args.use_pretrained_model:
-                if args.bias_classes:
-                    mile_stones_epochs = [20, 40]
-                    gamma = 0.1
-                else:
-                    mile_stones_epochs = [20, 40]
-                    gamma = 0.2
-            else:
-                mile_stones_epochs = [20, 40]
-                gamma = 0.1
-            if args.lr_decay:
-                scheduler = torch.optim.lr_scheduler.MultiStepLR(
-                    optimizer,
-                    milestones=mile_stones_epochs,
-                    last_epoch=start_epoch-1,
-                    gamma=gamma,
-                )
-            else:
-                scheduler = None
+        # if args.do_train:
+        #     if args.bias_classes:
+        #         mile_stones_epochs = [50, 60]
+        #     else:
+        #         mile_stones_epochs = [20, 40]
+        #     scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        #         optimizer,
+        #         milestones=mile_stones_epochs,
+        #         gamma=0.1,
+        #     )
+        # else:
+        #     if args.use_pretrained_model:
+        #         if args.bias_classes:
+        #             mile_stones_epochs = [50, 60]
+        #             gamma = 0.1
+        #         else:
+        #             mile_stones_epochs = [20, 40]
+        #             gamma = 0.2
+        #     else:
+        #         mile_stones_epochs = [20, 40]
+        #         gamma = 0.1
+        #     if args.lr_decay:
+        #         scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        #             optimizer,
+        #             milestones=mile_stones_epochs,
+        #             last_epoch=start_epoch-1,
+        #             gamma=gamma,
+        #         )
+        #     else:
+        scheduler = None
     elif args.dataset == 'imagenet':
         optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, net.parameters()), lr=args.lr,
                 momentum=0.9, weight_decay=5e-4, nesterov=True)
         optimizer.param_groups[0]['initial_lr'] = args.lr
         if args.do_train:
             if args.bias_classes:
-                mile_stones_epochs = [160, 180]
+                mile_stones_epochs = [10, 15]
             else:
-                mile_stones_epochs = [150, 225]
+                mile_stones_epochs = [10, 15]
             scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 optimizer,
                 milestones=mile_stones_epochs,
@@ -176,13 +176,14 @@ def obtain_optimizer_scheduler(args, net, start_epoch = 0):
         else:
             if args.use_pretrained_model:
                 if args.bias_classes:
-                    mile_stones_epochs = [80, 90]
+                    mile_stones_epochs = [40]
                     gamma = 0.1
                 else:
-                    mile_stones_epochs = [80, 90]
+                    # mile_stones_epochs = [10, 15]
+                    mile_stones_epochs = [40]
                     gamma = 0.2
             else:
-                mile_stones_epochs = [150, 200]
+                mile_stones_epochs = [40]
                 gamma = 0.1
             if args.lr_decay:
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(

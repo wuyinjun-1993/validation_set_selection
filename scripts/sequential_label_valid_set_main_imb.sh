@@ -59,6 +59,11 @@ then
 	
 	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
 
+elif [[ $method == "cluster_method_one" ]];
+then
+        add_valid_in_training_flag="--select_valid_set --cluster_method_two --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
+
+
 elif [[ $method == "certain" ]];
 then
 
@@ -145,10 +150,8 @@ exe_cmd="python -m torch.distributed.launch \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
-  --meta_lr ${meta_lr} \
-  --flip_labels \
+  --meta_lr ${meta_lr} \ 
   ${bias_flip_str} \
-  --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
   --lr ${lr} \
@@ -180,9 +183,7 @@ exe_cmd="python -m torch.distributed.launch \
   --dataset ${dataset_name} \
   --valid_count ${warm_up_valid_count} \
   --meta_lr ${meta_lr} \
-  --flip_labels \
   ${bias_flip_str} \
-  --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
   --prev_save_path ${save_path_prefix}_do_train/\
   --cuda \
@@ -228,9 +229,7 @@ do
     --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
-    --flip_labels \
     ${bias_flip_str} \
-    --err_label_ratio ${err_label_ratio} \
     --save_path ${save_path_prefix}_seq_select_${k}/ \
     --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
     --cuda \

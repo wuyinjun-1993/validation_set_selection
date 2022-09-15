@@ -187,6 +187,8 @@ def select_samples_by_ls(X, selected, is_cuda):
 
     for idx in range(len(X)):
         curr_X = X[idx][selected]
+        # print("selected shape::", selected.shape)
+        # print("curr_X shape::", curr_X.shape)
         if is_cuda:
             curr_X = curr_X.cuda()
 
@@ -1532,7 +1534,7 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg 
                 else:
                     max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
             else:
-                total_norm_ls = torch.sqrt(vec_norm_ls1.view(-1).unsqueeze(1)*torch.ones_like(torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1)).unsqueeze(0))
+                total_norm_ls = torch.sqrt(torch.ones_like(vec_norm_ls1.view(-1)).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
                 if full_inner_prod:
                     max_cosine_sim = torch.abs(total_cosin_ls)
                 else:
