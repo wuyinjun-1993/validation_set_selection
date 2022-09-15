@@ -20,8 +20,8 @@ warm_up_valid_count=10
 model_prov_period=20
 
 
-valid_ratio_each_run=120 #$(( total_valid_ratio / repeat_times ))
+valid_ratio_each_run=200 #$(( total_valid_ratio / repeat_times ))
 bias_flip=true
 method="cluster_method_three"
-total_valid_sample_count=120
+total_valid_sample_count=200
 use_pretrained_model=true

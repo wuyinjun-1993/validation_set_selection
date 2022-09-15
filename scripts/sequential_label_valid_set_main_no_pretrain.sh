@@ -63,7 +63,7 @@ then
 
 elif [[ $method == "cluster_method_one" ]];
 then
-        add_valid_in_training_flag="--select_valid_set --cluster_method_two --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
+        add_valid_in_training_flag="--select_valid_set --cluster_method_three --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
 
 
 elif [[ $method == "certain" ]];
