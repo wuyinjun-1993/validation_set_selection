@@ -48,7 +48,8 @@ def test(test_loader, network, criterion, args, logger, prefix = "test"):
     pred_prob_ls_tensor = torch.cat(pred_prob_ls)
     quadratic_kappa = torch.tensor(cohen_kappa_score(y_hat, y, weights='quadratic'),device='cuda:0')
     # if pred_prob_ls_tensor.shape[1] > 2:
-    auc_score = sklearn.metrics.roc_auc_score(y.data.cpu().numpy(), pred_prob_ls_tensor.cpu().numpy(), multi_class='ovr')
+    auc_score = sklearn.metrics.roc_auc_score(y.data.cpu().numpy(),
+            pred_prob_ls_tensor[:, 1].cpu().numpy(), multi_class='ovr')
     # else:
     #     auc_score = sklearn.metrics.roc_auc_score(y.data.cpu().numpy(), pred_prob_ls_tensor[:,1].cpu().numpy())
     test_loss /= len(test_loader.dataset)

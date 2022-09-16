@@ -27,6 +27,7 @@ from models.bert import *
 import collections
 from models.LeNet5 import *
 from models.ResNet import *
+from models.toynet import ToyNN
 import models.TAVAAL
 
 import torchvision.models
@@ -64,7 +65,7 @@ def report_best_test_performance_so_far(logger, test_loss_ls, test_acc_ls,
 
     test_loss_array = numpy.array(test_loss_ls)
     test_acc_array = numpy.array(test_acc_ls)
-    max_acc_epoch = numpy.argmax(test_acc_array)
+    max_acc_epoch = len(test_acc_array) - numpy.argmax(test_acc_array[::-1]) - 1
 
     min_test_loss = test_loss_array[max_acc_epoch]
     min_test_acc = test_acc_array[max_acc_epoch]
@@ -74,7 +75,8 @@ def report_best_test_performance_so_far(logger, test_loss_ls, test_acc_ls,
 def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls,
         test_loss_ls, test_acc_ls, args, logger, is_meta=True):
     valid_acc_arr = numpy.array(valid_acc_ls)
-    best_valid_acc_idx = numpy.argmax(valid_acc_arr)
+    # best_valid_acc_idx = numpy.argmax(valid_acc_arr)
+    best_valid_acc_idx = len(valid_acc_arr) - numpy.argmax(valid_acc_arr[::-1]) - 1
 
     final_test_loss = test_loss_ls[best_valid_acc_idx]
     final_test_acc = test_acc_ls[best_valid_acc_idx]
@@ -1238,6 +1240,16 @@ def main2(args, logger):
         args.num_class=6
         # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
+    elif args.dataset == "toy":
+        pretrained_rep_net = ToyNN()
+        args.num_class = 2
+        optimizer = torch.optim.SGD(
+            pretrained_rep_net.parameters(),
+            lr=args.lr,
+            momentum=0.9,
+            weight_decay=5e-4,
+            nesterov=True,
+        )
     else:
         raise NotImplementedError
         # pretrained_rep_net = ResNet18().cuda()
@@ -1401,6 +1413,8 @@ def main2(args, logger):
         net = custom_Bert(2)
     elif args.dataset.startswith('trec'):
         net = custom_Bert(6)
+    elif args.dataset == "toy":
+        net = ToyNN()
     else:
         raise NotImplementedError
 

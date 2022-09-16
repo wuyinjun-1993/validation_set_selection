@@ -22,6 +22,7 @@ from exp_datasets.imdb import *
 from exp_datasets.trec import *
 from exp_datasets.craige import *
 from sklearn.model_selection import train_test_split
+from sklearn.datasets import make_classification
 import pandas as pd
 # To ensure each process will produce the same dataset separately. Random flips
 # of labels become deterministic so we can perform them independently per
@@ -153,6 +154,7 @@ class dataset_wrapper(Dataset):
                 img = Image.fromarray(img.numpy(), mode="L")
             else:
                 img = Image.fromarray(img)
+
         
             img1 = self.transform(img)
 
@@ -1441,6 +1443,26 @@ def get_dataloader_for_meta(
             trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
             origin_labels = trainset.targets.clone()
 
+        elif args.dataset == "toy":
+            features, target = make_classification(
+                n_samples=1000,
+                n_features=2,
+                n_clusters_per_class=2,
+                n_redundant=0,
+                flip_y=0.0,
+                random_state=3161999,
+                class_sep=1.0,
+            )
+            X_train, X_test, y_train, y_test = train_test_split(
+                features,
+                target,
+                test_size=0.4,
+            )
+            trainset = dataset_wrapper(numpy.copy(X_train).astype("float32"), numpy.copy(y_train), None)
+            testset = dataset_wrapper(numpy.copy(X_test).astype("float32"), numpy.copy(y_test), None)
+            origin_labels = numpy.copy(trainset.targets)
+
+
         if args.low_data:
             trainset = trainset.subsampling_dataset_by_class(trainset, num_per_class=args.low_data_num_samples_per_class)
             if type(trainset.targets) is numpy.ndarray:
@@ -1541,7 +1563,7 @@ def get_dataloader_for_meta(
         args.logger.info("unique label count in meta set::%d"%(unique_labels_count))
         
     if validset is None:
-        validset, testset = randomly_produce_valid_set(testset, rate = 0.1)
+        validset, testset = randomly_produce_valid_set(testset, rate = 0.4)
 
     cache_train_valid_set(args, trainset, validset, metaset, remaining_origin_labels)
     cache_test_set(args, testset)
