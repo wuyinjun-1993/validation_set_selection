@@ -1519,7 +1519,10 @@ def get_dataloader_for_meta(
                     cached_sample_weights=cached_sample_weights,
                 )
             else:
-                active_strategy = CRAIGActive(metaset.data, metaset.targets, trainset.data, pretrained_model, torch.nn.CrossEntropyLoss(),  dataset_wrapper_X, dataset_wrapper, args.num_class, args.lr, "Supervised",  True, metaset.transform, {"lr": args.lr, "batch_size": args.batch_size})
+                if metaset is not None:
+                    active_strategy = CRAIGActive(metaset.data, metaset.targets, trainset.data, pretrained_model, torch.nn.CrossEntropyLoss(),  dataset_wrapper_X, dataset_wrapper, args.num_class, args.lr, "Supervised",  True, validset.transform, {"lr": args.lr, "batch_size": args.batch_size})
+                else:
+                    active_strategy = CRAIGActive(None, None, trainset.data, pretrained_model, torch.nn.CrossEntropyLoss(),  dataset_wrapper_X, dataset_wrapper, args.num_class, args.lr, "Supervised",  True, validset.transform, {"lr": args.lr, "batch_size": args.batch_size})
 
                 valid_ids = active_strategy.select(args.valid_count)
 
