@@ -24,13 +24,12 @@ echo "lr_decay::${lr_decay}"
 echo "warm_up_valid_count::${warm_up_valid_count}"
 echo "model_prov_period::${model_prov_period}"
 echo "valid_ratio_each_run::${valid_ratio_each_run}" #$(( total_valid_ratio / repeat_times ))
-echo "bias_flip::${bias_flip}"
 echo "method::${method}"
 echo "total_valid_sample_count::${total_valid_sample_count}"
 
 echo "metric::${metric}"
 echo "suffix::${suffix}"
-
+echo "imb_factor::${imb_factor}"
 echo "use_pretrained_model::$use_pretrained_model"
 
 #total_valid_sample_count=200
@@ -58,8 +57,7 @@ then
 elif [[ $method == "cluster_method_three" ]];
 then
 	
-	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
-
+	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
 
 elif [[ $method == "cluster_method_one" ]];
 then
@@ -111,14 +109,8 @@ fi
 #add_valid_in_training_flag="--cluster_method_three --not_rescale_features --weight_by_norm  --cosin_dist  --replace --use_model_prov --model_prov_period 20 --total_valid_sample_count ${total_valid_sample_count} --remove_empty_clusters --no_sample_weights_k_means"
 
 
-bias_flip_str=''
-err_type='rand_error'
-
-if "${bias_flip}";
-then
-	bias_flip_str='--biased_flip'
-	err_type='bias_error'
-fi
+bias_flip_str="--bias_classes --imb_factor ${imb_factor}"
+err_type="imb_factor_${imb_factor}"
 
 
 lr_decay_flag="--lr_decay"
@@ -158,10 +150,8 @@ exe_cmd="python -m torch.distributed.launch \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
-  --meta_lr ${meta_lr} \
-  --flip_labels \
+  --meta_lr ${meta_lr} \ 
   ${bias_flip_str} \
-  --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
   --cuda \
   --lr ${lr} \
@@ -180,7 +170,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+#${exe_cmd} > ${output_file_name} 2>&1
 
 <<cmd
 exe_cmd="python -m torch.distributed.launch \
@@ -193,9 +183,7 @@ exe_cmd="python -m torch.distributed.launch \
   --dataset ${dataset_name} \
   --valid_count ${warm_up_valid_count} \
   --meta_lr ${meta_lr} \
-  --flip_labels \
   ${bias_flip_str} \
-  --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
   --prev_save_path ${save_path_prefix}_do_train/\
   --cuda \
@@ -206,14 +194,6 @@ exe_cmd="python -m torch.distributed.launch \
   --total_valid_sample_count ${total_valid_sample_count} \
   ${metric_str} \
   ${lr_decay_flag}"
-
-
-output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}.txt
-
-echo "${exe_cmd} > ${output_file_name}"
-
-${exe_cmd} > ${output_file_name} 2>&1 
-
 cmd
 
 
@@ -229,9 +209,7 @@ exe_cmd="python -m torch.distributed.launch \
     --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
-    --flip_labels \
     ${bias_flip_str} \
-    --err_label_ratio ${err_label_ratio} \
     --save_path ${save_path_prefix}_seq_select_0/ \
     --prev_save_path ${save_path_prefix}_do_train/ \
     --cuda \
@@ -244,15 +222,13 @@ exe_cmd="python -m torch.distributed.launch \
         ${lr_decay_flag}"
 
 
+
+
 output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
-${exe_cmd} > ${output_file_name} 2>&1
-
-
-
-
+${exe_cmd} > ${output_file_name} 2>&1 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
 
@@ -281,9 +257,7 @@ do
     --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
-    --flip_labels \
     ${bias_flip_str} \
-    --err_label_ratio ${err_label_ratio} \
     --save_path ${save_path_prefix}_seq_select_${k}/ \
     --prev_save_path ${save_path_prefix}_seq_select_$(( k - 1 ))/ \
     --cuda \
