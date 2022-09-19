@@ -121,12 +121,23 @@ then
 fi
 
 
-lr_decay_flag="--lr_decay"
+
+lr_decay_flag0=''
+
+if "${lr_decay}";
+then
+        lr_decay_flag0="--lr_decay"
+fi
+
+
+
+lr_decay_flag=${lr_decay_flag0}
 
 if "${use_pretrained_model}";
-then 
-	lr_decay_flag="--use_pretrained_model --lr_decay"
+then
+        lr_decay_flag="--use_pretrained_model ${lr_decay_flag0}"
 fi
+
 
 
 save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}${suffix}
@@ -170,7 +181,7 @@ exe_cmd="python -m torch.distributed.launch \
   --epochs ${epochs} \
   --do_train \
   ${metric_str} \
-  --lr_decay
+  ${lr_decay_flag}
 "
 
 
@@ -226,7 +237,7 @@ exe_cmd="python -m torch.distributed.launch \
     --nce-k 200 \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
-    --valid_count ${valid_ratio_each_run} \
+    --valid_count ${warm_up_valid_count} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     --flip_labels \
