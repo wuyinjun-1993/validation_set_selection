@@ -1,13 +1,13 @@
 err_label_ratio=0.6
 
 dataset_name=MNIST
-data_dir="/data6/wuyinjun/valid_set_selections/mnist_0/"
-save_path_root_dir="/data6/wuyinjun/valid_set_selections/mnist_0/"
-output_dir="/data6/wuyinjun/valid_set_selections/mnist_0/"
+data_dir="/data6/wuyinjun/valid_set_selections/mnist_1/"
+save_path_root_dir="/data6/wuyinjun/valid_set_selections/mnist_1/"
+output_dir="/data6/wuyinjun/valid_set_selections/mnist_1/"
 gpu_ids=2
 #total_valid_ratio=$6
 repeat_times=10
-port_num=10362
+port_num=10012
 meta_lr=20
 lr=0.1
 batch_size=4096
@@ -22,6 +22,6 @@ model_prov_period=20
 
 valid_ratio_each_run=30 #$(( total_valid_ratio / repeat_times ))
 bias_flip=true
-method="cluster_method_one"
+method="finetune"
 total_valid_sample_count=30
-use_pretrained_model=false
+use_pretrained_model=true
