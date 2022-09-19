@@ -1,9 +1,9 @@
 err_label_ratio=0.6
 
 dataset_name=cifar10
-data_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
-save_path_root_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
-output_dir="/data5/wuyinjun/valid_set_selections/cifar100_4/"
+data_dir="/data5/wuyinjun/valid_set_selections/cifar10_4/"
+save_path_root_dir="/data5/wuyinjun/valid_set_selections/cifar10_4/"
+output_dir="/data5/wuyinjun/valid_set_selections/cifar10_4/"
 gpu_ids=2
 #total_valid_ratio=$6
 repeat_times=10
@@ -20,8 +20,8 @@ warm_up_valid_count=10
 model_prov_period=20
 
 
-valid_ratio_each_run=100 #$(( total_valid_ratio / repeat_times ))
+valid_ratio_each_run=50 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
 method="certain"
-total_valid_sample_count=100
+total_valid_sample_count=50
 use_pretrained_model=true
