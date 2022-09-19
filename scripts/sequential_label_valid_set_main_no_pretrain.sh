@@ -121,12 +121,23 @@ then
 fi
 
 
-lr_decay_flag="--lr_decay"
+
+lr_decay_flag0=''
+
+if "${lr_decay}";
+then
+        lr_decay_flag0="--lr_decay"
+fi
+
+
+
+lr_decay_flag=${lr_decay_flag0}
 
 if "${use_pretrained_model}";
-then 
-	lr_decay_flag="--use_pretrained_model --lr_decay"
+then
+        lr_decay_flag="--use_pretrained_model ${lr_decay_flag0}"
 fi
+
 
 
 save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}${suffix}

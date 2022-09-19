@@ -120,12 +120,20 @@ then
 	err_type='bias_error'
 fi
 
+lr_decay_flag0=''
 
-lr_decay_flag="--lr_decay"
+if "${lr_decay}";
+then
+	lr_decay_flag0="--lr_decay"
+fi
+
+
+
+lr_decay_flag=${lr_decay_flag0}
 
 if "${use_pretrained_model}";
 then 
-	lr_decay_flag="--use_pretrained_model --lr_decay"
+	lr_decay_flag="--use_pretrained_model ${lr_decay_flag0}"
 fi
 
 
