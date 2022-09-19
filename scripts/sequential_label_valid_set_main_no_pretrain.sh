@@ -181,7 +181,7 @@ exe_cmd="python -m torch.distributed.launch \
   --epochs ${epochs} \
   --do_train \
   ${metric_str} \
-  --lr_decay
+  ${lr_decay_flag}
 "
 
 
@@ -191,7 +191,7 @@ output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ra
 echo "${exe_cmd} > ${output_file_name}"
 
 
-${exe_cmd} > ${output_file_name} 2>&1
+#${exe_cmd} > ${output_file_name} 2>&1
 
 <<cmd
 exe_cmd="python -m torch.distributed.launch \
@@ -237,7 +237,7 @@ exe_cmd="python -m torch.distributed.launch \
     --nce-k 200 \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
-    --valid_count ${valid_ratio_each_run} \
+    --valid_count ${warm_up_valid_count} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     --flip_labels \

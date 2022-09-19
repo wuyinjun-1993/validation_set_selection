@@ -24,4 +24,4 @@ valid_ratio_each_run=30 #$(( total_valid_ratio / repeat_times ))
 bias_flip=true
 method="finetune"
 total_valid_sample_count=30
-use_pretrained_model=true
+use_pretrained_model=false

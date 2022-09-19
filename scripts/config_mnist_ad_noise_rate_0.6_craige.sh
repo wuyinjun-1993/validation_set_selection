@@ -1,9 +1,9 @@
 err_label_ratio=0.6
 
 dataset_name=MNIST
-data_dir="/data6/wuyinjun/valid_set_selections/mnist_0/"
-save_path_root_dir="/data6/wuyinjun/valid_set_selections/mnist_0/"
-output_dir="/data6/wuyinjun/valid_set_selections/mnist_0/"
+data_dir="/data6/wuyinjun/valid_set_selections/mnist_1/"
+save_path_root_dir="/data6/wuyinjun/valid_set_selections/mnist_1/"
+output_dir="/data6/wuyinjun/valid_set_selections/mnist_1/"
 gpu_ids=1
 #total_valid_ratio=$6
 repeat_times=10

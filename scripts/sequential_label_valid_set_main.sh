@@ -178,7 +178,7 @@ exe_cmd="python -m torch.distributed.launch \
   --epochs ${epochs} \
   --do_train \
   ${metric_str} \
-  --lr_decay
+  ${lr_decay_flag}
 "
 
 
