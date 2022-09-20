@@ -246,7 +246,7 @@ def update_centroid_by_ls(selected, initial_state, selected_sample_weights, inde
             if selected_sample_norm is None:
                 initial_state[k][index] = selected[k].mean(dim=0)
             else:
-                initial_state[k][index] = selected[k].sum(dim=0)/torch.sum(selected_sample_norm)
+                initial_state[k][index] = torch.mean(selected[k]/selected_sample_norm.view(-1,1), dim=0)
     else:
         for k in range(len(initial_state)):
             if selected_sample_norm is None:
@@ -532,7 +532,7 @@ def kmeans(
                         if selected_sample_norm is None:
                             selected_state = selected.mean(dim=0)
                         else:
-                            selected_state = selected.sum(dim=0)/torch.sum(selected_sample_norm)
+                            selected_state = torch.mean(selected/selected_sample_norm.view(-1,1), dim=0)
                     else:
                         if selected_sample_norm is None:
                             selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
