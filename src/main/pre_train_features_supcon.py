@@ -109,7 +109,7 @@ def calculate_entity_embedding_sim0_sample_wise(cl_temp, features, device, label
     # else:
     # logits, mask, inverse_mask, logits_mask, anchor_count, pos_in_deno = False, curr_mb_sim_weight = None, curr_mb_dissim_weight = None
     # loss = compute_full_cl_loss0(logits, mask, inverse_mask, logits_mask, anchor_count, pos_in_deno, curr_mb_sim_weight = curr_mb_sim_weight, curr_mb_dissim_weight = curr_mb_dissim_weight, extra_similar_count=extra_similar_count, extra_similarity_batch_wise=extra_similarity_batch_wise, extra_dissimilarity_batch_wise=extra_dissimilarity_batch_wise, rand_perm = rand_perm)
-    ######################################################Updates from YINJUN:: add one if statement for filtering out a corner case################################
+    ######################################################Updates from add one if statement for filtering out a corner case################################
     if (curr_mb_dissim_weight is None or torch.norm(curr_mb_dissim_weight) > 0) and torch.norm(inverse_mask) > 0:
         # print("compute cl loss")
         loss = compute_full_cl_loss0(labels, logits, mask, inverse_mask, logits_mask, anchor_count, pos_in_deno, curr_mb_sim_weight = curr_mb_sim_weight, curr_mb_dissim_weight = curr_mb_dissim_weight, cl_loss_sqr = cl_loss_sqr, sample_weights = sample_weights)
