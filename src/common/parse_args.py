@@ -61,7 +61,7 @@ def parse_args(args=None):
 
     parser.add_argument('--inner_prod', action='store_true', help='not save dataset')
     parser.add_argument('--rand_init', action='store_true', help='not save dataset')
-    parser.add_argument('--not_rescale_features', action='store_true', help='not save dataset')
+    # parser.add_argument('--not_rescale_features', action='store_true', help='not save dataset')
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
     parser.add_argument('--clustering_by_class', action='store_true', help='not save dataset')
 
@@ -128,8 +128,8 @@ def parse_args(args=None):
 
     # model and loss function
     parser.add_argument('--alpha', type=float, default=0.999, help='exponential moving average weight')
-    parser.add_argument('--nce-k', type=int, default=4096, help='num negative sampler')
-    parser.add_argument('--nce-t', type=float, default=0.1, help='NCE temperature')
+    # parser.add_argument('--nce-k', type=int, default=4096, help='num negative sampler')
+    # parser.add_argument('--nce-t', type=float, default=0.1, help='NCE temperature')
     parser.add_argument('--low-dim', default=128, type=int,
                         metavar='D', help='feature dimension')
     # optimization
