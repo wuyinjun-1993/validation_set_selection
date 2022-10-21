@@ -1486,13 +1486,14 @@ def get_dataloader_for_meta(
         if args.bias_classes:
             trainset, remaining_origin_labels = generate_class_biased_dataset(trainset,
                     args, logger, testset, remaining_origin_labels)
-        if args.flip_labels:
+        if args.real_noise:
+            print("use real noise in cifar")
+            if args.dataset.lower()== 'cifar10':
+                trainset.targets = torch.load(os.path.join(args.data_dir, "CIFAR-N/CIFAR-10_human.pt"))['worse_label']
+            elif args.dataset.lower() == 'cifar100':
+                trainset.targets = torch.load(os.path.join(args.data_dir, "CIFAR-N/CIFAR-100_human.pt"))['noisy_label']
+        elif args.flip_labels:
             trainset = generate_noisy_dataset(args, trainset, logger)
-        elif args.real_noise:
-            if args.dataset.lower().startswith("cifar10"):
-                trainset.targets = torch.load(args.data_dir, "CIFAR-N/CIFAR-10_human.pt")['noisy_label']
-            elif args.dataset.lower().startswith("cifar100"):
-                trainset.targets = torch.load(args.data_dir, "CIFAR-N/CIFAR-100_human.pt")['noisy_label']
     else:
         if args.continue_label:
             trainset, validset, metaset, origin_labels = load_train_valid_set(args)
