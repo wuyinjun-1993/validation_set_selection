@@ -182,7 +182,6 @@ def main(args, logger):
             transforms.Normalize(norm_mean, norm_std),
         ])
 
-    # args.data_dir = '/data1/wuyinjun/valid_set_selections/sample/'
     train_set = load_raw_set(args, "trainLabels.csv", transform_train, True)
     test_set = load_raw_set(args, "testLabels.csv", transform_test, False)
 
