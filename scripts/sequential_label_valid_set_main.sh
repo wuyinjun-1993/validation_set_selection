@@ -137,14 +137,19 @@ then
 fi
 
 
+
 flip_label_flag="--flip_labels"
 
-if "${real_noise}";
+if [[ ${real_noise} = true ]];
 then
+        echo "use real noise data"
 
-        echo "download real noise data"
-        wget "http://www.yliuu.com/web-cifarN/files/CIFAR-N.zip" -P ${data_dir}
-        unzip ${data_dir}/CIFAR-N.zip -d ${data_dir}
+        if test -f "${data_dir}/CIFAR-N.zip";
+        then
+                echo "download real noise data"
+                wget "http://www.yliuu.com/web-cifarN/files/CIFAR-N.zip" -P ${data_dir}
+                unzip ${data_dir}/CIFAR-N.zip -d ${data_dir}
+        fi
         flip_label_flag="--real_noise"
 fi
 
