@@ -342,14 +342,14 @@ def cluster_per_class(
                 curr_cluster_sample_representation = sample_representation_vec_ls[arr_idx]
                 curr_cluster_center = cluster_centers[arr_idx][cluster_id].view(1,-1)
                 curr_cluster_center_ls.append(curr_cluster_center)
-                if is_cuda:
-                    curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
+                # if is_cuda:
+                #     curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
                 curr_cluster_sample_representation_ls.append(curr_cluster_sample_representation)
 
             cluster_dist_ls_tensor = pairwise_distance_function(
                 curr_cluster_sample_representation_ls,
                 curr_cluster_center_ls,
-                is_cuda=is_cuda,
+                is_cuda=False,
                 weight_by_norm=args.weight_by_norm,
                 inner_prod=args.inner_prod,
                 ls_idx_range=args.origin_X_ls_lenth,
