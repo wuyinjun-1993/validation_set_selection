@@ -12,7 +12,7 @@ meta_lr=5
 lr=0.002
 batch_size=32
 test_batch_size=32
-epochs=30
+epochs=10
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
@@ -20,8 +20,8 @@ warm_up_valid_count=10
 model_prov_period=20
 
 
-valid_ratio_each_run=30 #$(( total_valid_ratio / repeat_times ))
+valid_ratio_each_run=50 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
-method="certain"
-total_valid_sample_count=30
+method="ta"
+total_valid_sample_count=50
 use_pretrained_model=false
