@@ -25,4 +25,4 @@ bias_flip=true
 method="cluster_method_two"
 total_valid_sample_count=200
 iuse_pretrained_model=true
-real_noise=false
+real_noise=true

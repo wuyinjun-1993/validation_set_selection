@@ -24,4 +24,4 @@ valid_ratio_each_run=200 #$(( total_valid_ratio / repeat_times ))
 bias_flip=true
 method="cluster_method_three"
 total_valid_sample_count=200
-use_pretrained_model=false
+use_pretrained_model=true

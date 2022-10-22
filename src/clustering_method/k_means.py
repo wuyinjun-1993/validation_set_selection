@@ -390,6 +390,7 @@ def kmeans(
         origin_X_ls_lenth = -1,
         rand_init = False
 ):
+    is_cuda = False
     """
     perform kmeans
     :param X: (torch.tensor) matrix

@@ -4,10 +4,10 @@ dataset_name=cifar10
 data_dir="/data6/wuyinjun/valid_set_selections/cifar10_2/"
 save_path_root_dir="/data6/wuyinjun/valid_set_selections/cifar10_2/"
 output_dir="/data6/wuyinjun/valid_set_selections/cifar10_2/"
-gpu_ids=0
+gpu_ids=2
 #total_valid_ratio=$6
-repeat_times=2
-port_num=10330
+repeat_times=10
+port_num=10339
 meta_lr=30
 lr=0.1
 batch_size=128
@@ -17,13 +17,11 @@ epochs=150
 add_valid_in_training_set=true
 lr_decay=true
 warm_up_valid_count=10
-model_prov_period=10
+model_prov_period=20
 
 
 valid_ratio_each_run=50 #$(( total_valid_ratio / repeat_times ))
 bias_flip=true
-method="cluster_method_three"
+method="certain"
 total_valid_sample_count=50
 use_pretrained_model=true
-real_noise=false
-

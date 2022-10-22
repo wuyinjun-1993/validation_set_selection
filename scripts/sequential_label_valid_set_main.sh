@@ -137,6 +137,29 @@ then
 fi
 
 
+flip_label_flag="--flip_labels"
+
+if [[ ${real_noise} = true ]];
+then
+        echo "use real noise data"
+
+        if [ -f "${data_dir}/CIFAR-N.zip" ];
+        then
+                echo "file exists!!!"
+        else
+                echo "download real noise data"
+                wget "http://www.yliuu.com/web-cifarN/files/CIFAR-N.zip" -P ${data_dir}
+                unzip ${data_dir}/CIFAR-N.zip -d ${data_dir}
+        fi
+        flip_label_flag="--real_noise"
+
+        bias_flip_str=''
+        err_type='real_error'
+        err_label_ratio='0'
+fi
+
+
+
 save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}${suffix}
 
 
@@ -167,7 +190,7 @@ exe_cmd="python -m torch.distributed.launch \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
   --meta_lr ${meta_lr} \
-  --flip_labels \
+  ${flip_label_flag} \
   ${bias_flip_str} \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
@@ -201,7 +224,7 @@ exe_cmd="python -m torch.distributed.launch \
   --dataset ${dataset_name} \
   --valid_count ${warm_up_valid_count} \
   --meta_lr ${meta_lr} \
-  --flip_labels \
+  ${flip_label_flag} \
   ${bias_flip_str} \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
@@ -250,7 +273,7 @@ do
     --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
-    --flip_labels \
+    ${flip_label_flag} \
     ${bias_flip_str} \
     --err_label_ratio ${err_label_ratio} \
     --save_path ${save_path_prefix}_seq_select_${k}/ \
