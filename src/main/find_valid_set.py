@@ -341,7 +341,7 @@ def cluster_per_class(
                 # curr_cluster_sample_representation = sample_representation_vec_ls[arr_idx][cluster_ids_x == cluster_id].view(torch.sum(cluster_ids_x == cluster_id), -1)
                 curr_cluster_sample_representation = sample_representation_vec_ls[arr_idx]
                 curr_cluster_center = cluster_centers[arr_idx][cluster_id].view(1,-1)
-                curr_cluster_center_ls.append(curr_cluster_center)
+                curr_cluster_center_ls.append(curr_cluster_center.cpu())
                 # if is_cuda:
                 #     curr_cluster_sample_representation = curr_cluster_sample_representation.cuda()
                 curr_cluster_sample_representation_ls.append(curr_cluster_sample_representation)
