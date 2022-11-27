@@ -1476,6 +1476,8 @@ def get_dataloader_for_meta(
         selection_method = uncertainty_sample
     elif split_method == 'certainty':
         selection_method = certainty_sample
+    elif args.ta_vaal_train:
+        selection_method = random_partition_train_valid_dataset0
     # elif split_method == 'craige':
         
 
@@ -1543,6 +1545,21 @@ def get_dataloader_for_meta(
                 metaset = metaset.concat_validset(metaset, new_metaset)
             else:
                 metaset = new_metaset
+
+        else:
+            if metaset is None:
+                trainset, metaset, remaining_origin_labels = selection_method(
+                        criterion,
+                        optimizer,
+                        pretrained_model,
+                        trainset,
+                        None,
+                        args,
+                        remaining_origin_labels,
+                        cached_sample_weights=cached_sample_weights,
+                    )
+
+                torch.save(metaset, os.path.join(args.prev_save_path, "cached_meta_set"))
 
         assert (metaset is not None), "Must use one of --continue_label or --ta_vaal_train"
 
