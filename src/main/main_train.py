@@ -1268,7 +1268,7 @@ def main2(args, logger):
         pretrained_rep_net = load_checkpoint2(args, pretrained_rep_net)
 
     cached_sample_weights = None
-    if args.load_cached_weights:
+    if args.load_cached_weights and not args.finetune:
         cached_sample_weights = torch.load(os.path.join(args.prev_save_path, args.cached_sample_weights_name))
         logger.info("sample weights loaded successfully")
     if args.cuda:

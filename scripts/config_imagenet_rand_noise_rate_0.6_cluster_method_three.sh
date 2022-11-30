@@ -17,11 +17,11 @@ epochs=30
 add_valid_in_training_set=true
 lr_decay=true
 warm_up_valid_count=10
-model_prov_period=4
+model_prov_period=2
 
 
-valid_ratio_each_run=50 #$(( total_valid_ratio / repeat_times ))
+valid_ratio_each_run=20 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
 method="cluster_method_three"
-total_valid_sample_count=50
-use_pretrained_model=true
+total_valid_sample_count=20
+use_pretrained_model=false

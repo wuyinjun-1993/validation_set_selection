@@ -225,9 +225,9 @@ class VAE(nn.Module):
             nn.BatchNorm2d(256),
             nn.ReLU(True),
             nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),    # B,  128, 64, 64
-            # nn.BatchNorm2d(128),
-            # nn.ReLU(True),
-            # nn.ConvTranspose2d(128, nc, 1),                       # B,   nc, 64, 64
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(128, nc, 1),                       # B,   nc, 64, 64
         )
         self.weight_init()
 

@@ -61,7 +61,7 @@ def parse_args(args=None):
 
     parser.add_argument('--inner_prod', action='store_true', help='not save dataset')
     parser.add_argument('--rand_init', action='store_true', help='not save dataset')
-    parser.add_argument('--not_rescale_features', action='store_true', help='not save dataset')
+    # parser.add_argument('--not_rescale_features', action='store_true', help='not save dataset')
     parser.add_argument('--not_save_dataset', action='store_true', help='not save dataset')
     parser.add_argument('--clustering_by_class', action='store_true', help='not save dataset')
 
@@ -128,8 +128,8 @@ def parse_args(args=None):
 
     # model and loss function
     parser.add_argument('--alpha', type=float, default=0.999, help='exponential moving average weight')
-    parser.add_argument('--nce-k', type=int, default=4096, help='num negative sampler')
-    parser.add_argument('--nce-t', type=float, default=0.1, help='NCE temperature')
+    # parser.add_argument('--nce-k', type=int, default=4096, help='num negative sampler')
+    # parser.add_argument('--nce-t', type=float, default=0.1, help='NCE temperature')
     parser.add_argument('--low-dim', default=128, type=int,
                         metavar='D', help='feature dimension')
     # optimization
@@ -189,7 +189,8 @@ def parse_args(args=None):
     parser.add_argument('--normlinear', action='store_true', help='whether use normalization linear layer')
     parser.add_argument('--aug-plus', action='store_true', help='whether add strong augmentation')
     parser.add_argument('--erasing', action='store_true', help='whether add random erasing as an augmentation')
-
+    # real_noise
+    parser.add_argument('--real_noise', action='store_true', help='whether to get real noise')
 
     # parser.add_argument('--obj_cl_hidden_layer_count', default=0, type=int)
 

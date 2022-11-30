@@ -53,17 +53,17 @@ cd ../src/main/
 
 if [[ ${method} == "cluster_method_two" ]];
 then
-	add_valid_in_training_flag="--select_valid_set --cluster_method_two --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
+	add_valid_in_training_flag="--select_valid_set --cluster_method_two --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
 
 elif [[ $method == "cluster_method_three" ]];
 then
 	
-	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
+	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
 
 
 elif [[ $method == "cluster_method_one" ]];
 then
-        add_valid_in_training_flag="--select_valid_set --cluster_method_two --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
+        add_valid_in_training_flag="--select_valid_set --cluster_method_two --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
 
 
 elif [[ $method == "certain" ]];
@@ -120,13 +120,44 @@ then
 	err_type='bias_error'
 fi
 
+lr_decay_flag0=''
 
-lr_decay_flag="--lr_decay"
+if "${lr_decay}";
+then
+	lr_decay_flag0="--lr_decay"
+fi
+
+
+
+lr_decay_flag=${lr_decay_flag0}
 
 if "${use_pretrained_model}";
 then 
-	lr_decay_flag="--use_pretrained_model --lr_decay"
+	lr_decay_flag="--use_pretrained_model ${lr_decay_flag0}"
 fi
+
+
+flip_label_flag="--flip_labels"
+
+if [[ ${real_noise} = true ]];
+then
+        echo "use real noise data"
+
+        if [ -f "${data_dir}/CIFAR-N.zip" ];
+        then
+                echo "file exists!!!"
+        else
+                echo "download real noise data"
+                wget "http://www.yliuu.com/web-cifarN/files/CIFAR-N.zip" -P ${data_dir}
+                unzip ${data_dir}/CIFAR-N.zip -d ${data_dir}
+        fi
+        flip_label_flag="--real_noise"
+
+        bias_flip_str=''
+        err_type='real_error'
+        err_label_ratio='0'
+fi
+
 
 
 save_path_prefix=${save_path_root_dir}/${err_type}_${err_label_ratio}_valid_select_${method}${suffix}
@@ -159,7 +190,7 @@ exe_cmd="python -m torch.distributed.launch \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
   --meta_lr ${meta_lr} \
-  --flip_labels \
+  ${flip_label_flag} \
   ${bias_flip_str} \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_do_train/ \
@@ -170,7 +201,7 @@ exe_cmd="python -m torch.distributed.launch \
   --epochs ${epochs} \
   --do_train \
   ${metric_str} \
-  --lr_decay
+  ${lr_decay_flag}
 "
 
 
@@ -193,7 +224,7 @@ exe_cmd="python -m torch.distributed.launch \
   --dataset ${dataset_name} \
   --valid_count ${warm_up_valid_count} \
   --meta_lr ${meta_lr} \
-  --flip_labels \
+  ${flip_label_flag} \
   ${bias_flip_str} \
   --err_label_ratio ${err_label_ratio} \
   --save_path ${save_path_prefix}_seq_select_0/ \
@@ -242,7 +273,7 @@ do
     --valid_count ${valid_ratio_each_run} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
-    --flip_labels \
+    ${flip_label_flag} \
     ${bias_flip_str} \
     --err_label_ratio ${err_label_ratio} \
     --save_path ${save_path_prefix}_seq_select_${k}/ \

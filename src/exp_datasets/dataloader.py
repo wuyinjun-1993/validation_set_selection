@@ -1498,6 +1498,8 @@ def get_dataloader_for_meta(
         selection_method = uncertainty_sample
     elif split_method == 'certainty':
         selection_method = certainty_sample
+    elif args.ta_vaal_train:
+        selection_method = random_partition_train_valid_dataset0
     # elif split_method == 'craige':
         
 
@@ -1508,7 +1510,13 @@ def get_dataloader_for_meta(
         if args.bias_classes:
             trainset, remaining_origin_labels = generate_class_biased_dataset(trainset,
                     args, logger, testset, remaining_origin_labels)
-        if args.flip_labels:
+        if args.real_noise:
+            print("use real noise in cifar")
+            if args.dataset.lower()== 'cifar10':
+                trainset.targets = torch.load(os.path.join(args.data_dir, "CIFAR-N/CIFAR-10_human.pt"))['worse_label']
+            elif args.dataset.lower() == 'cifar100':
+                trainset.targets = torch.load(os.path.join(args.data_dir, "CIFAR-N/CIFAR-100_human.pt"))['noisy_label']
+        elif args.flip_labels:
             trainset = generate_noisy_dataset(args, trainset, logger)
     else:
         if args.continue_label:
@@ -1559,6 +1567,21 @@ def get_dataloader_for_meta(
                 metaset = metaset.concat_validset(metaset, new_metaset)
             else:
                 metaset = new_metaset
+
+        else:
+            if metaset is None:
+                trainset, metaset, remaining_origin_labels = selection_method(
+                        criterion,
+                        optimizer,
+                        pretrained_model,
+                        trainset,
+                        None,
+                        args,
+                        remaining_origin_labels,
+                        cached_sample_weights=cached_sample_weights,
+                    )
+
+                torch.save(metaset, os.path.join(args.prev_save_path, "cached_meta_set"))
 
         assert (metaset is not None), "Must use one of --continue_label or --ta_vaal_train"
 

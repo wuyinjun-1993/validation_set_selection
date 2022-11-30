@@ -246,7 +246,7 @@ def update_centroid_by_ls(selected, initial_state, selected_sample_weights, inde
             if selected_sample_norm is None:
                 initial_state[k][index] = selected[k].mean(dim=0)
             else:
-                initial_state[k][index] = selected[k].sum(dim=0)/torch.sum(selected_sample_norm)
+                initial_state[k][index] = torch.mean(selected[k]/selected_sample_norm.view(-1,1), dim=0)
     else:
         for k in range(len(initial_state)):
             if selected_sample_norm is None:
@@ -390,6 +390,7 @@ def kmeans(
         origin_X_ls_lenth = -1,
         rand_init = False
 ):
+    is_cuda = False
     """
     perform kmeans
     :param X: (torch.tensor) matrix
@@ -532,7 +533,7 @@ def kmeans(
                         if selected_sample_norm is None:
                             selected_state = selected.mean(dim=0)
                         else:
-                            selected_state = selected.sum(dim=0)/torch.sum(selected_sample_norm)
+                            selected_state = torch.mean(selected/selected_sample_norm.view(-1,1), dim=0)
                     else:
                         if selected_sample_norm is None:
                             selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
@@ -1534,7 +1535,9 @@ def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, agg 
                 else:
                     max_cosine_sim = torch.abs(total_cosin_ls)/total_norm_ls
             else:
-                total_norm_ls = torch.sqrt(torch.ones_like(vec_norm_ls1.view(-1)).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
+                # total_norm_ls = torch.sqrt(torch.ones_like(vec_norm_ls1.view(-1)).unsqueeze(1)*torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1).unsqueeze(0))
+                total_norm_ls = torch.sqrt(vec_norm_ls1.view(-1).unsqueeze(1)*torch.ones_like(torch.sum(torch.stack(vec_norm_ls2, dim = 0), dim =0).view(-1)).unsqueeze(0))
+
                 if full_inner_prod:
                     max_cosine_sim = torch.abs(total_cosin_ls)
                 else:
