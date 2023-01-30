@@ -1483,7 +1483,7 @@ def get_extra_representations_last_layer(args, train_loader, criterion, net, ful
     if not args.all_layer:# and not args.all_layer2:
         full_sample_representation_vec_ls = [full_sample_representation_vec_ls]
         if validloader is not None:
-            full_valid_sample_representation_vec_ls = [valid_sample_representatiosn_vec_ls]
+            full_valid_sample_representation_vec_ls = [valid_sample_representation_vec_ls]
         else:
             full_valid_sample_representation_vec_ls = None
 
