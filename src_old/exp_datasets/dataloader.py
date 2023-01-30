@@ -455,10 +455,10 @@ def get_dataloader(args, add_erasing=False, aug_plus=False):
 
 def split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids):
 
-    # if args.noisy_valid:
-    #     clean_labels = train_dataset.targets.copy()
-    # else:
-    clean_labels = origin_labels
+    if args.noisy_valid:
+        clean_labels = train_dataset.targets.copy()
+    else:
+        clean_labels = origin_labels
     meta_set = train_dataset.get_subset_dataset(train_dataset, valid_ids, clean_labels)
     train_set = train_dataset.get_subset_dataset(train_dataset, update_train_ids)
 
@@ -501,55 +501,55 @@ def random_partition_train_valid_dataset0(criterion, optimizer, net, train_datas
     return train_set, meta_set, remaining_origin_labels
 
 
-# def random_partition_train_valid_dataset0_by_class(criterion, optimizer, net, train_dataset, validset, args, origin_labels, cached_sample_weights=None, sample_count_per_class = None):
+def random_partition_train_valid_dataset0_by_class(criterion, optimizer, net, train_dataset, validset, args, origin_labels, cached_sample_weights=None, sample_count_per_class = None):
 
-#     # if validset is not None and args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
-#     #     args.logger.info("already collect enough samples, exit!!!!")
-#     #     sys.exit(1)
+    # if validset is not None and args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
+    #     args.logger.info("already collect enough samples, exit!!!!")
+    #     sys.exit(1)
 
-#     # if len(validset) + args.valid_count > args.total_valid_sample_count:
-#     #     args.valid_count = args.total_valid_sample_count - len(validset)
+    # if len(validset) + args.valid_count > args.total_valid_sample_count:
+    #     args.valid_count = args.total_valid_sample_count - len(validset)
 
-#     unique_label_set = set(origin_labels.tolist())
-#     valid_size = args.valid_count
-#     if not type(origin_labels) is torch.Tensor:
-#         origin_labels = torch.from_numpy(origin_labels)
-#     label_id = 0
-#     curr_total_valid_size = 0
-#     all_selected_train_ids = []
-#     all_selected_valid_ids = []
-#     for label in unique_label_set:
-#         if label_id < len(unique_label_set) - 1:
-#             if sample_count_per_class is None:
-#                 curr_valid_size = int(valid_size/len(unique_label_set))
-#             else:
-#                 curr_valid_size = int(valid_size/sum(sample_count_per_class)*sample_count_per_class[label_id])
-#         else:
-#             curr_valid_size = valid_size - curr_total_valid_size
+    unique_label_set = set(origin_labels.tolist())
+    valid_size = args.valid_count
+    if not type(origin_labels) is torch.Tensor:
+        origin_labels = torch.from_numpy(origin_labels)
+    label_id = 0
+    curr_total_valid_size = 0
+    all_selected_train_ids = []
+    all_selected_valid_ids = []
+    for label in unique_label_set:
+        if label_id < len(unique_label_set) - 1:
+            if sample_count_per_class is None:
+                curr_valid_size = int(valid_size/len(unique_label_set))
+            else:
+                curr_valid_size = int(valid_size/sum(sample_count_per_class)*sample_count_per_class[label_id])
+        else:
+            curr_valid_size = valid_size - curr_total_valid_size
 
-#         curr_total_valid_size += curr_valid_size
-#         curr_train_ids = torch.nonzero(origin_labels == label).view(-1)
-#         rand_train_id_ids = torch.randperm(len(curr_train_ids))
-#         curr_train_sample_ids = curr_train_ids[rand_train_id_ids]
-#         assert torch.all(origin_labels[curr_train_sample_ids] == label) == True
-#         all_selected_train_ids.append(curr_train_sample_ids[curr_valid_size:])
-#         all_selected_valid_ids.append(curr_train_sample_ids[0:curr_valid_size])
-#         label_id += 1
+        curr_total_valid_size += curr_valid_size
+        curr_train_ids = torch.nonzero(origin_labels == label).view(-1)
+        rand_train_id_ids = torch.randperm(len(curr_train_ids))
+        curr_train_sample_ids = curr_train_ids[rand_train_id_ids]
+        assert torch.all(origin_labels[curr_train_sample_ids] == label) == True
+        all_selected_train_ids.append(curr_train_sample_ids[curr_valid_size:])
+        all_selected_valid_ids.append(curr_train_sample_ids[0:curr_valid_size])
+        label_id += 1
 
-#     # train_ids = torch.arange(len(train_dataset))
-#     # rand_train_ids = torch.randperm(len(train_ids))
-#     valid_ids = torch.cat(all_selected_valid_ids)
-#     update_train_ids = torch.cat(all_selected_train_ids)
-#     assert curr_total_valid_size == valid_size
-#     assert len(valid_ids) + len(update_train_ids) == len(origin_labels)
-#     # valid_ids = rand_train_ids[:valid_size]
+    # train_ids = torch.arange(len(train_dataset))
+    # rand_train_ids = torch.randperm(len(train_ids))
+    valid_ids = torch.cat(all_selected_valid_ids)
+    update_train_ids = torch.cat(all_selected_train_ids)
+    assert curr_total_valid_size == valid_size
+    assert len(valid_ids) + len(update_train_ids) == len(origin_labels)
+    # valid_ids = rand_train_ids[:valid_size]
 
-#     # update_train_ids = rand_train_ids[valid_size:]
+    # update_train_ids = rand_train_ids[valid_size:]
 
-#     torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
-#     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
-#     remaining_origin_labels = origin_labels[update_train_ids]
-#     return train_set, meta_set, remaining_origin_labels
+    torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
+    train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
+    remaining_origin_labels = origin_labels[update_train_ids]
+    return train_set, meta_set, remaining_origin_labels
 
 
 def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimizer):
@@ -643,58 +643,58 @@ def obtain_valid_count_ls_per_class(unique_label_set, total_valid_count, sample_
     
     return valid_count_ls
 
-# def find_representative_samples0_by_class(criterion, optimizer, net, train_dataset,validset,  args, origin_labels, cached_sample_weights = None, sample_count_per_class = None):
-#     unique_label_set = set(origin_labels.tolist())
-#     valid_labels = None
-#     if validset is not None:
-#         valid_labels = validset.targets
-#     if not type(origin_labels) is torch.Tensor:
-#         origin_labels = torch.from_numpy(origin_labels)
-#         if valid_labels is not None:
-#             valid_labels = torch.from_numpy(valid_labels)
-#     label_id = 0
-#     curr_total_valid_size = 0
-#     all_selected_train_ids = []
-#     all_selected_valid_ids = []
-#     res_train_set, res_meta_set, res_remaining_origin_labels = None, None, None
+def find_representative_samples0_by_class(criterion, optimizer, net, train_dataset,validset,  args, origin_labels, cached_sample_weights = None, sample_count_per_class = None):
+    unique_label_set = set(origin_labels.tolist())
+    valid_labels = None
+    if validset is not None:
+        valid_labels = validset.targets
+    if not type(origin_labels) is torch.Tensor:
+        origin_labels = torch.from_numpy(origin_labels)
+        if valid_labels is not None:
+            valid_labels = torch.from_numpy(valid_labels)
+    label_id = 0
+    curr_total_valid_size = 0
+    all_selected_train_ids = []
+    all_selected_valid_ids = []
+    res_train_set, res_meta_set, res_remaining_origin_labels = None, None, None
     
 
-#     valid_count_ls = obtain_valid_count_ls_per_class(unique_label_set, args.valid_count, sample_count_per_class = sample_count_per_class)
-#     origin_total_valid_sample_count = args.total_valid_sample_count
-#     total_valid_sample_count_ls = obtain_valid_count_ls_per_class(unique_label_set, args.total_valid_sample_count, sample_count_per_class = sample_count_per_class)
+    valid_count_ls = obtain_valid_count_ls_per_class(unique_label_set, args.valid_count, sample_count_per_class = sample_count_per_class)
+    origin_total_valid_sample_count = args.total_valid_sample_count
+    total_valid_sample_count_ls = obtain_valid_count_ls_per_class(unique_label_set, args.total_valid_sample_count, sample_count_per_class = sample_count_per_class)
 
-#     for label in unique_label_set:
-#         args.logger.info("collecting meta set for label %d"%(label))
-#         curr_sample_ids = torch.nonzero(origin_labels == label).view(-1)
-#         curr_origin_labels = origin_labels[curr_sample_ids]
-#         assert torch.all(curr_origin_labels == label) == True
-#         curr_cached_sample_weights = None
-#         if not cached_sample_weights is None:
-#             curr_cached_sample_weights = cached_sample_weights[curr_sample_ids]
-#         if not type(train_dataset.targets) is torch.Tensor:
-#             curr_sample_ids = curr_sample_ids.numpy()
-#         sub_trainset = train_dataset.get_subset_dataset(train_dataset, curr_sample_ids)
-#         sub_validset = None
-#         if validset is not None:
-#             curr_valid_sample_ids = torch.nonzero(valid_labels == label).view(-1)
-#             if not type(train_dataset.targets) is torch.Tensor:
-#                 curr_valid_sample_ids = curr_valid_sample_ids.numpy()
-#             sub_validset = validset.get_subset_dataset(validset, curr_valid_sample_ids)
-#         args.total_valid_sample_count = total_valid_sample_count_ls
-#         res_sub_train_set, res_sub_meta_set, res_sub_remaining_origin_labels = find_representative_samples0(criterion, optimizer, net, sub_trainset,sub_validset,  args, curr_origin_labels, cached_sample_weights = curr_cached_sample_weights, valid_count=valid_count_ls[label_id])
-#         if res_train_set is None:
-#             res_train_set = res_sub_train_set
-#             res_meta_set = res_sub_meta_set
-#             res_remaining_origin_labels = res_sub_remaining_origin_labels
-#         else:
-#             res_train_set = res_train_set.concat_validset(res_train_set, res_sub_train_set)
-#             res_meta_set = res_meta_set.concat_validset(res_meta_set, res_sub_meta_set)
-#             res_remaining_origin_labels = torch.cat([res_remaining_origin_labels, res_sub_remaining_origin_labels])
-#         label_id += 1
-#     if not type(train_dataset.targets) is torch.Tensor:
-#         res_remaining_origin_labels = res_remaining_origin_labels.numpy()
+    for label in unique_label_set:
+        args.logger.info("collecting meta set for label %d"%(label))
+        curr_sample_ids = torch.nonzero(origin_labels == label).view(-1)
+        curr_origin_labels = origin_labels[curr_sample_ids]
+        assert torch.all(curr_origin_labels == label) == True
+        curr_cached_sample_weights = None
+        if not cached_sample_weights is None:
+            curr_cached_sample_weights = cached_sample_weights[curr_sample_ids]
+        if not type(train_dataset.targets) is torch.Tensor:
+            curr_sample_ids = curr_sample_ids.numpy()
+        sub_trainset = train_dataset.get_subset_dataset(train_dataset, curr_sample_ids)
+        sub_validset = None
+        if validset is not None:
+            curr_valid_sample_ids = torch.nonzero(valid_labels == label).view(-1)
+            if not type(train_dataset.targets) is torch.Tensor:
+                curr_valid_sample_ids = curr_valid_sample_ids.numpy()
+            sub_validset = validset.get_subset_dataset(validset, curr_valid_sample_ids)
+        args.total_valid_sample_count = total_valid_sample_count_ls
+        res_sub_train_set, res_sub_meta_set, res_sub_remaining_origin_labels = find_representative_samples0(criterion, optimizer, net, sub_trainset,sub_validset,  args, curr_origin_labels, cached_sample_weights = curr_cached_sample_weights, valid_count=valid_count_ls[label_id])
+        if res_train_set is None:
+            res_train_set = res_sub_train_set
+            res_meta_set = res_sub_meta_set
+            res_remaining_origin_labels = res_sub_remaining_origin_labels
+        else:
+            res_train_set = res_train_set.concat_validset(res_train_set, res_sub_train_set)
+            res_meta_set = res_meta_set.concat_validset(res_meta_set, res_sub_meta_set)
+            res_remaining_origin_labels = torch.cat([res_remaining_origin_labels, res_sub_remaining_origin_labels])
+        label_id += 1
+    if not type(train_dataset.targets) is torch.Tensor:
+        res_remaining_origin_labels = res_remaining_origin_labels.numpy()
 
-#     return res_train_set, res_meta_set, res_remaining_origin_labels
+    return res_train_set, res_meta_set, res_remaining_origin_labels
 
 
 
@@ -716,7 +716,7 @@ def obtain_sample_pair_distance_bound(train_dataset, metaset, criterion, optimiz
 
     valid_representations, valid_representations2 = valid_representations
 
-    full_distance = compute_distance(args, True, True, full_sample_representation_tensor, valid_representations, args.cuda)
+    full_distance = compute_distance(args, args.cosin_dist, True, full_sample_representation_tensor, valid_representations, args.cuda)
     ratio = torch.sort(torch.abs(torch.sum(full_distance,dim=1))/torch.sum(torch.abs(full_distance),dim=1))[0]
     D_value = ((1+ratio)/(1-ratio)).min()
     args.logger.info("D value is::%f"%(D_value))
@@ -740,12 +740,12 @@ def obtain_sample_pair_distance_bound(train_dataset, metaset, criterion, optimiz
 
     full_meta_output_origin_probs_tensor_ls.append(meta_output_origin_probs_tensor)
 
-    # if args.use_model_prov:
-    args.all_layer = True
+    if args.use_model_prov:
+        args.all_layer = True
 
-    get_extra_output_prob_ls(args, trainloader, net, full_train_output_probs_tensor_ls, full_train_output_origin_probs_tensor_ls)
+        get_extra_output_prob_ls(args, trainloader, net, full_train_output_probs_tensor_ls, full_train_output_origin_probs_tensor_ls)
 
-    get_extra_output_prob_ls(args, metaloader, net, full_meta_output_probs_tensor_ls, full_meta_output_origin_probs_tensor_ls)
+        get_extra_output_prob_ls(args, metaloader, net, full_meta_output_probs_tensor_ls, full_meta_output_origin_probs_tensor_ls)
 
 
 
@@ -761,7 +761,7 @@ def obtain_sample_pair_distance_bound(train_dataset, metaset, criterion, optimiz
 
 def find_representative_samples0(criterion, optimizer, net, train_dataset,validset,  args, origin_labels, cached_sample_weights = None, valid_count = None):
     # valid_ratio = args.valid_ratio
-    # prob_gap_ls = torch.zeros(len(train_dataset))
+    prob_gap_ls = torch.zeros(len(train_dataset))
 
     if validset is not None and args.total_valid_sample_count > 0 and args.total_valid_sample_count <= len(validset):
         args.logger.info("already collect enough samples, exit!!!!")
@@ -773,7 +773,7 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
         else:
             valid_count = args.valid_count
 
-    # pred_labels = torch.zeros(len(train_dataset), dtype =torch.long)
+    pred_labels = torch.zeros(len(train_dataset), dtype =torch.long)
 
     trainloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
 
@@ -793,14 +793,14 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
             # train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None
             valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
             if existing_valid_representation is not None:
-                valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = True, is_cuda=args.cuda, all_layer=args.cluster_method_three)
+                valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer=args.cluster_method_three)
     else:
-        # if args.qualitiative:
-        #     valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, qualitiative = args.qualitiative, origin_label = origin_labels)
-        # else:
-            valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)#, qualitiative = args.qualitiative)
+        if args.qualitiative:
+            valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, qualitiative = args.qualitiative, origin_label = origin_labels)
+        else:
+            valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, qualitiative = args.qualitiative)
         # if existing_valid_representation is not None:
-        #     valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = True, is_cuda=args.cuda, all_layer = args.all_layer)
+        #     valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer = args.all_layer)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)
 
     torch.save(valid_ids, os.path.join(args.save_path, "valid_dataset_ids"))
@@ -811,8 +811,8 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
     
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
     
-    # if args.qualitiative:
-    #     obtain_sample_pair_distance_bound(train_dataset, meta_set, criterion, optimizer, trainloader, args, net, cached_sample_weights, valid_count, validset)
+    if args.qualitiative:
+        obtain_sample_pair_distance_bound(train_dataset, meta_set, criterion, optimizer, trainloader, args, net, cached_sample_weights, valid_count, validset)
 
     remaining_origin_labels = origin_labels[update_train_ids]
     torch.save(origin_labels, os.path.join(args.save_path, "train_and_meta_labels"))
@@ -839,23 +839,23 @@ def uncertainty_sample(criterion, optimizer, net, train_dataset, validset, args,
         vals[indices] = criterion(output, output).cpu()
         labels[indices] = target.type(torch.long).cpu()
 
-    # if args.clustering_by_class:
-    #     valid_ids = []
-    #     update_train_ids = []
-    #     unique_label_set = set(labels.tolist())
-    #     valid_size = int(args.valid_count / len(unique_label_set))
-    #     all_indices = torch.arange(labels.shape[0])
-    #     for l in unique_label_set:
-    #         _, indices = torch.sort(vals[labels == l], descending=True)
-    #         valid_ids.append(all_indices[labels == l][indices[:valid_size]])
-    #         update_train_ids.append(all_indices[labels == l][indices[valid_size:]])
-    #     valid_ids = torch.cat(valid_ids)
-    #     update_train_ids = torch.cat(update_train_ids)
-    # else:
-    valid_size = args.valid_count
-    _, indices = torch.sort(vals, descending=True)
-    valid_ids = indices[:valid_size]
-    update_train_ids = indices[valid_size:]
+    if args.clustering_by_class:
+        valid_ids = []
+        update_train_ids = []
+        unique_label_set = set(labels.tolist())
+        valid_size = int(args.valid_count / len(unique_label_set))
+        all_indices = torch.arange(labels.shape[0])
+        for l in unique_label_set:
+            _, indices = torch.sort(vals[labels == l], descending=True)
+            valid_ids.append(all_indices[labels == l][indices[:valid_size]])
+            update_train_ids.append(all_indices[labels == l][indices[valid_size:]])
+        valid_ids = torch.cat(valid_ids)
+        update_train_ids = torch.cat(update_train_ids)
+    else:
+        valid_size = args.valid_count
+        _, indices = torch.sort(vals, descending=True)
+        valid_ids = indices[:valid_size]
+        update_train_ids = indices[valid_size:]
 
     # torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
@@ -881,23 +881,23 @@ def certainty_sample(criterion, optimizer, net, train_dataset, validset, args, o
         vals[indices] = criterion(output, output).cpu()
         labels[indices] = target.type(torch.long).cpu()
 
-    # if args.clustering_by_class:
-    #     valid_ids = []
-    #     update_train_ids = []
-    #     unique_label_set = set(labels.tolist())
-    #     valid_size = int(args.valid_count / len(unique_label_set))
-    #     all_indices = torch.arange(labels.shape[0])
-    #     for l in unique_label_set:
-    #         _, indices = torch.sort(vals[labels == l], descending=False)
-    #         valid_ids.append(all_indices[labels == l][indices[:valid_size]])
-    #         update_train_ids.append(all_indices[labels == l][indices[valid_size:]])
-    #     valid_ids = torch.cat(valid_ids)
-    #     update_train_ids = torch.cat(update_train_ids)
-    # else:
-    valid_size = args.valid_count
-    _, indices = torch.sort(vals, descending=False)
-    valid_ids = indices[:valid_size]
-    update_train_ids = indices[valid_size:]
+    if args.clustering_by_class:
+        valid_ids = []
+        update_train_ids = []
+        unique_label_set = set(labels.tolist())
+        valid_size = int(args.valid_count / len(unique_label_set))
+        all_indices = torch.arange(labels.shape[0])
+        for l in unique_label_set:
+            _, indices = torch.sort(vals[labels == l], descending=False)
+            valid_ids.append(all_indices[labels == l][indices[:valid_size]])
+            update_train_ids.append(all_indices[labels == l][indices[valid_size:]])
+        valid_ids = torch.cat(valid_ids)
+        update_train_ids = torch.cat(update_train_ids)
+    else:
+        valid_size = args.valid_count
+        _, indices = torch.sort(vals, descending=False)
+        valid_ids = indices[:valid_size]
+        update_train_ids = indices[valid_size:]
 
     # torch.save(valid_ids, os.path.join(args.data_dir, "valid_dataset_ids"))
     train_set, meta_set = split_train_valid_set_by_ids(args, train_dataset, origin_labels, valid_ids, update_train_ids)
@@ -928,7 +928,7 @@ def find_representative_samples1(net, train_dataset,validset, train_transform, a
     valid_count = len(validset) + args.valid_count
 
     cluster_ids_x, cluster_centers = kmeans( 
-        X=torch.transpose(prev_w_array_delta_ls_tensor,0,1), num_clusters=valid_count, distance='euclidean', device = prev_w_array_delta_ls_tensor.device)#, rand_init=args.rand_init)
+        X=torch.transpose(prev_w_array_delta_ls_tensor,0,1), num_clusters=valid_count, distance='euclidean', device = prev_w_array_delta_ls_tensor.device, rand_init=args.rand_init)
 
     sorted_prev_w_array_idx_cluster_idx = cluster_ids_x[sorted_prev_w_array_total_delta_tensor_idx]
 
@@ -1335,23 +1335,23 @@ def get_dataloader_for_meta(
                 testset = dataset_wrapper(testset.data.clone(), testset.targets.clone(), transform_test)
                 origin_labels = trainset.targets.clone()
 
-        # elif args.dataset == 'retina':
-        #     # df = pd.read_csv(args.data_dir + "/diabetic-retinopathy-detection/trainLabels.csv")
-        #     # df['image'] = df['image'].apply(lambda x: args.data_dir + "/diabetic-retinopathy-detection/train/" + x + ".jpeg")
-        #     # df['eye'] = df['image'].map(lambda x: 1 if x.split('_')[-1]=='left' else 0)
-        #     # train_df, test_df = train_test_split(df, test_size=0.2, stratify=df['level'])
+        elif args.dataset == 'retina':
+            # df = pd.read_csv(args.data_dir + "/diabetic-retinopathy-detection/trainLabels.csv")
+            # df['image'] = df['image'].apply(lambda x: args.data_dir + "/diabetic-retinopathy-detection/train/" + x + ".jpeg")
+            # df['eye'] = df['image'].map(lambda x: 1 if x.split('_')[-1]=='left' else 0)
+            # train_df, test_df = train_test_split(df, test_size=0.2, stratify=df['level'])
 
-        #     # trainset = RetinaDataset(train_df)
-        #     # testset = RetinaDataset(test_df)
+            # trainset = RetinaDataset(train_df)
+            # testset = RetinaDataset(test_df)
 
-        #     trainset = torch.load(os.path.join(args.data_dir, "transformed_train_dataset"))
-        #     testset = torch.load(os.path.join(args.data_dir, "transformed_test_dataset"))
-        #     if len(trainset.targets.unique()) == 5:
-        #         trainset.targets = (trainset.targets >= 2).type(torch.long).view(-1)
-        #         testset.targets = (testset.targets >= 2).type(torch.long).view(-1)
+            trainset = torch.load(os.path.join(args.data_dir, "transformed_train_dataset"))
+            testset = torch.load(os.path.join(args.data_dir, "transformed_test_dataset"))
+            if len(trainset.targets.unique()) == 5:
+                trainset.targets = (trainset.targets >= 2).type(torch.long).view(-1)
+                testset.targets = (testset.targets >= 2).type(torch.long).view(-1)
             
             
-        #     origin_labels = trainset.targets.clone()
+            origin_labels = trainset.targets.clone()
 
         elif args.dataset == 'imagenet':
             normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -1441,13 +1441,12 @@ def get_dataloader_for_meta(
         #     trainset, validset, testset = create_train_valid_test_set(sstprocess, label_list, pretrained_model._tokenizer)
         #     origin_labels = trainset.targets.clone()
 
-        # if args.low_data:
-        #     trainset = trainset.subsampling_dataset_by_class(trainset, num_per_class=args.low_data_num_samples_per_class)
-        #     if type(trainset.targets) is numpy.ndarray:
-        #         origin_labels = numpy.copy(trainset.targets)
-        #     else:
-        #         origin_labels = trainset.targets.clone()
-
+        if args.low_data:
+            trainset = trainset.subsampling_dataset_by_class(trainset, num_per_class=args.low_data_num_samples_per_class)
+            if type(trainset.targets) is numpy.ndarray:
+                origin_labels = numpy.copy(trainset.targets)
+            else:
+                origin_labels = trainset.targets.clone()
 
     metaset = None
         
@@ -1464,15 +1463,15 @@ def get_dataloader_for_meta(
 
     remaining_origin_labels = []
 
-    # if args.clustering_by_class:
-    #     selection_method = random_partition_train_valid_dataset0_by_class
-    # else:
-    selection_method = random_partition_train_valid_dataset0
+    if args.clustering_by_class:
+        selection_method = random_partition_train_valid_dataset0_by_class
+    else:
+        selection_method = random_partition_train_valid_dataset0
     if split_method == 'cluster':
-        # if args.clustering_by_class:
-        #     selection_method = find_representative_samples0_by_class
-        # else:
-        selection_method = find_representative_samples0
+        if args.clustering_by_class:
+            selection_method = find_representative_samples0_by_class
+        else:
+            selection_method = find_representative_samples0
     elif split_method == 'uncertainty':
         selection_method = uncertainty_sample
     elif split_method == 'certainty':

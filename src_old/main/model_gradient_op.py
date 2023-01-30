@@ -108,7 +108,7 @@ def rand_sample_parameter(net, sampled_layer_count = 5, sampled_param_count = 10
     return selected_param_layer_ls, selected_sampled_param_id_by_layer_ls
 
 
-def biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_layer_count = 5, replace=False):
+def biased_rand_sample_parameter(net, avg_grad_norm_by_layer, sampled_layer_count = 5, sampled_param_count = 1000, include_last_layer = True, replace=False):
     prob_ls = avg_grad_norm_by_layer/torch.sum(avg_grad_norm_by_layer)
 
     net_param_ls = list(net.parameters())
@@ -383,9 +383,9 @@ def obtain_extra_model_gradient_per_sample_ls(args, net, train_loader, criterion
 def obtain_full_model_gradient_per_sample_ls(args, net, train_loader, criterion, optimizer):
     full_sample_grad_ls = obtain_model_gradient_per_sample_ls(args, net, train_loader, criterion, optimizer)
 
-    # if args.use_model_prov:
-    full_sample_grad_ls_ls = [full_sample_grad_ls]
-    obtain_extra_model_gradient_per_sample_ls(args, net, train_loader, criterion, optimizer, full_sample_grad_ls_ls)
+    if args.use_model_prov:
+        full_sample_grad_ls_ls = [full_sample_grad_ls]
+        obtain_extra_model_gradient_per_sample_ls(args, net, train_loader, criterion, optimizer, full_sample_grad_ls_ls)
     
     return full_sample_grad_ls
 

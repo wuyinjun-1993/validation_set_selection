@@ -19,6 +19,7 @@ import main.main_train
 from exp_datasets.dataloader import dataset_wrapper, split_train_valid_set_by_ids
 from models.resnet3 import resnet34
 from models.LeNet5 import *
+from models.DNN import *
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import Subset, Dataset, DataLoader, RandomSampler
 
