@@ -162,6 +162,12 @@ class ResNet(nn.Module):
             self.bn1 = norm_layer(self.inplanes, momentum=momentum_bn)
             self.relu = nn.ReLU(inplace=True)
             self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+            self.layer0 = nn.Sequential(
+                self.conv1,
+                self.bn1,
+                self.relu,
+                self.maxpool
+            )
             self.layer1 = self._make_layer(block, 64, layers[0])
             self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
                                         dilate=replace_stride_with_dilation[0])
@@ -267,37 +273,31 @@ class ResNet(nn.Module):
         #         return [x1, x2]
         return x
 
-    def feature_forward(self, x, all_layer=False):
-        if self.first:
-            x = self.conv1(x)
-            x = self.bn1(x)
-            x = self.relu(x)
-            x = self.maxpool(x)
-
-            x = self.layer1(x)
-            x = self.layer2(x)
-
-        if self.last:
-            x = self.layer3(x)
-            x = self.layer4(x)
-
-            x = self.avgpool(x)
-            x = torch.flatten(x, 1)
-
-            if x.shape[1] <= 1:
-                x = torch.sigmoid(x).view(-1)
-        # x = self.fc(x)
-        # if self.mlp and self.two_branch:
-        #     x = self.fc(x)
-        #     x1 = self.instDis(x)
-        #     x2 = self.groupDis(x)
-        #     return [x1, x2]
-        # else:
-        #     x1 = self.fc(x)
-        #     if self.two_branch:
-        #         x2 = self.groupDis(x)
-        #         return [x1, x2]
+    def features(self, x):
+        x = self.layer0(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        spatial_size = x.size(2)
+        x = nn.functional.avg_pool2d(x, spatial_size, 1)
+        x = x.view(x.size(0), -1)
         return x
+
+    def feature_forward(self, x, all_layer=False):
+        out = self.features(x)
+        return out
+    def feature_forward2(self, x, all_layer_grad_no_full_loss=False, labels=None):
+        out = self.features(x)
+        out2 = self.fc(out)
+        if all_layer_grad_no_full_loss:
+            out2 = out2 - torch.nn.functional.one_hot(labels, num_classes=out2.shape[1])
+
+        grad_approx = torch.bmm(out.view(out.shape[0], out.shape[1], 1), out2.view(out2.shape[0], 1, out2.shape[1]))
+        grad_approx = grad_approx.view(grad_approx.shape[0], -1)
+
+        return grad_approx
+
 
     def forward_with_features(self, x):
         # x = self.layer0(x)

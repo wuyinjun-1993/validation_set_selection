@@ -1450,35 +1450,6 @@ def get_dataloader_for_meta(
         #     else:
         #         origin_labels = trainset.targets.clone()
 
-<<<<<<< HEAD
-=======
-        elif args.dataset == "toy":
-            features, target = make_classification(
-                n_samples=1000,
-                n_features=2,
-                n_clusters_per_class=2,
-                n_redundant=0,
-                flip_y=0.0,
-                random_state=3161999,
-                class_sep=1.0,
-            )
-            X_train, X_test, y_train, y_test = train_test_split(
-                features,
-                target,
-                test_size=0.4,
-            )
-            trainset = dataset_wrapper(numpy.copy(X_train).astype("float32"), numpy.copy(y_train), None)
-            testset = dataset_wrapper(numpy.copy(X_test).astype("float32"), numpy.copy(y_test), None)
-            origin_labels = numpy.copy(trainset.targets)
-
-
-        if args.low_data:
-            trainset = trainset.subsampling_dataset_by_class(trainset, num_per_class=args.low_data_num_samples_per_class)
-            if type(trainset.targets) is numpy.ndarray:
-                origin_labels = numpy.copy(trainset.targets)
-            else:
-                origin_labels = trainset.targets.clone()
->>>>>>> ef6f9fc6dc8c99bc62fa232860f2ce253449ffe9
 
     metaset = None
         

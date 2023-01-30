@@ -190,7 +190,7 @@ def parse_args(args=None):
     # parser.add_argument('--aug-plus', action='store_true', help='whether add strong augmentation')
     # parser.add_argument('--erasing', action='store_true', help='whether add random erasing as an augmentation')
     # # real_noise
-    # parser.add_argument('--real_noise', action='store_true', help='whether to get real noise')
+    parser.add_argument('--real_noise', action='store_true', help='whether to get real noise')
 
     # parser.add_argument('--obj_cl_hidden_layer_count', default=0, type=int)
 

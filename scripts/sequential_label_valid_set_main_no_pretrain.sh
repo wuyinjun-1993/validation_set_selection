@@ -53,17 +53,17 @@ cd ../src/main/
 
 if [[ ${method} == "cluster_method_two" ]];
 then
-	add_valid_in_training_flag="--select_valid_set --cluster_method_two --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
+	add_valid_in_training_flag="--select_valid_set --cluster_method_two --weight_by_norm  --cosin_dist  --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
 
 elif [[ $method == "cluster_method_three" ]];
 then
 	
-	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
+	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm  --cosin_dist --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
 
 
 elif [[ $method == "cluster_method_one" ]];
 then
-        add_valid_in_training_flag="--select_valid_set --cluster_method_two --not_rescale_features  --cosin_dist --replace --use_model_prov --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count} --no_sample_weights_k_means"
+        add_valid_in_training_flag="--select_valid_set --cluster_method_two  --cosin_dist --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
 
 
 elif [[ $method == "certain" ]];
@@ -186,8 +186,6 @@ exe_cmd="python -m torch.distributed.launch \
   --nproc_per_node 1 \
   --master_port ${port_num} \
   main_train.py \
-  --nce-t 0.07 \
-  --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
   --valid_count ${valid_ratio_each_run} \
@@ -203,7 +201,8 @@ exe_cmd="python -m torch.distributed.launch \
   --epochs ${epochs} \
   --do_train \
   ${metric_str} \
-  ${lr_decay_flag}
+  ${lr_decay_flag} \
+  --all_layer_grad_no_full_loss
 "
 
 
@@ -221,7 +220,6 @@ exe_cmd="python -m torch.distributed.launch \
   --master_port ${port_num} \
   main_train.py \
   --load_dataset \
-  --nce-k 200 \
   --data_dir ${data_dir} \
   --dataset ${dataset_name} \
   --valid_count ${warm_up_valid_count} \
@@ -238,7 +236,8 @@ exe_cmd="python -m torch.distributed.launch \
   --epochs ${epochs} \
   --total_valid_sample_count ${total_valid_sample_count} \
   ${metric_str} \
-  ${lr_decay_flag}"
+  ${lr_decay_flag} \
+  --all_layer_grad_no_full_loss"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}.txt
@@ -255,8 +254,6 @@ exe_cmd="python -m torch.distributed.launch \
     --master_port ${port_num} \
     main_train.py \
     --load_dataset \
-    --nce-t 0.07 \
-    --nce-k 200 \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
     --valid_count ${warm_up_valid_count} \
@@ -274,7 +271,8 @@ exe_cmd="python -m torch.distributed.launch \
     --epochs ${epochs} \
     ${metric_str} \
     ${add_valid_in_training_flag} \
-        ${lr_decay_flag}"
+        ${lr_decay_flag} \
+	--all_layer_grad_no_full_loss"
 
 
 output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}.txt
@@ -307,8 +305,6 @@ do
     --continue_label \
     --load_cached_weights \
     --cached_sample_weights_name cached_sample_weights \
-    --nce-t 0.07 \
-    --nce-k 200 \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
     --valid_count ${valid_ratio_each_run} \
@@ -324,6 +320,7 @@ do
     --batch_size ${batch_size} \
     --test_batch_size ${test_batch_size} \
     --epochs ${epochs} \
+    --all_layer_grad_no_full_loss \
     ${metric_str} \
     ${add_valid_in_training_flag} \
 	${lr_decay_flag}"
