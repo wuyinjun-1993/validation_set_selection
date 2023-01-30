@@ -154,8 +154,8 @@ def parse_args(args=None):
     # parser.add_argument('--cached_model_name', type=str, default = None,
     #                     help='cached model name')
 
-    # parser.add_argument('--cached_sample_weights_name', type=str, default = None,
-    #                     help='cached sample weights')
+    parser.add_argument('--cached_sample_weights_name', type=str, default = None,
+                        help='cached sample weights')
     
     # parser.add_argument('--epochs', type=int, default=200, help='number of training epochs')
     # parser.add_argument('--start-epoch', type=int, default=1, help='used for resume')
