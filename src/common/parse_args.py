@@ -110,7 +110,7 @@ def parse_args(args=None):
     parser.add_argument('--meta_lr', default=0.2, type=float)
     parser.add_argument('--valid_ratio', default=0.1, type=float)
     parser.add_argument('--test_batch_size', default=4, type=int)
-    # parser.add_argument('--epochs', default=4, type=int)
+    parser.add_argument('--epochs', default=4, type=int)
 
     # parser.add_argument('--norm_fn', choices=['bound', 'linear', 'softmax'])
     # parser.add_argument("--w_decay", default=10., type=float)
@@ -148,8 +148,8 @@ def parse_args(args=None):
     # parser.add_argument('--amp-opt-level', type=str, default='O0', choices=['O0', 'O1', 'O2'],
     #                     help='mixed precision opt level, if O0, no amp is used')
 
-    # parser.add_argument('--metric', type=str, default='accuracy', choices=['accuracy', 'kappa', 'auc'],
-    #                     help='mixed precision opt level, if O0, no amp is used')
+    parser.add_argument('--metric', type=str, default='accuracy', choices=['accuracy', 'kappa', 'auc'],
+                        help='mixed precision opt level, if O0, no amp is used')
 
     # parser.add_argument('--cached_model_name', type=str, default = None,
     #                     help='cached model name')

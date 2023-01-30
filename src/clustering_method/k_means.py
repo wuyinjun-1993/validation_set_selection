@@ -389,7 +389,7 @@ def kmeans(
         origin_X_ls_lenth = -1,
         # rand_init = False
 ):
-    # is_cuda = False
+    is_cuda = False
     """
     perform kmeans
     :param X: (torch.tensor) matrix
@@ -497,10 +497,11 @@ def kmeans(
             selected = torch.nonzero(choice_cluster == index).view(-1)
             selected_sample_norm = None
             if sample_norm_ls is not None:
+                if is_cuda:
+                    sample_norm_ls = sample_norm_ls.cuda()
                 selected_sample_norm = sample_norm_ls[selected]
 
-                if is_cuda:
-                    selected_sample_norm = selected_sample_norm.cuda()
+                
             if torch.sum(choice_cluster == index) <= 0:
                 continue
 
