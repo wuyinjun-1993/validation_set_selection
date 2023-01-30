@@ -22,11 +22,7 @@ from models.resnet3 import *
 import collections
 from models.LeNet5 import *
 from models.ResNet import *
-<<<<<<< HEAD
 from main.helper_func import *
-=======
-from models.toynet import ToyNN
->>>>>>> ef6f9fc6dc8c99bc62fa232860f2ce253449ffe9
 import models.TAVAAL
 
 import torchvision.models
@@ -34,45 +30,22 @@ import torchvision.models
 cached_model_name="cached_model"
 pretrained_model_name="pretrained_model"
 
-<<<<<<< HEAD
-=======
-def vary_learning_rate(current_learning_rate, eps, args, model=None):
-    # current_learning_rate = current_learning_rate / 2
-    if args.dataset == 'MNIST':#args.dataset == 'MNIST'
-        current_learning_rate = args.lr* ((0.5 ** int(eps >= 500)) * (0.5 ** int(eps >= 800)))
-    else:
-        if args.dataset.startswith('cifar'):
-            current_learning_rate = args.lr* ((0.2 ** int(eps >= 50)) * (0.2 ** int(eps >= 100)))
-    logging.info('Change learning_rate to %f at step %d' % (current_learning_rate, eps))
 
-    optimizer = None
+def cache_sample_weights_given_epoch(epoch, args):
+    best_w_array = torch.load(os.path.join(args.save_path, 'sample_weights_' + str(epoch)))
+    best_model = torch.load(os.path.join(args.save_path, 'refined_model_' + str(epoch)))
 
-    if model is not None:
-        # optimizer = torch.optim.Adam(
-        #     filter(lambda p: p.requires_grad, model.parameters()), 
-        #     lr=current_learning_rate
+    logging.info("caching sample weights at epoch %d"%(epoch))
+
+    torch.save(best_w_array, os.path.join(args.save_path, "cached_sample_weights"))
+    torch.save(best_model, os.path.join(args.save_path, cached_model_name))
+    torch.save(best_model, os.path.join(args.save_path, pretrained_model_name))
 
 
-        # )
-
-        optimizer = torch.optim.SGD(model.parameters(), lr=current_learning_rate)
-
-    return optimizer, current_learning_rate
-
-def report_best_test_performance_so_far(logger, test_loss_ls, test_acc_ls,
-        test_loss, test_acc, set_name):
-    test_loss_ls.append(test_loss)
-    test_acc_ls.append(test_acc)
-
-    test_loss_array = numpy.array(test_loss_ls)
-    test_acc_array = numpy.array(test_acc_ls)
-    max_acc_epoch = len(test_acc_array) - numpy.argmax(test_acc_array[::-1]) - 1
-
-    min_test_loss = test_loss_array[max_acc_epoch]
-    min_test_acc = test_acc_array[max_acc_epoch]
-
-    logger.info("best %s performance is in epoch %d: %f, %f"%(set_name, max_acc_epoch, min_test_loss, min_test_acc))
->>>>>>> ef6f9fc6dc8c99bc62fa232860f2ce253449ffe9
+def cache_sample_weights_given_epoch_basic_train(epoch, args):
+    best_model = torch.load(os.path.join(args.save_path, 'model_' + str(epoch)))
+    torch.save(best_model, os.path.join(args.save_path, cached_model_name))
+    torch.save(best_model, os.path.join(args.save_path, pretrained_model_name))
 
 def report_final_performance_by_early_stopping(valid_loss_ls, valid_acc_ls,
         test_loss_ls, test_acc_ls, args, logger, is_meta=True):
@@ -767,40 +740,7 @@ def main2(args, logger):
         args.num_class=10
         optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr, weight_decay=5e-4)
         optimizer.param_groups[0]['initial_lr'] = args.lr
-<<<<<<< HEAD
     
-=======
-    elif args.dataset.startswith('sst2'):
-        pretrained_rep_net = custom_Bert(2)
-        args.num_class=2
-        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
-        optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-    elif args.dataset.startswith('sst5'):
-        pretrained_rep_net = custom_Bert(5)
-        args.num_class=5
-        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
-        optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-    elif args.dataset.startswith('imdb'):
-        pretrained_rep_net = custom_Bert(2)
-        args.num_class=2
-        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
-        optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-    elif args.dataset.startswith('trec'):
-        pretrained_rep_net = custom_Bert(6)
-        args.num_class=6
-        # pretrained_rep_net = init_model_with_pretrained_model_weights(pretrained_rep_net)
-        optimizer = torch.optim.Adam(pretrained_rep_net.parameters(), lr=args.lr)# get_bert_optimizer(net, args.lr)
-    elif args.dataset == "toy":
-        pretrained_rep_net = ToyNN()
-        args.num_class = 2
-        optimizer = torch.optim.SGD(
-            pretrained_rep_net.parameters(),
-            lr=args.lr,
-            momentum=0.9,
-            weight_decay=5e-4,
-            nesterov=True,
-        )
->>>>>>> ef6f9fc6dc8c99bc62fa232860f2ce253449ffe9
     else:
         raise NotImplementedError
         # pretrained_rep_net = ResNet18().cuda()
@@ -945,26 +885,6 @@ def main2(args, logger):
     elif args.dataset == 'imagenet':
         net = resnet34_imagenet(pretrained=True, first=True, last=True).cuda()
         net.fc = nn.Linear(512, 10)
-<<<<<<< HEAD
-
-=======
-        # for param in net.conv1.parameters():
-        #     param.requires_grad = False
-        # for param in net.layer1.parameters():
-        #     param.requires_grad = False
-        # for param in net.layer2.parameters():
-        #     param.requires_grad = False
-    elif args.dataset.startswith('sst2'):
-        net = custom_Bert(2)
-    elif args.dataset.startswith('sst5'):
-        net = custom_Bert(5)
-    elif args.dataset.startswith('imdb'):
-        net = custom_Bert(2)
-    elif args.dataset.startswith('trec'):
-        net = custom_Bert(6)
-    elif args.dataset == "toy":
-        net = ToyNN()
->>>>>>> ef6f9fc6dc8c99bc62fa232860f2ce253449ffe9
     else:
         raise NotImplementedError
 
