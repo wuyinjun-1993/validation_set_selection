@@ -12,7 +12,7 @@ meta_lr=30
 lr=0.1
 batch_size=128
 test_batch_size=128
-epochs=200
+epochs=150
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
@@ -25,3 +25,5 @@ bias_flip=true
 method="craige"
 total_valid_sample_count=200
 use_pretrained_model=true
+real_noise=false
+

@@ -1,27 +1,28 @@
 err_label_ratio=0.6
 
 dataset_name=cifar10
-data_dir="/data5/wuyinjun/valid_set_selections/cifar10_4/"
-save_path_root_dir="/data5/wuyinjun/valid_set_selections/cifar10_4/"
-output_dir="/data5/wuyinjun/valid_set_selections/cifar10_4/"
+data_dir="/data6/wuyinjun/valid_set_selections/cifar10_1/"
+save_path_root_dir="/data6/wuyinjun/valid_set_selections/cifar10_1/"
+output_dir="/data6/wuyinjun/valid_set_selections/cifar10_1/"
 gpu_ids=2
 #total_valid_ratio=$6
 repeat_times=10
 port_num=10112
-meta_lr=30
-lr=0.1
+meta_lr=10
+lr=0.05
 batch_size=128
 test_batch_size=128
-epochs=150
+epochs=10
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
 warm_up_valid_count=10
-model_prov_period=20
+model_prov_period=2
 
 
-valid_ratio_each_run=50 #$(( total_valid_ratio / repeat_times ))
+valid_ratio_each_run=10 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
 method="cluster_method_three"
 total_valid_sample_count=50
 use_pretrained_model=true
+label_aware=false

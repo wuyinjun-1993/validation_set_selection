@@ -55,44 +55,44 @@ cd ../src/main/
 
 if [[ ${method} == "cluster_method_two" ]];
 then
-	add_valid_in_training_flag="--select_valid_set --cluster_method_two --weight_by_norm  --cosin_dist  --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
+	add_valid_in_training_flag="--select_valid_set --cluster_method_two --weight_by_norm  --cosin_dist  --model_prov_period ${model_prov_period}"
 
 elif [[ $method == "cluster_method_three" ]];
 then
 	
-	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm  --cosin_dist --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
+	add_valid_in_training_flag="--select_valid_set --cluster_method_three --weight_by_norm  --cosin_dist --model_prov_period ${model_prov_period}"
 
 
 elif [[ $method == "cluster_method_one" ]];
 then
-        add_valid_in_training_flag="--select_valid_set --cluster_method_two  --cosin_dist --model_prov_period ${model_prov_period} --total_valid_sample_count ${total_valid_sample_count}"
+        add_valid_in_training_flag="--select_valid_set --cluster_method_two  --cosin_dist --model_prov_period ${model_prov_period}"
 
 
 elif [[ $method == "certain" ]];
 then
 
-	add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --certain_select"
+	add_valid_in_training_flag="--certain_select"
 
 elif [[ $method == "uncertain" ]];
 then
-	add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --uncertain_select"
+	add_valid_in_training_flag="--uncertain_select"
 
 elif [[ $method == "rand" ]];
 then
-        add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count}"
+        add_valid_in_training_flag=""
 
 elif [[ $method == "ta" ]];
 then
-        add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --ta_vaal_train"
+        add_valid_in_training_flag="--ta_vaal_train"
 
 
 elif [[ $method == 'craige' ]];
 then 
-	add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --craige"
+	add_valid_in_training_flag="--craige"
 
 elif [[ $method == 'finetune'  ]]
 then 
-	add_valid_in_training_flag="--total_valid_sample_count ${total_valid_sample_count} --finetune"
+	add_valid_in_training_flag="--finetune"
 
 fi
 
@@ -259,6 +259,16 @@ ${exe_cmd} > ${output_file_name} 2>&1
 cmd
 
 
+
+
+meta_num_ls=(10 20 30 40 50)
+
+
+for meta_num in "${meta_num_ls[@]}"
+do
+
+	echo "meta sample count::${meta_num}"
+
 exe_cmd="python -m torch.distributed.launch \
     --nproc_per_node 1 \
     --master_port ${port_num} \
@@ -266,13 +276,13 @@ exe_cmd="python -m torch.distributed.launch \
     --load_dataset \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
-    --valid_count ${warm_up_valid_count} \
+    --valid_count ${meta_num} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     ${flip_label_flag} \
     ${bias_flip_str} \
     --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_0/ \
+    --save_path ${save_path_prefix}_seq_select_meta_num_${meta_num}/ \
     --prev_save_path ${save_path_prefix}_do_train/ \
     --cuda \
     --lr ${lr} \
@@ -282,17 +292,20 @@ exe_cmd="python -m torch.distributed.launch \
     ${metric_str} \
     ${add_valid_in_training_flag} \
         ${lr_decay_flag} \
+	--total_valid_sample_count ${meta_num} \
 	${label_aware_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}.txt
+output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}_meta_num_${meta_num}.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
 ${exe_cmd} > ${output_file_name} 2>&1
 
 
+done
 
+<<comment
 
 
 mkdir ${save_path_prefix}_no_reweighting_seq_select_0/
@@ -343,5 +356,5 @@ do
 	
 done
 
-
+comment
 
