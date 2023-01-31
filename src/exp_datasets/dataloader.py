@@ -560,7 +560,7 @@ def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimi
     sample_representation_ls = []
 
     if not args.all_layer_grad:
-        full_sample_representation_tensor, all_sample_ids = get_representations_last_layer2(valid_set, args, validloader, criterion, optimizer, net)
+        full_sample_representation_tensor, all_sample_ids = get_all_sample_representations_gbc(valid_set, args, validloader, criterion, optimizer, net)
         # full_sample_representation_tensor, all_sample_ids = get_representations_last_layer(args, validloader, criterion, optimizer, net)
         return full_sample_representation_tensor
         # with torch.no_grad():
@@ -700,63 +700,63 @@ def obtain_valid_count_ls_per_class(unique_label_set, total_valid_count, sample_
 
 
 
-def obtain_sample_pair_distance_bound(train_dataset, metaset, criterion, optimizer, trainloader, args, net, cached_sample_weights, valid_count, validset):
-    if not args.cluster_method_two:
-        if args.cluster_method_three:
-            # valid_ids, new_valid_representations = get_representative_valid_ids3(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
-            full_sample_representation_tensor = get_representative_valid_ids2_4(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, only_sample_representation=True)
+# def obtain_sample_pair_distance_bound(train_dataset, metaset, criterion, optimizer, trainloader, args, net, cached_sample_weights, valid_count, validset):
+#     if not args.cluster_method_two:
+#         if args.cluster_method_three:
+#             # valid_ids, new_valid_representations = get_representative_valid_ids3(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
+#             full_sample_representation_tensor = get_representative_valid_ids_gbc(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, only_sample_representation=True)
             
-        else:
-            # train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None
-            full_sample_representation_tensor = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, only_sample_representation=True)
+#         else:
+#             # train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None
+#             full_sample_representation_tensor = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, only_sample_representation=True)
             
-    else:
+#     else:
 
-        full_sample_representation_tensor, valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, only_sample_representation=True, qualitiative=True)
+#         full_sample_representation_tensor, valid_representations = get_representative_valid_ids_rbc(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, only_sample_representation=True, qualitiative=True)
     
-    full_sample_representation_tensor, full_sample_representation_tensor2 = full_sample_representation_tensor
+#     full_sample_representation_tensor, full_sample_representation_tensor2 = full_sample_representation_tensor
 
-    valid_representations, valid_representations2 = valid_representations
+#     valid_representations, valid_representations2 = valid_representations
 
-    full_distance = compute_distance(args, True, True, full_sample_representation_tensor, valid_representations, args.cuda)
-    ratio = torch.sort(torch.abs(torch.sum(full_distance,dim=1))/torch.sum(torch.abs(full_distance),dim=1))[0]
-    D_value = ((1+ratio)/(1-ratio)).min()
-    args.logger.info("D value is::%f"%(D_value))
-    full_sim = -(full_distance.cpu() - 1)
+#     full_distance = compute_distance_both(args, True, True, full_sample_representation_tensor, valid_representations, args.cuda)
+#     ratio = torch.sort(torch.abs(torch.sum(full_distance,dim=1))/torch.sum(torch.abs(full_distance),dim=1))[0]
+#     D_value = ((1+ratio)/(1-ratio)).min()
+#     args.logger.info("D value is::%f"%(D_value))
+#     full_sim = -(full_distance.cpu() - 1)
 
-    full_train_output_probs_tensor_ls, full_train_output_origin_probs_tensor_ls = [], []
+#     full_train_output_probs_tensor_ls, full_train_output_origin_probs_tensor_ls = [], []
 
-    full_meta_output_probs_tensor_ls, full_meta_output_origin_probs_tensor_ls = [], []
+#     full_meta_output_probs_tensor_ls, full_meta_output_origin_probs_tensor_ls = [], []
 
-    train_output_probs_grad_tensor, train_output_origin_probs_tensor = obtain_grad_last_layer(trainloader, args, net)
+#     train_output_probs_grad_tensor, train_output_origin_probs_tensor = obtain_grad_last_layer(trainloader, args, net)
 
-    full_train_output_probs_tensor_ls.append(train_output_probs_grad_tensor)
+#     full_train_output_probs_tensor_ls.append(train_output_probs_grad_tensor)
 
-    full_train_output_origin_probs_tensor_ls.append(train_output_origin_probs_tensor)
+#     full_train_output_origin_probs_tensor_ls.append(train_output_origin_probs_tensor)
 
-    metaloader = DataLoader(metaset, batch_size=args.batch_size, shuffle=False)
+#     metaloader = DataLoader(metaset, batch_size=args.batch_size, shuffle=False)
 
-    meta_output_probs_grad_tensor, meta_output_origin_probs_tensor = obtain_grad_last_layer(metaloader, args, net)
+#     meta_output_probs_grad_tensor, meta_output_origin_probs_tensor = obtain_grad_last_layer(metaloader, args, net)
 
-    full_meta_output_probs_tensor_ls.append(meta_output_probs_grad_tensor)
+#     full_meta_output_probs_tensor_ls.append(meta_output_probs_grad_tensor)
 
-    full_meta_output_origin_probs_tensor_ls.append(meta_output_origin_probs_tensor)
+#     full_meta_output_origin_probs_tensor_ls.append(meta_output_origin_probs_tensor)
 
-    # if args.use_model_prov:
-    args.all_layer = True
+#     # if args.use_model_prov:
+#     args.all_layer = True
 
-    get_extra_output_prob_ls(args, trainloader, net, full_train_output_probs_tensor_ls, full_train_output_origin_probs_tensor_ls)
+#     get_extra_output_prob_ls(args, trainloader, net, full_train_output_probs_tensor_ls, full_train_output_origin_probs_tensor_ls)
 
-    get_extra_output_prob_ls(args, metaloader, net, full_meta_output_probs_tensor_ls, full_meta_output_origin_probs_tensor_ls)
-
-
+#     get_extra_output_prob_ls(args, metaloader, net, full_meta_output_probs_tensor_ls, full_meta_output_origin_probs_tensor_ls)
 
 
-    full_sim_mat = torch.mm(train_output_probs_grad_tensor, torch.t(meta_output_probs_grad_tensor))*full_sim
 
-    print(torch.abs(full_sim_mat).max())
 
-    print(full_sim_mat.max())
+#     full_sim_mat = torch.mm(train_output_probs_grad_tensor, torch.t(meta_output_probs_grad_tensor))*full_sim
+
+#     print(torch.abs(full_sim_mat).max())
+
+#     print(full_sim_mat.max())
 
     
 
@@ -789,18 +789,18 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
     if not args.cluster_method_two:
         if args.cluster_method_three:
             # valid_ids, new_valid_representations = get_representative_valid_ids3(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
-            valid_ids, new_valid_representations = get_representative_valid_ids2_4(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)
+            valid_ids, new_valid_representations = get_representative_valid_ids_gbc(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)
             
-        else:
-            # train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None
-            valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
-            if existing_valid_representation is not None:
-                valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = True, is_cuda=args.cuda, all_layer=args.cluster_method_three)
+        # else:
+        #     # train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None
+        #     valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights)
+        #     if existing_valid_representation is not None:
+        #         valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = True, is_cuda=args.cuda, all_layer=args.cluster_method_three)
     else:
         # if args.qualitiative:
         #     valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, qualitiative = args.qualitiative, origin_label = origin_labels)
         # else:
-            valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)#, qualitiative = args.qualitiative)
+            valid_ids, new_valid_representations = get_representative_valid_ids_rbc(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)#, qualitiative = args.qualitiative)
         # if existing_valid_representation is not None:
         #     valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = True, is_cuda=args.cuda, all_layer = args.all_layer)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)

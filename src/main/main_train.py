@@ -16,7 +16,6 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 import json
 from utils.logger import setup_logger
-from lib.BootstrappingLoss import SoftBootstrappingLoss, HardBootstrappingLoss
 from models.resnet3 import *
 
 import collections
@@ -342,24 +341,28 @@ def meta_learning_model(
         device = torch.device("cpu")
 
     if cached_w_array is None:
-        if args.w_rectified_gaussian_init:
-            w_array = torch.normal(
-                mean=0.0,
-                std=1.0,
-                size=(len(train_loader.dataset),),
-                device=device,
-            )
-            w_array = F.relu(w_array)
-            w_array = (w_array / torch.sum(w_array)) * w_array.shape[0]
-            w_array.requires_grad = True
-        else:
+        # if args.w_rectified_gaussian_init:
+        #     w_array = torch.normal(
+        #         mean=0.0,
+        #         std=1.0,
+        #         size=(len(train_loader.dataset),),
+        #         device=device,
+        #     )
+        #     w_array = F.relu(w_array)
+        #     w_array = (w_array / torch.sum(w_array)) * w_array.shape[0]
+        #     w_array.requires_grad = True
+        # else:
+        if not args.use_pretrained_model:
             w_array = torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
+        else:
+            w_array = torch.ones(len(train_loader.dataset), requires_grad=True, device = device)
             # w_array = torch.ones(len(train_loader.dataset), requires_grad=True, device=device)
     else:
         cached_w_array.requires_grad = False
         w_array = cached_w_array.clone()
         w_array = w_array.to(device)
         w_array.requires_grad = True
+    print("initial sample weights::", w_array)
     
     total_iter_count = 1
 
@@ -891,6 +894,8 @@ def main2(args, logger):
     if args.use_pretrained_model:
         net = load_checkpoint2(args, net)
 
+    
+
     mile_stones_epochs = None
 
     if not args.do_train and args.resume_meta_train:
@@ -899,7 +904,8 @@ def main2(args, logger):
         net = resume_training_by_epoch(args, net)
         start_epoch = args.resumed_training_epoch
         # net, prev_weights, start_epoch = resume_meta_training_by_loading_cached_info(args, net)
-
+    if prev_weights is None:
+        prev_weights = cached_sample_weights
     if args.cuda:
         net = net.cuda()
 
@@ -911,7 +917,7 @@ def main2(args, logger):
     # if args.dataset == 'cifar100':
     #     iter_per_epoch = len(trainloader)
     #     warmup_scheduler = WarmUpLR(optimizer, iter_per_epoch * args.warm)
-
+    test(testloader, net, criterion, args, logger, "test")
     if args.do_train:
         logger.info("starting basic training")
         basic_train(
