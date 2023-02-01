@@ -273,7 +273,7 @@ exe_cmd="python -m torch.distributed.launch \
     --load_dataset \
     --data_dir ${data_dir} \
     --dataset ${dataset_name} \
-    --valid_count ${meta_num} \
+    --valid_count ${total_valid_sample_count} \
     --meta_lr ${meta_lr} \
     --not_save_dataset \
     ${flip_label_flag} \
@@ -293,7 +293,7 @@ exe_cmd="python -m torch.distributed.launch \
 	${label_aware_flag}"
 
 
-output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}_meta_num_${meta_num}.txt
+output_file_name=${output_dir}/output_${dataset_name}_${err_type}_${err_label_ratio}_valid_select_seq_select_0_${method}${suffix}_meta_num_${total_valid_sample_count}.txt
 
 echo "${exe_cmd} > ${output_file_name}"
 
