@@ -261,7 +261,7 @@ cmd
 
 
 
-meta_num_ls=(10 20 30 40 50)
+meta_num_ls=(20)
 
 
 for meta_num in "${meta_num_ls[@]}"
