@@ -352,10 +352,10 @@ def meta_learning_model(
         #     w_array = (w_array / torch.sum(w_array)) * w_array.shape[0]
         #     w_array.requires_grad = True
         # else:
-        if not args.use_pretrained_model:
-            w_array = torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
-        else:
-            w_array = torch.ones(len(train_loader.dataset), requires_grad=True, device = device)
+        # if not args.use_pretrained_model:
+        w_array = torch.rand(len(train_loader.dataset), requires_grad=True, device = device)
+        # else:
+        #     w_array = torch.ones(len(train_loader.dataset), requires_grad=True, device = device)
             # w_array = torch.ones(len(train_loader.dataset), requires_grad=True, device=device)
     else:
         cached_w_array.requires_grad = False
