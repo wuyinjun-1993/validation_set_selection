@@ -12,7 +12,7 @@ meta_lr=30
 lr=0.1
 batch_size=128
 test_batch_size=128
-epochs=200
+epochs=100
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
@@ -24,4 +24,5 @@ valid_ratio_each_run=200 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
 method="cluster_method_three"
 total_valid_sample_count=200
+label_aware=false
 

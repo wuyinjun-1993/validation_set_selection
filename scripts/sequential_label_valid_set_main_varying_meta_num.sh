@@ -261,13 +261,10 @@ cmd
 
 
 
-meta_num_ls=(20)
+#for meta_num in "${meta_num_ls[@]}"
+#do
 
-
-for meta_num in "${meta_num_ls[@]}"
-do
-
-	echo "meta sample count::${meta_num}"
+echo "meta sample count::${total_valid_sample_count}"
 
 exe_cmd="python -m torch.distributed.launch \
     --nproc_per_node 1 \
@@ -292,7 +289,7 @@ exe_cmd="python -m torch.distributed.launch \
     ${metric_str} \
     ${add_valid_in_training_flag} \
         ${lr_decay_flag} \
-	--total_valid_sample_count ${meta_num} \
+	--total_valid_sample_count ${total_valid_sample_count} \
 	${label_aware_flag}"
 
 
@@ -303,7 +300,7 @@ echo "${exe_cmd} > ${output_file_name}"
 ${exe_cmd} > ${output_file_name} 2>&1
 
 
-done
+#done
 
 <<comment
 
