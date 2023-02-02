@@ -261,7 +261,7 @@ def cluster_per_class_both(
     # dist_to_other_cluster_centroid_ls = []
     args.logger.info("unique cluster count::%d"%(unique_cluster_count))
 
-    for cluster_id in range(unique_cluster_count):
+    for cluster_id in range(num_clusters):
         # curr_cluster_center = cluster_centers[cluster_id]
 
         # cluster_dist_ls = []

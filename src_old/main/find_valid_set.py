@@ -2037,21 +2037,21 @@ def get_uncovered_new_valid_ids(args, valid_ids, new_valid_representations, exis
     else:
         existing_valid_count = existing_valid_representations.shape[0]
         valid_count = new_valid_representations.shape[0]
-    if not args.all_layer_grad:
+    # if not args.all_layer_grad:
 
-        if not cosine_dist:
-            if not all_layer:
-                existing_new_dists = pairwise_distance(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
-            else:
-                existing_new_dists = pairwise_distance_ls(new_valid_representations, existing_valid_representations , is_cuda=is_cuda)
+    if not cosine_dist:
+        if not all_layer:
+            existing_new_dists = pairwise_distance(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
         else:
-            if not all_layer:
-                existing_new_dists = pairwise_cosine(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
-            else:
-                existing_new_dists = pairwise_cosine_ls(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, inner_prod=args.inner_prod, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=False)
-    
+            existing_new_dists = pairwise_distance_ls(new_valid_representations, existing_valid_representations , is_cuda=is_cuda)
     else:
-        existing_new_dists = pairwise_cosine2(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
+        if not all_layer:
+            existing_new_dists = pairwise_cosine(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm)
+        else:
+            existing_new_dists = pairwise_cosine_ls(new_valid_representations, existing_valid_representations, is_cuda=is_cuda, weight_by_norm = args.weight_by_norm, ls_idx_range=args.origin_X_ls_lenth, full_inner_prod=False)
+    
+    # else:
+    #     existing_new_dists = pairwise_cosine2(new_valid_representations, existing_valid_representations, is_cuda=is_cuda)
 
     uncovered_new_valid_ids = torch.nonzero(torch.sum(existing_new_dists > cluster_max_radius, dim = 1) >= existing_new_dists.shape[1])
     uncovered_new_valid_ids = uncovered_new_valid_ids.view(-1)

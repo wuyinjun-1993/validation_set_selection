@@ -558,7 +558,7 @@ def obtain_representations_for_valid_set(args, valid_set, net, criterion, optimi
     sample_representation_ls = []
 
     if not args.all_layer_grad:
-        full_sample_representation_tensor, all_sample_ids = get_representations_last_layer2(valid_set, args, validloader, criterion, optimizer, net)
+        full_sample_representation_tensor, all_sample_ids = get_all_sample_representations_gbc(valid_set, args, validloader, criterion, optimizer, net)
         # full_sample_representation_tensor, all_sample_ids = get_representations_last_layer(args, validloader, criterion, optimizer, net)
         return full_sample_representation_tensor
         # with torch.no_grad():
@@ -702,7 +702,7 @@ def obtain_sample_pair_distance_bound(train_dataset, metaset, criterion, optimiz
     if not args.cluster_method_two:
         if args.cluster_method_three:
             # valid_ids, new_valid_representations = get_representative_valid_ids3(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
-            full_sample_representation_tensor = get_representative_valid_ids2_4(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, only_sample_representation=True)
+            full_sample_representation_tensor = get_representative_valid_ids_gbc(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, only_sample_representation=True)
             
         else:
             # train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None
@@ -710,13 +710,13 @@ def obtain_sample_pair_distance_bound(train_dataset, metaset, criterion, optimiz
             
     else:
 
-        full_sample_representation_tensor, valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, only_sample_representation=True, qualitiative=True)
+        full_sample_representation_tensor, valid_representations = get_representative_valid_ids_rbc(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, only_sample_representation=True, qualitiative=True)
     
     full_sample_representation_tensor, full_sample_representation_tensor2 = full_sample_representation_tensor
 
     valid_representations, valid_representations2 = valid_representations
 
-    full_distance = compute_distance(args, args.cosin_dist, True, full_sample_representation_tensor, valid_representations, args.cuda)
+    full_distance = compute_distance_both(args, args.cosin_dist, True, full_sample_representation_tensor, valid_representations, args.cuda)
     ratio = torch.sort(torch.abs(torch.sum(full_distance,dim=1))/torch.sum(torch.abs(full_distance),dim=1))[0]
     D_value = ((1+ratio)/(1-ratio)).min()
     args.logger.info("D value is::%f"%(D_value))
@@ -787,7 +787,7 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
     if not args.cluster_method_two:
         if args.cluster_method_three:
             # valid_ids, new_valid_representations = get_representative_valid_ids3(trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation)
-            valid_ids, new_valid_representations = get_representative_valid_ids2_4(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)
+            valid_ids, new_valid_representations = get_representative_valid_ids_gbc(train_dataset, criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset)
             
         else:
             # train_loader, args, net, valid_count, cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None
@@ -796,9 +796,9 @@ def find_representative_samples0(criterion, optimizer, net, train_dataset,valids
                 valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer=args.cluster_method_three)
     else:
         if args.qualitiative:
-            valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, qualitiative = args.qualitiative, origin_label = origin_labels)
+            valid_ids, new_valid_representations = get_representative_valid_ids_rbc(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, qualitiative = args.qualitiative, origin_label = origin_labels)
         else:
-            valid_ids, new_valid_representations = get_representative_valid_ids2(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, qualitiative = args.qualitiative)
+            valid_ids, new_valid_representations = get_representative_valid_ids_rbc(criterion, optimizer, trainloader, args, net, valid_count, cached_sample_weights = cached_sample_weights, validset = validset, qualitiative = args.qualitiative)
         # if existing_valid_representation is not None:
         #     valid_ids = determine_new_valid_ids(args, valid_ids, new_valid_representations, existing_valid_representation, valid_count, cosine_dist = args.cosin_dist, is_cuda=args.cuda, all_layer = args.all_layer)
         # valid_ids, new_valid_representations = get_representative_valid_ids(trainloader, args, net, valid_count - len(validset), cached_sample_weights = cached_sample_weights, existing_valid_representation = existing_valid_representation, existing_valid_set=validset)

@@ -126,9 +126,9 @@ def do_clustering_main(args):
 
         optimizer = get_optimizer_given_model(args, curr_net)
 
-        full_sample_representation_tensor = get_representative_valid_ids2(criterion, optimizer, train_loader, args, curr_net, len(metaloader.dataset), cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info=True, only_sample_representation=True)
+        full_sample_representation_tensor = get_representative_valid_ids_rbc(criterion, optimizer, train_loader, args, curr_net, len(metaloader.dataset), cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info=True, only_sample_representation=True)
 
-        meta_sample_representation_tensor = get_representative_valid_ids2(criterion, optimizer, metaloader, args, curr_net, len(metaloader.dataset), cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info=True, only_sample_representation=True)
+        meta_sample_representation_tensor = get_representative_valid_ids_rbc(criterion, optimizer, metaloader, args, curr_net, len(metaloader.dataset), cached_sample_weights = None, existing_valid_representation = None, existing_valid_set = None, return_cluster_info=True, only_sample_representation=True)
 
         if not args.cosin_dist:
             if not args.all_layer:
