@@ -71,7 +71,7 @@ def kmeans_init(data, num_clusters, distance, all_layer,is_cuda, weight_by_norm 
     # plot(data, np.array(centroids))
   
     ## compute remaining k - 1 centroids
-    for c_id in range(num_clusters - 1):
+    for c_id in tqdm(range(num_clusters - 1)):
          
         ## initialize a list to store distances of data
         ## points from nearest centroid
@@ -101,6 +101,7 @@ def kmeans_init(data, num_clusters, distance, all_layer,is_cuda, weight_by_norm 
              
         # ## select data point with maximum distance as our next centroid
         # dist = np.array(dist)
+        dist = dist.cpu()
         max_dis_sample_id = torch.argmax(dist)
         if not all_layer:
             next_centroid = data[max_dis_sample_id, :]
@@ -117,7 +118,7 @@ def kmeans_init(data, num_clusters, distance, all_layer,is_cuda, weight_by_norm 
     else:
         return centroids
 
-def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 32, ls_idx_range=-1, weight_by_norm=False, flatten = False):
+def pairwise_cosine_ls(data1_ls, data2_ls, is_cuda=False,  batch_size = 64, ls_idx_range=-1, weight_by_norm=False, flatten = False):
 
     if ls_idx_range < 0:
         ls_idx_range = len(data1_ls)
@@ -403,7 +404,7 @@ def kmeans(
         origin_X_ls_lenth = -1,
         # rand_init = False
 ):
-    is_cuda = False
+    # is_cuda = False
     """
     perform kmeans
     :param X: (torch.tensor) matrix
@@ -473,12 +474,12 @@ def kmeans(
     # initial_state = initialize(X, num_clusters, all_layer = all_layer)
     # else:
     initial_state = kmeans_init(X, num_clusters, pairwise_distance_function, all_layer, is_cuda, weight_by_norm=weight_by_norm, ls_idx_range=origin_X_ls_lenth)
-    if is_cuda:
-        if not all_layer:
-            initial_state = initial_state.cuda()
-        else:
-            for idx in range(len(initial_state)):
-                initial_state[idx] = initial_state[idx].cuda()
+    # if is_cuda:
+    #     if not all_layer:
+    #         initial_state = initial_state.cuda()
+    #     else:
+    #         for idx in range(len(initial_state)):
+    #             initial_state[idx] = initial_state[idx].cuda()
 
     iteration = 0
     tqdm_meter = tqdm(desc='[running kmeans]')
@@ -506,13 +507,13 @@ def kmeans(
             initial_state_pre = [initial_state[k].clone() for k in range(len(initial_state))]
 
         
-
+        choice_cluster = choice_cluster.cpu()
         for index in range(num_clusters):
             selected = torch.nonzero(choice_cluster == index).view(-1)
             selected_sample_norm = None
             if sample_norm_ls is not None:
-                if is_cuda:
-                    sample_norm_ls = sample_norm_ls.cuda()
+                # if is_cuda:
+                #     sample_norm_ls = sample_norm_ls.cuda()
                 selected_sample_norm = sample_norm_ls[selected]
 
                 
@@ -538,10 +539,10 @@ def kmeans(
                 # selected = torch.index_select(X, 0, selected)
             if not all_layer:
                 selected = X[selected]
-                if is_cuda:
-                    selected = selected.cuda()
-                    if selected_sample_weights is not None:
-                        selected_sample_weights = selected_sample_weights.cuda()
+                # if is_cuda:
+                #     selected = selected.cuda()
+                #     if selected_sample_weights is not None:
+                #         selected_sample_weights = selected_sample_weights.cuda()
 
                 if selected_sample_weights is None:
                     if selected_sample_norm is None:
@@ -553,12 +554,12 @@ def kmeans(
                         selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights)
                     else:
                         selected_state = torch.sum(selected*selected_sample_weights.view(-1,1), dim = 0)/torch.sum(selected_sample_weights.view(-1)*selected_sample_norm.view(-1))
-                if is_cuda:
-                    selected_state = selected_state.cuda()
+                # if is_cuda:
+                #     selected_state = selected_state.cuda()
 
                 initial_state[index] = selected_state
             else:
-                selected = select_samples_by_ls(X, selected, is_cuda)
+                selected = select_samples_by_ls(X, selected, False)
             
                 update_centroid_by_ls(selected, initial_state, selected_sample_weights, index, selected_sample_norm)
             
