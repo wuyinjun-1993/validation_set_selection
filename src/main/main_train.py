@@ -768,56 +768,56 @@ def main2(args, logger):
     if args.cuda:
         pretrained_rep_net.cuda()
     
-    # if args.select_valid_set:
-    #     trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
-    #         criterion,
-    #         optimizer,
-    #         args,
-    #         'cluster',
-    #         logger,
-    #         pretrained_model=pretrained_rep_net,
-    #         cached_sample_weights=cached_sample_weights,
-    #     )
-    # elif args.uncertain_select:
-    #     trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
-    #         criterion,
-    #         optimizer,
-    #         args,
-    #         'uncertainty',
-    #         logger,
-    #         pretrained_model=pretrained_rep_net,
-    #         cached_sample_weights=cached_sample_weights,
-    #     )
-    # elif args.certain_select:
-    #     trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
-    #         criterion,
-    #         optimizer,
-    #         args,
-    #         'certainty',
-    #         logger,
-    #         pretrained_model=pretrained_rep_net,
-    #         cached_sample_weights=cached_sample_weights,
-    #     )
-    # elif args.craige:
-    #     trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
-    #         criterion,
-    #         optimizer,
-    #         args,
-    #         'craige',
-    #         logger,
-    #         pretrained_model=pretrained_rep_net,
-    #         cached_sample_weights=cached_sample_weights,
-    #     )
-    # else:
-    #     trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
-    #         criterion,
-    #         optimizer,
-    #         args,
-    #         'random',
-    #         logger,
-    #         pretrained_model=pretrained_rep_net,
-    #     )
-    trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta2(args)
+    if args.select_valid_set:
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
+            criterion,
+            optimizer,
+            args,
+            'cluster',
+            logger,
+            pretrained_model=pretrained_rep_net,
+            cached_sample_weights=cached_sample_weights,
+        )
+    elif args.uncertain_select:
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
+            criterion,
+            optimizer,
+            args,
+            'uncertainty',
+            logger,
+            pretrained_model=pretrained_rep_net,
+            cached_sample_weights=cached_sample_weights,
+        )
+    elif args.certain_select:
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
+            criterion,
+            optimizer,
+            args,
+            'certainty',
+            logger,
+            pretrained_model=pretrained_rep_net,
+            cached_sample_weights=cached_sample_weights,
+        )
+    elif args.craige:
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
+            criterion,
+            optimizer,
+            args,
+            'craige',
+            logger,
+            pretrained_model=pretrained_rep_net,
+            cached_sample_weights=cached_sample_weights,
+        )
+    else:
+        trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta(
+            criterion,
+            optimizer,
+            args,
+            'random',
+            logger,
+            pretrained_model=pretrained_rep_net,
+        )
+    # trainloader, validloader, metaloader, testloader, origin_labels = get_dataloader_for_meta2(args)
 
     del pretrained_rep_net
 
