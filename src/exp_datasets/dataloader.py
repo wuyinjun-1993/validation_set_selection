@@ -1119,6 +1119,34 @@ def load_train_valid_set(args):
         remaining_origin_labels = None
     return train_set, valid_set, meta_set, remaining_origin_labels
 
+
+def load_train_valid_set2(args):
+    train_set_path = os.path.join(args.save_path, "cached_train_set")
+    valid_set_path = os.path.join(args.save_path, "cached_valid_set")
+    meta_set_path = os.path.join(args.save_path, "cached_meta_set")
+    origin_label_path = os.path.join(args.save_path, "cached_train_origin_labels")
+    if os.path.exists(train_set_path):
+        train_set = torch.load(train_set_path)
+    else:
+        train_set = None
+    
+    if os.path.exists(valid_set_path):
+        valid_set = torch.load(valid_set_path)
+    else:
+        valid_set = None
+    
+    if os.path.exists(meta_set_path):
+        meta_set = torch.load(meta_set_path)
+    else:
+        meta_set = None
+
+    if os.path.exists(origin_label_path):
+        remaining_origin_labels = torch.load(origin_label_path)
+    else:
+        remaining_origin_labels = None
+    return train_set, valid_set, meta_set, remaining_origin_labels
+
+
 def evaluate_dataset_with_basic_models(args, dataset, model, criterion):
     
     curr_model_state = model.state_dict()
@@ -1249,6 +1277,61 @@ def generate_noisy_dataset(args, trainset, logger):
     # logger.info("Label accuracy: %f"%(torch.sum(flipped_labels == torch.tensor(trainset.df['level'].values)) / len(trainset.targets)))
     trainset.targets = flipped_labels
     return trainset
+
+def get_dataloader_for_meta2(args):
+    trainset, validset, metaset, remaining_origin_labels = load_train_valid_set2(args)
+    testset = load_test_set(args)
+    train_sampler = DistributedSampler(
+        trainset,
+        num_replicas=args.world_size,
+        rank=args.local_rank,
+    )
+    metaloader = None
+    trainloader = DataLoader(
+        trainset,
+        batch_size=args.batch_size,
+        num_workers=4*4, #args.num_workers,
+        pin_memory=True,
+        shuffle=False,
+        sampler=train_sampler,
+    )
+    if metaset is not None:
+        # meta_sampler = DistributedSampler(
+        #     metaset,
+        #     num_replicas=args.world_size,
+        #     rank=args.local_rank,
+        # )
+        if not args.finetune:
+            meta_sampler = RandomSampler(metaset, replacement=True, num_samples=args.epochs*len(trainloader)*args.batch_size*10)
+            metaloader = DataLoader(
+                metaset,
+                batch_size=args.test_batch_size,
+                num_workers=0,#args.num_workers,
+                pin_memory=True,
+                sampler=meta_sampler,
+            )
+        else:
+            meta_sampler = DistributedSampler(
+                metaset,
+                num_replicas=args.world_size,
+                rank=args.local_rank,
+            )
+            metaloader = DataLoader(
+                metaset,
+                batch_size=args.batch_size,
+                num_workers=4*4, #args.num_workers,
+                pin_memory=True,
+                shuffle=False,
+                sampler=meta_sampler,
+            )       
+
+    
+    
+    validloader = DataLoader(validset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
+    testloader = DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=2, pin_memory=False)
+
+    return trainloader, validloader, metaloader, testloader, remaining_origin_labels
+
 
 
 def get_dataloader_for_meta(
