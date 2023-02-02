@@ -343,7 +343,7 @@ def cluster_per_class_both(
             cluster_dist_ls_tensor = pairwise_distance_function(
                 curr_cluster_sample_representation_ls,
                 curr_cluster_center_ls,
-                is_cuda=False,
+                is_cuda=is_cuda,
                 weight_by_norm=args.weight_by_norm,
                 # inner_prod=args.inner_prod,
                 ls_idx_range=args.origin_X_ls_lenth,
