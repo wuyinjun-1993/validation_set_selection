@@ -20,9 +20,9 @@ warm_up_valid_count=10
 model_prov_period=20
 
 
-valid_ratio_each_run=200 #$(( total_valid_ratio / repeat_times ))
+valid_ratio_each_run=150 #$(( total_valid_ratio / repeat_times ))
 bias_flip=false
 method="cluster_method_three"
-total_valid_sample_count=200
+total_valid_sample_count=150
 label_aware=false
 
