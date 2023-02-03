@@ -279,7 +279,7 @@ exe_cmd="python -m torch.distributed.launch \
     ${flip_label_flag} \
     ${bias_flip_str} \
     --err_label_ratio ${err_label_ratio} \
-    --save_path ${save_path_prefix}_seq_select_meta_num_${meta_num}/ \
+    --save_path ${save_path_prefix}_seq_select_meta_num_${total_valid_sample_count}/ \
     --prev_save_path ${save_path_prefix}_do_train/ \
     --cuda \
     --lr ${lr} \

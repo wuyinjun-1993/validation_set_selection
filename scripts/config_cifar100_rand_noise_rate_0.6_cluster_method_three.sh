@@ -16,7 +16,7 @@ epochs=100
 #cached_model_name=${14}
 add_valid_in_training_set=true
 lr_decay=true
-warm_up_valid_count=10
+warm_up_valid_count=150
 model_prov_period=20
 
 
@@ -25,4 +25,4 @@ bias_flip=false
 method="cluster_method_three"
 total_valid_sample_count=150
 label_aware=false
-
+use_pretrained_model=true
