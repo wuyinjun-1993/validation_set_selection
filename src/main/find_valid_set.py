@@ -179,26 +179,26 @@ def cluster_per_class_both(
     unique_cluster_count = len(cluster_ids_x.unique())
     args.logger.info("cluster count before and after:(%d,%d)"%(num_clusters, unique_cluster_count))
     # if args.remove_empty_clusters:
-    # if unique_cluster_count < num_clusters:
-    #     while(True):
-    #         cluster_ids_x, cluster_centers = do_cluster_both(
-    #             args,
-    #             unique_cluster_count,
-    #             sample_representation_vec_ls,
-    #             is_cuda,
-    #             cosin_distance,
-    #             sample_weights,
-    #             all_layer=all_layer,
-    #         )
+    if unique_cluster_count < num_clusters:
+        while(True):
+            cluster_ids_x, cluster_centers = do_cluster_both(
+                args,
+                unique_cluster_count,
+                sample_representation_vec_ls,
+                is_cuda,
+                cosin_distance,
+                sample_weights,
+                all_layer=all_layer,
+            )
 
-    #         new_unique_cluster_count = len(cluster_ids_x.unique())
-    #         args.logger.info("cluster count before and after:(%d,%d)"%(unique_cluster_count, new_unique_cluster_count))
+            new_unique_cluster_count = len(cluster_ids_x.unique())
+            args.logger.info("cluster count before and after:(%d,%d)"%(unique_cluster_count, new_unique_cluster_count))
 
-    #         if new_unique_cluster_count >= unique_cluster_count:
-    #             break
-    #         unique_cluster_count = new_unique_cluster_count
+            if new_unique_cluster_count >= unique_cluster_count:
+                break
+            unique_cluster_count = new_unique_cluster_count
 
-    #     unique_cluster_count = new_unique_cluster_count
+        unique_cluster_count = new_unique_cluster_count
         # else:
         #     cluster_assignment_file_name = os.path.join(args.save_path, "cluster_assignments")
 
@@ -261,7 +261,8 @@ def cluster_per_class_both(
     # dist_to_other_cluster_centroid_ls = []
     args.logger.info("unique cluster count::%d"%(unique_cluster_count))
 
-    for cluster_id in range(num_clusters):
+    # for cluster_id in range(num_clusters):
+    for cluster_id in list(cluster_ids_x.unique()):
         # curr_cluster_center = cluster_centers[cluster_id]
 
         # cluster_dist_ls = []
