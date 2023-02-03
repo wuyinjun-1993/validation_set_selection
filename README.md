@@ -1,4 +1,7 @@
-#Install the pre-requiste:
+Code for the paper:
+> Yinjun Wu, Adam Stein, Jacob Gardner, Mayur Naik, "Learning to Select Pivotal Samples for Meta Re-weighting " (AAAI 2023)
+
+# Install the pre-requiste:
 ```
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
