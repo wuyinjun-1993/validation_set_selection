@@ -354,7 +354,7 @@ def cluster_per_class_both(
             # if args.weight_by_norm:
             #     cluster_dist_ls_tensor = rescale_dist_by_cluster_mean_norm(cluster_dist_ls_tensor, curr_cluster_center_ls,all_layer)
 
-            cluster_dist_ls_tensor = cluster_dist_ls_tensor.view(-1)
+            cluster_dist_ls_tensor = cluster_dist_ls_tensor.view(-1).cpu()
 
             sorted_dist_tensor, sorted_sample_idx_tensor = torch.sort(cluster_dist_ls_tensor, descending=False)
 
