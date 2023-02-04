@@ -322,7 +322,6 @@ def meta_learning_model(
     metaloader,
     valid_loader,
     test_loader,
-    to_device,
     cached_w_array=None,
     scheduler=None,
     target_id=None,
@@ -747,10 +746,10 @@ def main2(args, logger):
     else:
         raise NotImplementedError
         # pretrained_rep_net = ResNet18().cuda()
-    if not args.dataset == 'retina':
-        criterion = torch.nn.CrossEntropyLoss()
-    else:
-        criterion = torch.nn.BCELoss()
+    # if not args.dataset == 'retina':
+    criterion = torch.nn.CrossEntropyLoss()
+    # else:
+    #     criterion = torch.nn.BCELoss()
 
     meta_criterion = criterion
     # if args.l1_meta_loss:
@@ -988,14 +987,11 @@ def main2(args, logger):
             metaloader,
             validloader,
             testloader,
-            mnist_to_device,
             scheduler=scheduler,
             cached_w_array=prev_weights,
             target_id=None,
             start_ep=start_epoch,
             mile_stones_epochs=mile_stones_epochs,
-            heuristic=uncertainty_heuristic if args.active_learning else None,
-            gt_training_labels=torch.tensor(origin_labels) if args.active_learning else None,
         )
 
 if __name__ == "__main__":

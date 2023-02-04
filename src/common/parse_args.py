@@ -108,7 +108,7 @@ def parse_args(args=None):
     parser.add_argument('--gpu_id', default=4, type=int)
     parser.add_argument('--lr', default=0.2, type=float)
     parser.add_argument('--meta_lr', default=0.2, type=float)
-    parser.add_argument('--valid_ratio', default=0.1, type=float)
+    
     parser.add_argument('--test_batch_size', default=4, type=int)
     parser.add_argument('--epochs', default=4, type=int)
 
