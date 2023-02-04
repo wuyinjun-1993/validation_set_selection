@@ -10,6 +10,28 @@ Code for the paper:
 pip install -r requirements.txt
 ```
 
+
+# Minimal code block for using our algorithm for selecting meta samples for meta reweighting algorithm:
+```
+
+from src.common.parse_args import parse_args
+
+args = parse_args()
+
+valid_count = args.valid_count
+
+#select valid samples with rbc
+valid_ids, new_valid_representations = get_representative_valid_ids_rbc(train_dataset, criterion, optimizer, trainloader, args, net, valid_count)
+
+
+
+#select valid samples with gbc
+valid_ids, new_valid_representations = get_representative_valid_ids_gbc(train_dataset, criterion, optimizer, trainloader, args, net, valid_count)
+
+
+```
+
+
 # How to run the code for meta sample selections
 
 We can use the following command to select 20 validation samples by using our methods on cifar10 dataset where 60% labels are polluted. Note that this is separated into three phases. In the first phase, we pretrain the model by using all the noisy training samples, which is assumed to have log directory "/path/to/logs0/". Then in the second phase, we use our methods to collect the remaining set of samples, which will use some cached information from the previous run with random sampling. So it will use two log directories, one is "/path/to/logs0/" (the log directory for storing logs in the first phase) while the other one is "/path/to/logs1/" (the log directory for storing the logs in the second phase):
