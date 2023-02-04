@@ -1,5 +1,5 @@
 Code for the paper:
-> Yinjun Wu, Adam Stein, Jacob Gardner, Mayur Naik, "Learning to Select Pivotal Samples for Meta Re-weighting " (AAAI 2023)
+> Yinjun Wu, Adam Stein, Jacob Gardner, Mayur Naik, "Learning to Select Pivotal Samples for Meta Re-weighting " (AAAI 2023 oral)
 
 ![plot](images/toy_experiment.png)
 
