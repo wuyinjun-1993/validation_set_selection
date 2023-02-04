@@ -1,10 +1,13 @@
 Code for the paper:
 > Yinjun Wu, Adam Stein, Jacob Gardner, Mayur Naik, "Learning to Select Pivotal Samples for Meta Re-weighting " (AAAI 2023)
 
+![plot](images/toy_experiment.png)
+
+
+
 # Install the pre-requiste:
 ```
 pip install -r requirements.txt
-python -m spacy download en_core_web_sm
 ```
 
 # How to run the code for meta sample selections
