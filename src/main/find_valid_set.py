@@ -404,7 +404,7 @@ def obtain_representations_given_model_gbc(train_dataset, args, train_loader, ne
 
     return sample_representation_vec_ls, sample_id_ls, valid_sample_representation_ls
  
-def get_extra_representations_given_model_rbc(args, train_loader, criterion, net, full_sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = None, full_sample_representation_vec_ls2 = None, valid_sample_representation_vec_ls2 = None, qualitiative = False, origin_label = None):
+def get_extra_representations_given_model_rbc(args, optimizer, train_loader, criterion, net, full_sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = None, full_sample_representation_vec_ls2 = None, valid_sample_representation_vec_ls2 = None, qualitiative = False, origin_label = None):
     
     start_epoch_id = 0
     if args.use_pretrained_model:
@@ -447,7 +447,7 @@ def get_extra_representations_given_model_rbc(args, train_loader, criterion, net
         net = load_checkpoint_by_epoch(args, net, ep)
         if net is None:
             continue
-        optimizer, _=obtain_optimizer_scheduler(args, net, start_epoch = 0)
+        # optimizer, _=obtain_optimizer_scheduler(args, net, start_epoch = 0)
         sample_representation_vec_ls, _,sampled_col_ids = obtain_representations_given_model_rbc(args, train_loader, net, criterion, optimizer)
         if qualitiative:
             args.label_aware = True
@@ -556,7 +556,7 @@ def get_all_sample_representations_rbc(args, train_loader, criterion, optimizer,
 
     # if args.use_model_prov:
     # if not qualitiative:
-    sample_representation_vec_ls, valid_sample_representation_vec_ls = get_extra_representations_given_model_rbc(args, train_loader, criterion, net, sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = validloader, full_sample_representation_vec_ls2 = sample_representation_vec_ls2, valid_sample_representation_vec_ls2 = valid_sample_representation_vec_ls2, qualitiative = qualitiative)
+    sample_representation_vec_ls, valid_sample_representation_vec_ls = get_extra_representations_given_model_rbc(args, optimizer, train_loader, criterion, net, sample_representation_vec_ls, valid_sample_representation_vec_ls, validloader = validloader, full_sample_representation_vec_ls2 = sample_representation_vec_ls2, valid_sample_representation_vec_ls2 = valid_sample_representation_vec_ls2, qualitiative = qualitiative)
  
     full_sample_representation_tensor = sample_representation_vec_ls
 
@@ -587,18 +587,18 @@ def get_representative_valid_ids_rbc(criterion, optimizer, train_loader, args, n
 
     origin_X_ls_lenth = len(full_sample_representation_tensor)
 
-    if args.get_representations:
-        torch.save(full_sample_representation_tensor, os.path.join(args.save_path,
-            "sample_representation"))
+    # if args.get_representations:
+    #     torch.save(full_sample_representation_tensor, os.path.join(args.save_path,
+    #         "sample_representation"))
 
     args.origin_X_ls_lenth = origin_X_ls_lenth
 
     if only_sample_representation:
         return full_sample_representation_tensor, existing_valid_representation
     # sample_representation_vec_ls = sample_representation_vec_ls_by_class[label]
-    if args.cluster_no_reweighting:
-        logging.info("no reweighting for k-means")
-        cached_sample_weights = None
+    # if args.cluster_no_reweighting:
+    #     logging.info("no reweighting for k-means")
+    #     cached_sample_weights = None
     # extra_valid_ids, extra_valid_sample_representation_tensor = None, None
     if existing_valid_representation is None:
         if cached_sample_weights is not None:
