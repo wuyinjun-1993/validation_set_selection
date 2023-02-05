@@ -679,6 +679,8 @@ def obtain_farthest_training_samples_both(args, cosine_dist, all_layer, full_sam
     
     existing_new_dists = compute_distance_both(args, cosine_dist, all_layer, full_sample_representation_tensor, valid_sample_representation_tensor, is_cuda)
 
+    existing_new_dists = existing_new_dists.cpu()
+
     min_dist_per_sample = torch.min(existing_new_dists, dim = 1)[0]
 
     _, sorted_dist_sample_ids = torch.sort(min_dist_per_sample, descending = True)
