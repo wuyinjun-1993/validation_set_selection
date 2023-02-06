@@ -728,7 +728,7 @@ def obtain_farthest_training_samples_both(args, cosine_dist, all_layer, full_sam
 
     _, sorted_dist_sample_ids = torch.sort(min_dist_per_sample, descending = True)
 
-    far_sample_count = int(len(sorted_dist_sample_ids)/2)
+    far_sample_count = int(len(sorted_dist_sample_ids)/5*4)
 
     far_sample_ids = sorted_dist_sample_ids[0:far_sample_count]
 
