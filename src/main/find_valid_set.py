@@ -606,13 +606,19 @@ def get_representative_valid_ids_rbc(criterion, optimizer, train_loader, args, n
     
     # if existing_valid_representation is None:
     all_valid_sample_representation_tensor = []
+    
+    cluster_count = main_represent_count
     while True:
+        
+        if all_valid_ids is not None:
+            cluster_count = cluster_count - len(all_valid_ids)
+        
         if cached_sample_weights is not None:
-            valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
+            valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = cluster_count, num_clusters = cluster_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
             # if args.inner_prod:
             #     extra_valid_ids, extra_valid_sample_representation_tensor = handle_outliers(args, all_sample_ids, full_sample_representation_tensor, valid_sample_representation_tensor, cached_sample_weights[all_sample_ids])
         else:
-            valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
+            valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = cluster_count, num_clusters = cluster_count, sample_weights=None, cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
         
         if all_valid_ids is None:            
             all_valid_ids = valid_ids
@@ -758,13 +764,20 @@ def get_representative_valid_ids_gbc(train_dataset, criterion, optimizer, train_
     
     # if existing_valid_representation is None:
     all_valid_sample_representation_tensor = []
+    
+    cluster_count = main_represent_count
+    
     while True:
+        
+        if all_valid_ids is not None:
+            cluster_count = cluster_count - len(all_valid_ids)
+        
         if cached_sample_weights is not None:
-            valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
+            valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = cluster_count, num_clusters = cluster_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
             # if args.inner_prod:
             #     extra_valid_ids, extra_valid_sample_representation_tensor = handle_outliers(args, all_sample_ids, full_sample_representation_tensor, valid_sample_representation_tensor, cached_sample_weights[all_sample_ids])
         else:
-            valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = main_represent_count, num_clusters = main_represent_count, sample_weights=None, cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
+            valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = cluster_count, num_clusters = cluster_count, sample_weights=None, cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
         
         if all_valid_ids is None:            
             all_valid_ids = valid_ids
@@ -792,10 +805,10 @@ def get_representative_valid_ids_gbc(train_dataset, criterion, optimizer, train_
     
     valid_sample_representation_tensor = all_valid_sample_representation_tensor
     valid_ids = all_valid_ids
-    if args.total_valid_sample_count > 0 and args.total_valid_sample_count < len(valid_ids):
-        remaining_valid_ids, remaining_valid_sample_ids, _ = get_uncovered_new_valid_ids_both(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, args.total_valid_sample_count- existing_valid_representation[0].shape[0], cosine_dist = True, all_layer = True, is_cuda = args.cuda)
-        valid_ids = remaining_valid_sample_ids
-        valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+    # if args.total_valid_sample_count > 0 and args.total_valid_sample_count < len(valid_ids):
+    #     remaining_valid_ids, remaining_valid_sample_ids, _ = get_uncovered_new_valid_ids_both(args, valid_ids, valid_sample_representation_tensor, None, args.total_valid_sample_count, cosine_dist = True, all_layer = True, is_cuda = args.cuda)
+    #     valid_ids = remaining_valid_sample_ids
+    #     valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_valid_ids] for k in range(len(valid_sample_representation_tensor))]
 
     # if existing_valid_representation is None:
     #     if cached_sample_weights is not None:
