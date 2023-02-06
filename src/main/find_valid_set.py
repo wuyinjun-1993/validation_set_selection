@@ -611,7 +611,7 @@ def get_representative_valid_ids_rbc(criterion, optimizer, train_loader, args, n
     while True:
         
         if all_valid_ids is not None:
-            cluster_count = cluster_count - len(all_valid_ids)
+            cluster_count = main_represent_count - len(all_valid_ids)
         
         if cached_sample_weights is not None:
             valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = cluster_count, num_clusters = cluster_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
@@ -770,7 +770,7 @@ def get_representative_valid_ids_gbc(train_dataset, criterion, optimizer, train_
     while True:
         
         if all_valid_ids is not None:
-            cluster_count = cluster_count - len(all_valid_ids)
+            cluster_count = main_represent_count - len(all_valid_ids)
         
         if cached_sample_weights is not None:
             valid_ids, valid_sample_representation_tensor = cluster_per_class_both(args, far_sample_representation_tensor, global_far_sample_ids, valid_count_per_class = cluster_count, num_clusters = cluster_count, sample_weights=cached_sample_weights[all_sample_ids], cosin_distance=True, is_cuda=args.cuda, all_layer=True, return_cluster_info = return_cluster_info)  
