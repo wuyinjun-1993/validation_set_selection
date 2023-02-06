@@ -646,10 +646,10 @@ def get_representative_valid_ids_rbc(criterion, optimizer, train_loader, args, n
     
     valid_sample_representation_tensor = all_valid_sample_representation_tensor
     valid_ids = all_valid_ids
-    if args.total_valid_sample_count > 0 and args.total_valid_sample_count < len(valid_ids):
-        remaining_valid_ids, remaining_valid_sample_ids, _ = get_uncovered_new_valid_ids_both(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, args.total_valid_sample_count- existing_valid_representation[0].shape[0], cosine_dist = True, all_layer = True, is_cuda = args.cuda)
-        valid_ids = remaining_valid_sample_ids
-        valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_valid_ids] for k in range(len(valid_sample_representation_tensor))]
+    # if args.total_valid_sample_count > 0 and args.total_valid_sample_count < len(valid_ids):
+    #     remaining_valid_ids, remaining_valid_sample_ids, _ = get_uncovered_new_valid_ids_both(args, valid_ids, valid_sample_representation_tensor, existing_valid_representation, args.total_valid_sample_count- existing_valid_representation[0].shape[0], cosine_dist = True, all_layer = True, is_cuda = args.cuda)
+    #     valid_ids = remaining_valid_sample_ids
+    #     valid_sample_representation_tensor = [valid_sample_representation_tensor[k][remaining_valid_ids] for k in range(len(valid_sample_representation_tensor))]
 
 
     # else:
