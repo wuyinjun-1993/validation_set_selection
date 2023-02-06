@@ -9,12 +9,13 @@ import torchvision.transforms as transforms
 from torch.utils.data import Subset, Dataset, DataLoader, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 import random
-# from main.find_valid_set import *
+
 
 from PIL import Image
 import numpy
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+from main.find_valid_set import *
 # from exp_datasets.sst import *
 # from exp_datasets.imdb import *
 # from exp_datasets.trec import *
