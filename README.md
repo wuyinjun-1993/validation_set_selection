@@ -25,7 +25,7 @@ valid_ids, new_valid_representations = get_representative_valid_ids_gbc(train_da
 
 ```
 
-See the jupyter notebook [a relative link](main_example.ipynb) for details 
+See the jupyter notebook [main_example.ipynb](main_example.ipynb) for details 
 
 
 
