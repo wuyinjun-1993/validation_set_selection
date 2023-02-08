@@ -755,14 +755,11 @@ def main_train_taaval(args):
                     dataloaders['meta'],
                     dataloaders['valid'],
                     dataloaders['test'],
-                    mnist_to_device,
                     scheduler=schedulers['backbone'],
                     cached_w_array=prev_weights,
                     target_id=None,
                     start_ep=0,
                     mile_stones_epochs=MILESTONES,
-                    heuristic=None,
-                    gt_training_labels=None,
                 )
             acc = test(models, method, dataloaders['test'])
             args.logger.info(

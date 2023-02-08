@@ -296,6 +296,18 @@ def obtain_representations_given_model_rbc(args, train_loader, net, criterion, o
     #     return sample_representation_vec_ls, sample_id_ls
     # else:
     sample_representation_vec_ls = torch.cat(sample_representation_vec_ls)
+    
+    # if args.cluster_method_two_sampling:
+    if sampled_col_ids is not None:
+        sample_representation_vec_ls = sample_representation_vec_ls[:, sampled_col_ids]
+    else:
+        if args.cluster_method_two_sample_col_count >= sample_representation_vec_ls.shape[1]:
+            sampled_col_ids = torch.tensor(list(range(sample_representation_vec_ls.shape[1])))
+        else:
+            sampled_col_ids = np.random.choice(sample_representation_vec_ls.shape[1], size = args.cluster_method_two_sample_col_count, replace=False)
+            sampled_col_ids = torch.from_numpy(sampled_col_ids)
+
+        sample_representation_vec_ls = sample_representation_vec_ls[:, sampled_col_ids]
          
     print_norm_range_of_representations(args, sample_representation_vec_ls)
     return sample_representation_vec_ls, sample_id_ls, sampled_col_ids
@@ -354,6 +366,35 @@ def obtain_representations_for_validset_gbc(valid_set, args, net, criterion, opt
 
     return sample_representation_vec_ls
 
+
+def obtain_sampled_representations_cluster_method_three(sample_representation_vec_ls, args, sampled_col_ids_ls = None):
+    sampled_sample_representation_vec_ls = []
+    sampled_sampled_col_ids = []
+
+    for layer_idx in range(len(sample_representation_vec_ls)):
+        represetion_vec = sample_representation_vec_ls[layer_idx]
+        sampled_col_ids = None
+        if sampled_col_ids_ls is not None:
+            sampled_col_ids = sampled_col_ids_ls[layer_idx]
+
+        if sampled_col_ids is not None:
+            represetion_vec = represetion_vec[:, sampled_col_ids]
+        else:
+            if args.cluster_method_three_sample_col_count >= represetion_vec.shape[1]:
+                sampled_col_ids = torch.tensor(list(range(represetion_vec.shape[1])))
+            else:
+                sampled_col_ids = np.random.choice(represetion_vec.shape[1], size = args.cluster_method_three_sample_col_count, replace=False)
+                sampled_col_ids = torch.from_numpy(sampled_col_ids)
+
+            represetion_vec = represetion_vec[:, sampled_col_ids]
+
+        sampled_sample_representation_vec_ls.append(represetion_vec)
+        sampled_sampled_col_ids.append(sampled_col_ids)
+    sample_representation_vec_ls = sampled_sample_representation_vec_ls
+    sampled_col_ids_ls  = sampled_sampled_col_ids
+
+    return sample_representation_vec_ls, sampled_col_ids_ls
+
 def obtain_representations_given_model_gbc(train_dataset, args, train_loader, net, criterion, optimizer, validset = None, sampled_col_ids_ls = None):
     sample_representation_vec_ls = []
 
@@ -395,12 +436,12 @@ def obtain_representations_given_model_gbc(train_dataset, args, train_loader, ne
     valid_sample_representation_ls = None
 
     # if args.cluster_method_three_sampling:
-    #     sample_representation_vec_ls, sampled_col_ids_ls =  obtain_sampled_representations_cluster_method_three(sample_representation_vec_ls, args, sampled_col_ids_ls = sampled_col_ids_ls)
+    sample_representation_vec_ls, sampled_col_ids_ls =  obtain_sampled_representations_cluster_method_three(sample_representation_vec_ls, args, sampled_col_ids_ls = sampled_col_ids_ls)
 
     if validset is not None:
         valid_sample_representation_ls = obtain_representations_for_validset_gbc(validset, args, net, criterion, optimizer, sampled_net_param_layer_ls, sampled_layer_sqrt_prob_ls, sampled_col_ids_ls)
         # if args.cluster_method_three_sampling:
-        #     valid_sample_representation_ls, _ =  obtain_sampled_representations_cluster_method_three(valid_sample_representation_ls, args, sampled_col_ids_ls = sampled_col_ids_ls)
+        valid_sample_representation_ls, _ =  obtain_sampled_representations_cluster_method_three(valid_sample_representation_ls, args, sampled_col_ids_ls = sampled_col_ids_ls)
 
     return sample_representation_vec_ls, sample_id_ls, valid_sample_representation_ls
  
@@ -449,12 +490,12 @@ def get_extra_representations_given_model_rbc(args, optimizer, train_loader, cri
             continue
         # optimizer, _=obtain_optimizer_scheduler(args, net, start_epoch = 0)
         sample_representation_vec_ls, _,sampled_col_ids = obtain_representations_given_model_rbc(args, train_loader, net, criterion, optimizer)
-        if qualitiative:
-            args.label_aware = True
-            sample_representation_vec_ls2, _,_ = obtain_representations_given_model_rbc(args, train_loader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
-            if origin_label is not None:
-                sample_representation_vec_ls3, _,_ = obtain_representations_given_model_rbc(args, train_loader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids, origin_label = origin_label)
-            args.label_aware = False
+        # if qualitiative:
+        #     args.label_aware = True
+        #     sample_representation_vec_ls2, _,_ = obtain_representations_given_model_rbc(args, train_loader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)
+        #     if origin_label is not None:
+        #         sample_representation_vec_ls3, _,_ = obtain_representations_given_model_rbc(args, train_loader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids, origin_label = origin_label)
+        #     args.label_aware = False
 
         if validloader is not None:
             curr_valid_sample_representation_vec_ls, _,_ = obtain_representations_given_model_rbc(args, validloader, net, criterion, optimizer, sampled_col_ids=sampled_col_ids)

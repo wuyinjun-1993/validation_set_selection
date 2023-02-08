@@ -922,7 +922,7 @@ def main2(args, logger):
     # if args.dataset == 'cifar100':
     #     iter_per_epoch = len(trainloader)
     #     warmup_scheduler = WarmUpLR(optimizer, iter_per_epoch * args.warm)
-    if not args.do_train:
+    if not args.do_train and args.use_pretrained_model:
         test(testloader, net, criterion, args, logger, "test")
     if args.do_train:
         logger.info("starting basic training")

@@ -32,8 +32,8 @@ def parse_args(args=None):
 
     # parser.add_argument('--full_model_out', action='store_true', help='use GPU')
     # parser.add_argument('--cluster_method_two_sampling', action='store_true', help='use GPU')
-    # parser.add_argument('--cluster_method_two_sample_col_count', default=1000, type=int, help='capture model_prov')
-    # parser.add_argument('--cluster_method_three_sample_col_count', default=1000, type=int, help='capture model_prov')
+    parser.add_argument('--cluster_method_two_sample_col_count', default=5000, type=int, help='capture model_prov')
+    parser.add_argument('--cluster_method_three_sample_col_count', default=5000, type=int, help='capture model_prov')
 
     parser.add_argument('--cluster_no_reweighting', action='store_true', help='use GPU')
     # parser.add_argument('--low_data', action='store_true', help='low data application')
